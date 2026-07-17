@@ -3,7 +3,7 @@
 MoteWeave turns uploaded or optionally AI-generated game art into inspectable,
 previewable, and exportable character, motion, scene, and tile assets.
 
-Current preview version: `0.5.0-preview.1`.
+Current preview version: `0.5.0-preview.2`.
 
 ## Contributing
 

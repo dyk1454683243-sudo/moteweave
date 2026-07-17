@@ -145,7 +145,13 @@ export function scoreProductionSheetCandidate({ result, error } = {}) {
   }
 }
 
-function scoreQualityImage({ styleReport, finishReport, error } = {}) {
+function finiteCandidateMetric(value) {
+  if (value === null || value === undefined || value === '') return null
+  const number = Number(value)
+  return Number.isFinite(number) ? number : null
+}
+
+export function scoreQualityCharacterCandidate({ styleReport, finishReport, error } = {}) {
   if (error) {
     return {
       score: -1000,
@@ -161,28 +167,28 @@ function scoreQualityImage({ styleReport, finishReport, error } = {}) {
     }
   }
   const metrics = styleReport?.metrics ?? {}
-  const visible = Number(metrics.visible_pixel_count ?? 0)
-  const unique = Number(metrics.unique_color_count ?? 0)
-  const changed = Number(finishReport?.palette_snap?.changed_pixel_ratio ?? 0)
-  const outline = Number(finishReport?.outline?.outline_pixel_ratio ?? 0)
+  const visible = finiteCandidateMetric(metrics.visible_pixel_count)
+  const unique = finiteCandidateMetric(metrics.unique_color_count)
+  const changed = finiteCandidateMetric(finishReport?.palette_snap?.changed_pixel_ratio)
+  const outline = finiteCandidateMetric(finishReport?.outline?.outline_pixel_ratio)
   const spec = finishReport?.quality_spec?.metrics ?? {}
-  const bboxWidth = Number(spec.bbox_width_ratio ?? 0)
-  const bboxHeight = Number(spec.bbox_height_ratio ?? 0)
-  const bboxArea = Number(spec.bbox_area_ratio ?? 0)
-  const centerOffset = Number(spec.center_offset_ratio ?? 0)
-  const edgeMargin = Number(spec.edge_margin_ratio ?? 0)
+  const bboxWidth = finiteCandidateMetric(spec.bbox_width_ratio)
+  const bboxHeight = finiteCandidateMetric(spec.bbox_height_ratio)
+  const bboxArea = finiteCandidateMetric(spec.bbox_area_ratio)
+  const centerOffset = finiteCandidateMetric(spec.center_offset_ratio)
+  const edgeMargin = finiteCandidateMetric(spec.edge_margin_ratio)
   const score =
     650 +
-    Math.min(70, unique * 2) +
-    Math.min(40, visible / 5000) -
-    Math.max(0, visible - 220000) * 0.00035 -
-    Math.max(0, bboxWidth - 0.72) * 220 -
-    Math.max(0, bboxHeight - 0.86) * 220 -
-    Math.max(0, bboxArea - 0.42) * 320 -
-    Math.max(0, centerOffset - 0.1) * 260 -
-    Math.max(0, 0.035 - edgeMargin) * 180 -
-    Math.max(0, changed - 0.7) * 120 -
-    Math.max(0, outline - 0.08) * 200
+    Math.min(70, (unique ?? 0) * 2) +
+    Math.min(40, (visible ?? 0) / 5000) -
+    Math.max(0, (visible ?? 0) - 220000) * 0.00035 -
+    Math.max(0, (bboxWidth ?? 0) - 0.72) * 220 -
+    Math.max(0, (bboxHeight ?? 0) - 0.86) * 220 -
+    Math.max(0, (bboxArea ?? 0) - 0.42) * 320 -
+    Math.max(0, (centerOffset ?? 0) - 0.1) * 260 -
+    Math.max(0, 0.035 - (edgeMargin ?? 0)) * 180 -
+    Math.max(0, (changed ?? 0) - 0.7) * 120 -
+    Math.max(0, (outline ?? 0) - 0.08) * 200
   const roundedScore = round(score)
   const candidateMetrics = {
     visible_pixel_count: visible,
@@ -709,7 +715,7 @@ export async function runQualityCharacterTextToImage({
     } catch (error) {
       candidates.push({
         index,
-        ...scoreQualityImage({ error }),
+        ...scoreQualityCharacterCandidate({ error }),
       })
       if (isNonRetryableProviderError(error)) break
       continue
@@ -727,7 +733,7 @@ export async function runQualityCharacterTextToImage({
         generated,
         buffer: generated.buffer,
         finished,
-        ...scoreQualityImage({ styleReport: finished.styleReport, finishReport: finished.report }),
+        ...scoreQualityCharacterCandidate({ styleReport: finished.styleReport, finishReport: finished.report }),
       })
     } catch (error) {
       const processingError = postProcessingCandidateError(error)
@@ -735,7 +741,7 @@ export async function runQualityCharacterTextToImage({
         index,
         generated,
         buffer: generated.buffer,
-        ...scoreQualityImage({ error: processingError }),
+        ...scoreQualityCharacterCandidate({ error: processingError }),
       })
     }
   }

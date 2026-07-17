@@ -7,6 +7,10 @@ import {
   TEXT_TO_IMAGE_MODE_PRODUCTION_SHEET,
   TEXT_TO_IMAGE_MODE_QUALITY_CHARACTER,
 } from './textToImagePrompt.js'
+import {
+  CHARACTER_QUALITY_CLOSURE_GATE_IDS,
+  CHARACTER_QUALITY_CLOSURE_MODE,
+} from './qualityClosureGate.js'
 
 export const GENERATION_RELEASE_GATE_MODE = 'generation_release_gate_v1'
 
@@ -173,17 +177,27 @@ export function evaluateProductionSheetReleaseGate({ debugReport } = {}) {
       release_ready: null,
     }
   } else {
+    const mode = typeof qualityClosure.mode === 'string' ? qualityClosure.mode : null
     const status = typeof qualityClosure.status === 'string' ? qualityClosure.status : null
     const gates = Array.isArray(qualityClosure.gates) ? qualityClosure.gates : null
+    const gateIds = gates?.map((gate) => gate?.id ?? null) ?? null
+    const canonicalGateIds = gates !== null &&
+      gates.length === CHARACTER_QUALITY_CLOSURE_GATE_IDS.length &&
+      new Set(gateIds).size === CHARACTER_QUALITY_CLOSURE_GATE_IDS.length &&
+      CHARACTER_QUALITY_CLOSURE_GATE_IDS.every((id) => gateIds.includes(id))
+    if (mode === null) blockingErrors.push('quality_closure.mode_missing')
+    else if (mode !== CHARACTER_QUALITY_CLOSURE_MODE) blockingErrors.push('quality_closure.mode_unsupported')
     if (status === null) blockingErrors.push('quality_closure.status_missing')
     else if (status !== 'pass') blockingErrors.push('quality_closure.status_not_pass')
     if (qualityClosure.release_ready !== true) blockingErrors.push('quality_closure.not_release_ready')
     if (gates === null) blockingErrors.push('quality_closure.gates_missing')
-    else if (gates.some((gate) => gate?.status !== 'pass')) {
+    else if (!canonicalGateIds) blockingErrors.push('quality_closure.gates_invalid')
+    if (gates?.some((gate) => gate?.status !== 'pass')) {
       blockingErrors.push('quality_closure.gates_not_pass')
     }
     qualityClosureEvidence = {
       present: true,
+      mode,
       status,
       release_ready: qualityClosure.release_ready === true,
       gate_statuses: gates?.map((gate) => ({ id: gate?.id ?? null, status: gate?.status ?? null })) ?? null,

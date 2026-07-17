@@ -67,3 +67,15 @@ After the public repository exists:
 - The Preview is installable from source but is not a packaged consumer
   application.
 - Final publication waits for the independent brand-selection decision.
+
+## Subsequent Preview Updates
+
+Accepted prerelease tags and their GitHub-generated source archives are
+immutable. A fix to an accepted Preview uses a new prerelease version, a new
+deterministic export, and a reviewed public-mirror pull request; it never moves
+or rebuilds an existing tag.
+
+The existing public visibility does not waive approval for a later prerelease
+or its production website update. Private implementation history remains
+excluded, and every update must pass the same provider-free release, snapshot,
+CI, clean-checkout, and provenance gates.

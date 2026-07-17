@@ -3,8 +3,12 @@
 Use this runbook before exporting a public snapshot, changing repository
 visibility, creating a release tag, or adding a public website CTA.
 
-Normative plan:
-`docs/superpowers/plans/2026-07-17-public-preview-release-readiness.md`.
+Normative plans:
+
+- `docs/superpowers/plans/2026-07-17-public-preview-release-readiness.md` for
+  the initial public snapshot;
+- `docs/superpowers/plans/2026-07-17-public-preview-2-release-readiness.md` for
+  the current update.
 
 ## 1. Human Approval Gates
 
@@ -13,10 +17,11 @@ Stop unless all applicable approvals are recorded:
 - final display name and package/repository/Pages slug
   (`MoteWeave` / `moteweave` is recorded in
   `docs/decisions/2026-07-17-public-brand-selection.md`);
-- creation of the new GitHub repository;
-- changing the validated repository from private to public;
+- creation of a new GitHub repository, when applicable;
+- changing a validated repository from private to public, when applicable;
 - creating the final prerelease;
-- deploying the final-brand website and transitioning the old site.
+- deploying the final-brand website or changing its Release CTA;
+- transitioning the old site, when applicable.
 
 The implementation agent must not select the final brand or make a repository
 public on the user's behalf without explicit approval.
@@ -55,7 +60,7 @@ Confirm these agree:
 
 - approved display name and slug;
 - `package.json` and `package-lock.json`;
-- version `0.5.0-preview.1`;
+- the version declared by `configs/public-release.json`;
 - README install instructions and supported Node range;
 - CHANGELOG and release notes;
 - `LICENSE` and `ATTRIBUTIONS.md`;
@@ -80,9 +85,11 @@ Run in order:
 No Provider secret may be configured for these checks. Do not run live
 generation.
 
-Repeat `npm ci`, `npm run release:check`, `npm test`, and
-`npm run smoke:local` in a fresh exported snapshot. Record pass counts,
-duration, peak process-tree RSS, and peak process count.
+In a fresh exported snapshot, run `npm run release:check` before installing
+dependencies so the ledger verifies the exact export. Then run `npm ci`,
+`npm test`, and `npm run smoke:local`. `node_modules/` remains excluded from the
+ledger and public commit. Record pass counts, duration, peak process-tree RSS,
+and peak process count.
 
 ## 6. Snapshot Export
 
@@ -94,41 +101,50 @@ duration, peak process-tree RSS, and peak process count.
 - Run the release checker inside the export.
 - Initialize a new Git repository in the export. Do not copy `.git`.
 
-## 7. GitHub Private Review
+## 7. GitHub Review
 
 - Restore authorized GitHub access.
-- Create the new repository as private.
-- Push only the clean snapshot history.
+- For an initial release, create the new repository as private and push only
+  the clean snapshot history.
+- For an update to the existing public mirror, copy only the deterministic
+  exported snapshot delta onto a dedicated public branch and open a pull
+  request. Never merge private history into the public repository.
 - Enable read-only-default CI with Node 22/24 serial jobs.
 - Verify branch protection and CI.
-- Clone the private repository into a separate clean directory and repeat the
-  install/release/full/smoke checks.
+- Clone the candidate public branch into a separate clean directory and repeat
+  the install/release/full/smoke checks.
 - Inspect GitHub's source archives before public visibility.
 
-Any failure leaves the repository private.
+Any failure leaves initial repository visibility or the existing public
+`main` unchanged.
 
 ## 8. Public Visibility And Prerelease
 
 After explicit approval:
 
-1. change repository visibility to public;
-2. verify anonymous clone and source archive access;
-3. create tag `v0.5.0-preview.1`;
-4. create a GitHub prerelease using source archives only;
-5. verify the repository, issues URL, tag, release notes, and checksums/ledger.
+1. for an initial release, change repository visibility to public;
+2. verify anonymous access to the accepted public candidate commit;
+3. create tag `v<release_version>` from that exact candidate commit;
+4. create and verify the GitHub prerelease using source archives only;
+5. for an update, merge the pull request only after the new Release URL resolves,
+   and verify that protected `main` has the same tree as the tagged candidate;
+6. verify the repository, issues URL, tag, release notes, and checksums/ledger.
 
 Do not upload an installer, packaged `node_modules`, Sharp/libvips bundle,
 FFmpeg, rembg, model, plugin, or generated sample pack.
 
 ## 9. Website Cutover
 
-- Keep the existing site without a download CTA until the public prerelease
-  exists.
-- Create a new final-brand Git-integrated Cloudflare Pages project.
+- Keep a new Release CTA out of production until that public prerelease exists.
+- Create a new final-brand Git-integrated Cloudflare Pages project only for the
+  initial cutover; later updates reuse the existing Git-integrated project.
 - Deploy and verify repository/Release links, canonical URL, OG image, responsive
   layout, and capability boundaries.
 - Treat a branch-preview deployment as pre-merge evidence only. Close the
   cutover only after production is deployed from protected `main`.
+- Because production deploys from `main`, create and verify an approved update's
+  tag/prerelease before merging the exact tagged tree; never expose a production
+  CTA whose Release URL does not yet resolve.
 - Record the final production deployment id and source commit in the normative
   release plan.
 - After explicit approval, update the old site to a temporary notice or `302`

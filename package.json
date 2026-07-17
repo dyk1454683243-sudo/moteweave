@@ -1,6 +1,6 @@
 {
   "name": "moteweave",
-  "version": "0.5.0-preview.1",
+  "version": "0.5.0-preview.2",
   "private": true,
   "license": "MIT",
   "type": "module",
@@ -20,7 +20,7 @@
     "guard:full": "node scripts/run-with-resource-guard.mjs --max-old-space-mib 2048 --max-rss-mib 4096 --timeout-ms 900000 --poll-ms 500 --",
     "test": "node scripts/run-with-resource-guard.mjs --max-old-space-mib 2048 --max-rss-mib 4096 --timeout-ms 900000 --poll-ms 500 -- node --test --test-concurrency=1",
     "test:focused": "node scripts/run-with-resource-guard.mjs --max-old-space-mib 1024 --max-rss-mib 1536 --timeout-ms 60000 --poll-ms 500 -- node --test --test-concurrency=1",
-    "site:check": "npm run test:focused -- test/website/publicSite.test.js",
+    "site:check": "npm run test:focused -- test/website/publicSite.test.js test/website/websiteOg.test.js",
     "start": "node server.js",
     "dev": "node --watch server.js",
     "character-pack": "node scripts/character-pack-cli.mjs",

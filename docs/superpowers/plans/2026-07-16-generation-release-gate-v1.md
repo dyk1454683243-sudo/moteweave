@@ -260,3 +260,12 @@ Guarded verification:
 
 The independent A implementation commit is `371e7c5`. The later documentation
 closure can record that hash without changing the independent A code unit.
+
+## 2026-07-17 P0 Hardening Follow-up
+
+A read-only follow-up found two narrow conformance edges around missing Quality
+Character metrics and canonical quality-closure provenance. The approved,
+provider-free hardening delta is tracked independently in
+`docs/superpowers/plans/2026-07-17-generation-release-gate-p0-hardening.md`.
+It does not change thresholds, candidate budgets, Provider behavior, prompts, or
+the completed v1 product contract.
