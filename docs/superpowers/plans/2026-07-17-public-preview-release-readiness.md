@@ -55,7 +55,7 @@ release gate.
 | 2. IP, asset, naming, and privacy closure | Replace unproven assets, neutralize sample naming, remove personal paths, complete provenance | Phase 1 | No active unproven binary, tracked named-IP sample, real local path, or unexplained attribution gap | Complete: `94c01dd` plus deterministic MoteWeave OG |
 | 3. Release metadata and automation | Align version/install claims and add release checks, export, and CI | Phases 0-2 | Node 22/24 checks, complete tests, site check, and local smoke pass provider-free | Complete: Node 22/24 CI, site, full-suite, and Node 24 smoke gates pass provider-free |
 | 4. Clean public snapshot | Create and validate a new private GitHub snapshot, then request visibility approval | Phase 3 | Anonymous clone/install/archive checks pass after public approval | Complete: public mirror, protected `main`, anonymous verification, tag, and source-only prerelease pass |
-| 5. Website cutover | Deploy final-brand website from Git integration and add real source/Release CTA | Phase 4 | Website, repository, version, canonical URL, OG metadata, and legacy-site transition agree | Complete: production `moteweave.pages.dev` serves `34f44d4`; retained `gametool.pages.dev` provides a verified path-preserving `302` transition |
+| 5. Website cutover | Deploy final-brand website from Git integration and add real source/Release CTA | Phase 4 | Website, repository, version, canonical URL, OG metadata, and legacy-site transition agree | Complete: production cutover from `34f44d4` passed; retained `gametool.pages.dev` provides a verified path-preserving `302` transition |
 
 Public-release checkpoint on 2026-07-17:
 
