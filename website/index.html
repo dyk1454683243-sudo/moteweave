@@ -1,0 +1,552 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="MoteWeave 是本地优先的像素角色处理、动作选帧、质量证据检查与多格式导出工作流。"
+    />
+    <meta name="theme-color" content="#101411" />
+    <link rel="canonical" href="https://moteweave.pages.dev/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://moteweave.pages.dev/" />
+    <meta property="og:title" content="MoteWeave · 本地优先的像素角色工作流" />
+    <meta
+      property="og:description"
+      content="把角色源图和动作素材整理成可验证、可预览、可导出的像素角色包。"
+    />
+    <meta property="og:image" content="https://moteweave.pages.dev/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="MoteWeave 本地优先像素角色工作流的原创程序化分享卡片"
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="MoteWeave · 本地优先的像素角色工作流" />
+    <meta
+      name="twitter:description"
+      content="把角色源图和动作素材整理成可验证、可预览、可导出的像素角色包。"
+    />
+    <meta name="twitter:image" content="https://moteweave.pages.dev/og.png" />
+    <title>MoteWeave · 本地优先的像素角色工作流</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">跳到主要内容</a>
+
+    <header class="site-header" data-site-header>
+      <div class="shell header-inner">
+        <a class="brand" href="#top" aria-label="MoteWeave 首页">
+          <span class="brand-mark" aria-hidden="true">
+            <i></i><i></i><i></i><i></i>
+          </span>
+          <span class="brand-name">MoteWeave</span>
+          <span class="brand-version">v0.5.0-preview.1</span>
+        </a>
+
+        <button
+          class="menu-toggle"
+          type="button"
+          aria-expanded="false"
+          aria-controls="site-navigation"
+          data-menu-toggle
+        >
+          <span>菜单</span>
+          <i aria-hidden="true"></i>
+        </button>
+
+        <nav class="site-nav" id="site-navigation" aria-label="主要导航" data-site-nav>
+          <a href="#demo">交互演示</a>
+          <a href="#workflow">工作流程</a>
+          <a href="#capabilities">能力边界</a>
+          <a href="#local-run">本地运行</a>
+          <a href="#faq">常见问题</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main-content">
+      <section class="hero section" id="top">
+        <div class="shell hero-grid">
+          <div class="hero-copy" data-reveal>
+            <div class="eyebrow">
+              <span class="status-dot" aria-hidden="true"></span>
+              本地优先 · 可选 AI · 证据化质量门
+            </div>
+            <h1>把角色素材，整理成<span>可检查、可预览、可导出</span>的游戏资产包。</h1>
+            <p class="hero-lede">
+              MoteWeave 面向像素角色与动作素材工作流：从源图清理、像素网格精修和动作选帧，
+              到发布证据检查与兼容导出。完整处理在本地应用中运行，AI 生成只是可选路径。
+            </p>
+            <div class="hero-actions">
+              <a class="button button-primary" href="#demo">
+                <span>查看交互演示</span>
+                <span aria-hidden="true">↓</span>
+              </a>
+              <a class="button button-secondary" href="#capabilities">了解真实能力</a>
+            </div>
+            <p class="phase-note">
+              官网第一阶段：纯静态展示，不接收文件、不调用模型、不创建账号。
+            </p>
+          </div>
+
+          <div class="hero-workbench" data-reveal>
+            <div class="window-bar">
+              <div class="window-title">
+                <span class="window-led" aria-hidden="true"></span>
+                LOCAL WORKBENCH
+              </div>
+              <span class="window-state">READY</span>
+            </div>
+            <div class="workbench-body">
+              <div class="hero-canvas-wrap">
+                <canvas
+                  id="hero-canvas"
+                  width="320"
+                  height="240"
+                  aria-label="程序绘制的像素角色动作示意"
+                >
+                  程序绘制的像素角色动作示意。
+                </canvas>
+                <span class="canvas-label">BUILT-IN SAMPLE</span>
+              </div>
+              <ol class="mini-pipeline" aria-label="角色包处理阶段">
+                <li class="is-complete">
+                  <span>01</span>
+                  <div><strong>Source</strong><small>源图与动作素材</small></div>
+                  <i>✓</i>
+                </li>
+                <li class="is-complete">
+                  <span>02</span>
+                  <div><strong>Refine</strong><small>网格与调色板证据</small></div>
+                  <i>✓</i>
+                </li>
+                <li class="is-active">
+                  <span>03</span>
+                  <div><strong>Review</strong><small>预览与发布门</small></div>
+                  <i></i>
+                </li>
+                <li>
+                  <span>04</span>
+                  <div><strong>Export</strong><small>多规格兼容包</small></div>
+                  <i></i>
+                </li>
+              </ol>
+            </div>
+            <div class="workbench-footer">
+              <span><b>8×8</b> 标准角色表</span>
+              <span><b>5</b> 种帧尺寸</span>
+              <span><b>3</b> 类兼容导出</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="shell proof-strip" aria-label="产品原则">
+          <span>LOCAL-FIRST</span>
+          <i aria-hidden="true"></i>
+          <span>EVIDENCE BEFORE EXPORT</span>
+          <i aria-hidden="true"></i>
+          <span>ORIGINAL WORKFLOW</span>
+          <i aria-hidden="true"></i>
+          <span>NO WEBSITE UPLOADS</span>
+        </div>
+      </section>
+
+      <section class="section demo-section" id="demo">
+        <div class="shell">
+          <div class="section-heading" data-reveal>
+            <div>
+              <span class="section-index">01 / INTERACTIVE DEMO</span>
+              <h2>先看清流程，再决定是否在本地处理。</h2>
+            </div>
+            <p>
+              这个演示使用程序生成的内置样例，不上传文件、不调用模型，也不等同于完整本地处理结果。
+            </p>
+          </div>
+
+          <div class="demo-shell" data-reveal>
+            <aside class="demo-controls" aria-label="演示控制">
+              <div class="control-group">
+                <span class="control-label">查看阶段</span>
+                <div class="mode-tabs" role="tablist" aria-label="演示阶段">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected="false"
+                    data-demo-mode="source"
+                  >
+                    <span>01</span>原始帧
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected="true"
+                    class="is-active"
+                    data-demo-mode="grid"
+                  >
+                    <span>02</span>网格整理
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected="false"
+                    data-demo-mode="motion"
+                  >
+                    <span>03</span>动作预览
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected="false"
+                    data-demo-mode="evidence"
+                  >
+                    <span>04</span>检查证据
+                  </button>
+                </div>
+              </div>
+
+              <div class="control-group">
+                <span class="control-label">内置动作</span>
+                <div class="action-switch" role="group" aria-label="选择内置动作">
+                  <button type="button" data-demo-action="idle">Idle</button>
+                  <button type="button" class="is-active" data-demo-action="walk">Walk</button>
+                  <button type="button" data-demo-action="attack">Attack</button>
+                </div>
+              </div>
+
+              <div class="control-group">
+                <label class="range-label" for="demo-speed">
+                  <span>播放速度</span>
+                  <output id="demo-speed-output" for="demo-speed">8 FPS</output>
+                </label>
+                <input id="demo-speed" type="range" min="2" max="12" value="8" step="1" />
+              </div>
+
+              <label class="toggle-row" for="demo-grid">
+                <span>
+                  <strong>像素网格</strong>
+                  <small>只影响演示画布</small>
+                </span>
+                <input id="demo-grid" type="checkbox" checked />
+                <i aria-hidden="true"></i>
+              </label>
+
+              <div class="demo-boundary">
+                <span>演示边界</span>
+                <p>没有上传入口、网络请求、模型调用或云端存储。</p>
+              </div>
+            </aside>
+
+            <div class="demo-stage">
+              <header class="stage-header">
+                <div>
+                  <span class="stage-kicker">PROGRAMMATIC SAMPLE</span>
+                  <strong id="demo-stage-title">网格整理</strong>
+                </div>
+                <div class="stage-status">
+                  <span aria-hidden="true"></span>
+                  BROWSER ONLY
+                </div>
+              </header>
+
+              <div class="stage-canvas-wrap">
+                <canvas
+                  id="demo-canvas"
+                  width="640"
+                  height="480"
+                  aria-describedby="demo-status"
+                  aria-label="可切换阶段和动作的程序化像素角色演示"
+                >
+                  可切换阶段和动作的程序化像素角色演示。
+                </canvas>
+                <div class="canvas-corner canvas-corner-tl" aria-hidden="true"></div>
+                <div class="canvas-corner canvas-corner-br" aria-hidden="true"></div>
+                <p id="demo-status" class="visually-hidden" aria-live="polite">
+                  正在展示 Walk 动作的网格整理阶段。
+                </p>
+              </div>
+
+              <div class="timeline-panel">
+                <div class="timeline-head">
+                  <span>FRAME SEQUENCE</span>
+                  <span id="demo-frame-label">FRAME 01 / 08</span>
+                </div>
+                <div class="frame-track" id="demo-frame-track" aria-label="当前动作帧"></div>
+              </div>
+
+              <dl class="evidence-grid" aria-label="内置样例的计算结果">
+                <div>
+                  <dt>帧数</dt>
+                  <dd id="metric-frame-count">8</dd>
+                </div>
+                <div>
+                  <dt>唯一姿态</dt>
+                  <dd id="metric-unique-poses">7</dd>
+                </div>
+                <div>
+                  <dt>首尾位移</dt>
+                  <dd id="metric-loop-gap">0 px</dd>
+                </div>
+                <div>
+                  <dt>演示色板</dt>
+                  <dd id="metric-palette-count">8</dd>
+                </div>
+              </dl>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section workflow-section" id="workflow">
+        <div class="shell">
+          <div class="section-heading compact" data-reveal>
+            <div>
+              <span class="section-index">02 / LOCAL WORKFLOW</span>
+              <h2>一条可追踪的本地资产流程。</h2>
+            </div>
+            <p>每一步都留下可查看的产物或证据，导出不是一个没有解释的黑盒按钮。</p>
+          </div>
+
+          <ol class="workflow-list" data-reveal>
+            <li>
+              <span class="workflow-number">01</span>
+              <div class="workflow-icon" aria-hidden="true"><i></i><i></i><i></i></div>
+              <h3>准备来源</h3>
+              <p>处理上传或生成的角色表；Motion Source 也可读取 GIF、帧序列、单图或视频。</p>
+              <small>完整操作：本地 MoteWeave</small>
+            </li>
+            <li>
+              <span class="workflow-number">02</span>
+              <div class="workflow-icon grid-icon" aria-hidden="true"><i></i><i></i><i></i></div>
+              <h3>像素网格优化</h3>
+              <p>按需使用序列共识、谐波排除、共享调色板与细节保护；弱证据时保持原图。</p>
+              <small>Pixel Grid v2：显式启用</small>
+            </li>
+            <li>
+              <span class="workflow-number">03</span>
+              <div class="workflow-icon motion-icon" aria-hidden="true"><i></i><i></i><i></i></div>
+              <h3>动作帧选择</h3>
+              <p>自动或手动选择动作阶段，并记录对齐、近重复聚类与周期分析证据。</p>
+              <small>Motion Source：无需 Provider</small>
+            </li>
+            <li>
+              <span class="workflow-number">04</span>
+              <div class="workflow-icon gate-icon" aria-hidden="true"><i></i><i></i><i></i></div>
+              <h3>质量证据检查</h3>
+              <p>查看验证、调试覆盖图、动作预览与发布门；候选分数不替代发布条件。</p>
+              <small>未通过时保留诊断证据</small>
+            </li>
+            <li>
+              <span class="workflow-number">05</span>
+              <div class="workflow-icon export-icon" aria-hidden="true"><i></i><i></i><i></i></div>
+              <h3>兼容导出</h3>
+              <p>输出标准角色包、多分辨率图像及 Godot、RPG Maker、OCAD 等兼容格式。</p>
+              <small>不捆绑第三方插件或运行时</small>
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <section class="section capabilities-section" id="capabilities">
+        <div class="shell">
+          <div class="section-heading" data-reveal>
+            <div>
+              <span class="section-index">03 / CAPABILITY TRUTH</span>
+              <h2>把已实现、实验中和网页未提供的能力分开。</h2>
+            </div>
+            <p>网站只描述当前仓库能够证明的行为，不把未来路线做成看似可点击的功能。</p>
+          </div>
+
+          <div class="capability-feature-grid" data-reveal>
+            <article class="feature-card feature-primary">
+              <span class="feature-code">CHARACTER PACK</span>
+              <h3>角色包处理与发布证据</h3>
+              <p>
+                支持标准 8×8 和固定区域来源，完成背景清理、校正、标准化、验证、动作预览与 ZIP 产物。
+              </p>
+              <ul>
+                <li>96 / 64 / 48 / 32 / 16 px 多分辨率</li>
+                <li>浏览器可玩预览与动作 GIF</li>
+                <li>独立发布门与诊断证据</li>
+              </ul>
+            </article>
+            <article class="feature-card">
+              <span class="feature-code">MOTION SOURCE</span>
+              <h3>动作来源整理</h3>
+              <p>
+                通过五步本地流程完成来源预览、Auto/Manual 选帧、清理、动作条构建、复核与应用。
+              </p>
+              <ul>
+                <li>Provider-free 本地路径</li>
+                <li>对齐、全局近重复与周期证据</li>
+                <li>明确的资源与取消边界</li>
+              </ul>
+            </article>
+            <article class="feature-card">
+              <span class="feature-code">EDITOR WORKSPACE</span>
+              <h3>项目与修整工作台</h3>
+              <p>
+                管理项目资产、场景画布、时间线、交互预览和精确帧修整，并保留修订与证据。
+              </p>
+              <ul>
+                <li>Before / After / Split / Difference</li>
+                <li>Recipe 驱动的可复核调整</li>
+                <li>项目包与引擎交接证据</li>
+              </ul>
+            </article>
+            <article class="feature-card feature-lab">
+              <span class="feature-code">SCENE &amp; 2.5D LAB</span>
+              <h3>场景与 Tileset 实验室</h3>
+              <p>
+                已有本地 atlas、规则地图、验证和单层 LDtk/Tiled 输出，但不宣称完整 WFC 或生产级生成。
+              </p>
+              <ul>
+                <li>确定性本地流程</li>
+                <li>结构质量与导出证据</li>
+                <li>当前按实验性能力展示</li>
+              </ul>
+            </article>
+          </div>
+
+          <div class="status-matrix" data-reveal>
+            <article>
+              <header>
+                <span class="status-pill status-available">本地已可用</span>
+                <h3>当前可验证能力</h3>
+              </header>
+              <ul>
+                <li>角色表处理、质量报告与多规格导出</li>
+                <li>Guided Motion Source 与动作选择证据</li>
+                <li>可选 AI 生成与生成发布门</li>
+                <li>Editor Workspace 项目工作流</li>
+              </ul>
+            </article>
+            <article>
+              <header>
+                <span class="status-pill status-experiment">实验 / 暂缓</span>
+                <h3>不能当成默认承诺</h3>
+              </header>
+              <ul>
+                <li>语义发布阻断门</li>
+                <li>自动增加候选与额外 Provider 消耗</li>
+                <li>逐动作高质量生成模式</li>
+                <li>完整 WFC 与多层世界工作流</li>
+              </ul>
+            </article>
+            <article>
+              <header>
+                <span class="status-pill status-unavailable">网页未提供</span>
+                <h3>第一阶段明确不做</h3>
+              </header>
+              <ul>
+                <li>用户文件上传与云端处理</li>
+                <li>账号、团队空间和在线项目存储</li>
+                <li>付费、订阅与额度系统</li>
+                <li>网站内 Provider 调用</li>
+              </ul>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section local-section" id="local-run">
+        <div class="shell local-grid">
+          <div class="local-copy" data-reveal>
+            <span class="section-index">04 / RUN LOCALLY</span>
+            <h2>完整能力继续留在本地应用。</h2>
+            <p>
+              当前公开网页只做介绍与内置演示。角色上传、Motion Source、Editor
+              等无需 Provider 的路径在本机运行；只有你主动配置 AI 生成时，才会调用对应 Provider。
+            </p>
+            <div class="privacy-points">
+              <span><i aria-hidden="true"></i>网页不接收素材</span>
+              <span><i aria-hidden="true"></i>没有分析脚本</span>
+              <span><i aria-hidden="true"></i>AI 调用显式配置</span>
+            </div>
+          </div>
+
+          <div class="command-card" data-reveal>
+            <header>
+              <div>
+                <span class="command-dot"></span>
+                LOCAL TERMINAL
+              </div>
+              <button type="button" id="copy-command">复制命令</button>
+            </header>
+            <pre id="local-commands" tabindex="0"><code><span>$</span> npm ci
+<span>$</span> npm start</code></pre>
+            <footer>
+              <span id="copy-status" aria-live="polite">启动后打开终端显示的本地地址</span>
+              <span>Node.js · Local HTTP</span>
+            </footer>
+          </div>
+        </div>
+      </section>
+
+      <section class="section faq-section" id="faq">
+        <div class="shell faq-grid">
+          <div class="faq-intro" data-reveal>
+            <span class="section-index">05 / FAQ</span>
+            <h2>上线前最容易误解的几个问题。</h2>
+            <p>第一阶段故意保持简单：静态页面负责解释，完整产品继续由本地工作流负责。</p>
+          </div>
+          <div class="faq-list" data-reveal>
+            <details>
+              <summary>这个网站会上传或保存我的素材吗？<span aria-hidden="true">+</span></summary>
+              <p>
+                不会。第一阶段没有文件选择器、上传接口、数据库或云端任务。页面中的角色是程序生成的内置样例。
+              </p>
+            </details>
+            <details>
+              <summary>网页里的 Demo 是完整处理结果吗？<span aria-hidden="true">+</span></summary>
+              <p>
+                不是。它只演示阶段切换、动作播放和内置数据指标。真实清理、选帧、质量检查与导出仍在本地 MoteWeave 中运行。
+              </p>
+            </details>
+            <details>
+              <summary>使用 MoteWeave 一定不花钱吗？<span aria-hidden="true">+</span></summary>
+              <p>
+                本地的 Provider-free 路径不会产生模型调用费用。若主动启用 OpenRouter、Gemini
+                等可选 AI Provider，费用与额度由对应服务决定。
+              </p>
+            </details>
+            <details>
+              <summary>现在需要账号或订阅吗？<span aria-hidden="true">+</span></summary>
+              <p>不需要。当前没有网站账号、在线项目空间、订阅或收费系统。</p>
+            </details>
+            <details>
+              <summary>能直接导出完整 Godot 场景或多层 LDtk 世界吗？<span aria-hidden="true">+</span></summary>
+              <p>
+                不能这样承诺。当前提供兼容元数据、角色包和单层场景交接产物，不包含完整 Godot
+                场景运行时，也不宣称完整多层 LDtk 世界工作流。
+              </p>
+            </details>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="shell footer-inner">
+        <div>
+          <a class="brand footer-brand" href="#top">
+            <span class="brand-mark" aria-hidden="true">
+              <i></i><i></i><i></i><i></i>
+            </span>
+            <span class="brand-name">MoteWeave</span>
+          </a>
+          <p>原创、本地优先、证据化的像素角色与动作资产工作流。</p>
+        </div>
+        <div class="footer-meta">
+          <span>STATIC PHASE 1</span>
+          <span>NO CLOUD PROCESSING</span>
+          <span>© <span id="current-year">2026</span> MoteWeave</span>
+        </div>
+      </div>
+    </footer>
+
+    <script src="./site.js" defer></script>
+  </body>
+</html>

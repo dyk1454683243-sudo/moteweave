@@ -1,0 +1,50 @@
+{
+  "name": "moteweave",
+  "version": "0.5.0-preview.1",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dyk1454683243-sudo/moteweave.git"
+  },
+  "homepage": "https://moteweave.pages.dev/",
+  "bugs": {
+    "url": "https://github.com/dyk1454683243-sudo/moteweave/issues"
+  },
+  "engines": {
+    "node": ">=22 <25"
+  },
+  "scripts": {
+    "guard:focused": "node scripts/run-with-resource-guard.mjs --max-old-space-mib 1024 --max-rss-mib 1536 --timeout-ms 60000 --poll-ms 500 --",
+    "guard:full": "node scripts/run-with-resource-guard.mjs --max-old-space-mib 2048 --max-rss-mib 4096 --timeout-ms 900000 --poll-ms 500 --",
+    "test": "node scripts/run-with-resource-guard.mjs --max-old-space-mib 2048 --max-rss-mib 4096 --timeout-ms 900000 --poll-ms 500 -- node --test --test-concurrency=1",
+    "test:focused": "node scripts/run-with-resource-guard.mjs --max-old-space-mib 1024 --max-rss-mib 1536 --timeout-ms 60000 --poll-ms 500 -- node --test --test-concurrency=1",
+    "site:check": "npm run test:focused -- test/website/publicSite.test.js",
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "character-pack": "node scripts/character-pack-cli.mjs",
+    "character-pack:process": "node scripts/character-pack-cli.mjs process",
+    "character-pack:generate": "node scripts/character-pack-cli.mjs generate",
+    "character-pack:benchmark": "node scripts/character-pack-cli.mjs benchmark",
+    "fixture:character-pack": "node scripts/create-character-pack-fixture.mjs",
+    "fixture:fixed-region": "node scripts/create-fixed-region-motion-assets.mjs",
+    "asset:website-og": "node scripts/create-website-og.mjs",
+    "release:check": "node scripts/public-release.mjs check",
+    "release:export": "node scripts/public-release.mjs export",
+    "benchmark:character-pack": "node scripts/benchmark-character-pack.mjs",
+    "benchmark:processed": "node scripts/benchmark-generated-samples.mjs",
+    "benchmark:openrouter": "node scripts/benchmark-openrouter-character-pack.mjs",
+    "benchmark:topdown-quality": "node scripts/character-pack-cli.mjs benchmark topdown-quality-closure",
+    "quality:smoke": "node scripts/character-pack-cli.mjs benchmark local-images --gate-layer smoke --disable-visual-previews",
+    "quality:local-golden": "node scripts/character-pack-cli.mjs benchmark local-images --gate-layer local-golden",
+    "quality:release": "node scripts/character-pack-cli.mjs benchmark local-images --gate-layer release",
+    "smoke:local": "node scripts/run-with-resource-guard.mjs --max-old-space-mib 2048 --max-rss-mib 4096 --timeout-ms 600000 --poll-ms 500 -- node scripts/run-local-smoke.mjs",
+    "smoke:openrouter": "node scripts/run-with-resource-guard.mjs --max-old-space-mib 2048 --max-rss-mib 4096 --timeout-ms 900000 --poll-ms 500 -- node scripts/smoke-openrouter-generate.mjs"
+  },
+  "dependencies": {
+    "gifenc": "^1.0.3",
+    "jszip": "^3.10.1",
+    "sharp": "^0.33.5"
+  }
+}

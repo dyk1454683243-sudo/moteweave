@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "include_paths": [
+    ".agents/",
+    ".env.example",
+    ".github/",
+    ".gitignore",
+    "AGENTS.md",
+    "ATTRIBUTIONS.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "PUBLIC_SNAPSHOT.json",
+    "README.md",
+    "configs/",
+    "docs/",
+    "editor.html",
+    "index.html",
+    "package-lock.json",
+    "package.json",
+    "scripts/",
+    "server.js",
+    "src/",
+    "templates/",
+    "test/",
+    "website/"
+  ],
+  "exclude_paths": [
+    ".claude/"
+  ],
+  "forbidden_paths": [
+    ".env",
+    ".npm-cache/",
+    ".superpowers/",
+    ".worktrees/",
+    "generated/",
+    "node_modules/",
+    "output/",
+    "templates/motion_template_ocad_primary.png",
+    "test/fixtures/character-pack/local-image-golden/ocad-sheet/ocad_knight_walk.jpg",
+    "workspace/"
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "release_version": "0.5.0-preview.1",
+  "source_only": true,
+  "npm_publish": false,
+  "required_ancestors": [
+    "8263e85c0469b969bc78840a42946ed52ff62881",
+    "8a5c6f849572e70443ff606d45e323881957db12"
+  ],
+  "privacy": {
+    "synthetic_home_path_allowlist": [
+      {
+        "path_prefix": "test/editor-project/",
+        "users": ["alice", "local-user", "person", "private"]
+      },
+      {
+        "path": "docs/superpowers/plans/2026-07-12-frame-repair-safe-provider-diagnostics.md",
+        "users": ["private"]
+      },
+      {
+        "path": "test/two-point-five-d/externalRoundtripValidation.test.js",
+        "users": ["local-user"]
+      }
+    ]
+  },
+  "brand": {
+    "status": "approved",
+    "display_name": "MoteWeave",
+    "slug": "moteweave",
+    "github_owner": "dyk1454683243-sudo",
+    "repository_url": "https://github.com/dyk1454683243-sudo/moteweave.git",
+    "homepage_url": "https://moteweave.pages.dev/",
+    "pages_project": "moteweave",
+    "decision_file": "docs/decisions/2026-07-17-public-brand-selection.md"
+  }
+}

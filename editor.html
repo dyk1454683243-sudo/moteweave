@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Editor Workspace for real project assets, scenes, asset revisions, and project persistence."
+    />
+    <title>Editor Workspace</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="./src/v8.css" />
+    <link rel="stylesheet" href="./src/ui/editor/editor.css" />
+  </head>
+  <body class="editor-page">
+    <main class="editor-shell" id="editor-shell" data-editor-shell>
+      <header class="editor-header">
+        <a class="editor-brand" href="/" aria-label="Open original app">
+          <span>EW</span>
+          <strong>Editor Workspace</strong>
+        </a>
+        <form class="editor-project-bar" id="editor-project-form">
+          <label>
+            <span>Project</span>
+            <input id="editor-project-id" type="text" value="project_demo" autocomplete="off" />
+          </label>
+          <label>
+            <span>Name</span>
+            <input id="editor-project-name" type="text" value="Demo Project" autocomplete="off" />
+          </label>
+          <label>
+            <span>Scene</span>
+            <select id="editor-scene-select" disabled>
+              <option value="">No project</option>
+            </select>
+          </label>
+          <button id="editor-create-project" type="submit">New</button>
+          <button id="editor-load-project" class="secondary" type="button">Load</button>
+        </form>
+        <nav class="editor-actions" aria-label="Editor actions">
+          <button id="editor-save-project" type="button" disabled>Save</button>
+          <button id="editor-autosave-project" class="secondary" type="button" disabled>Autosave</button>
+          <button id="editor-undo-project" class="secondary" type="button" disabled>Undo</button>
+          <button id="editor-redo-project" class="secondary" type="button" disabled>Redo</button>
+          <button id="editor-playback-toggle" class="secondary" type="button" aria-pressed="false" disabled>Preview</button>
+          <button id="editor-export-project-pack" class="secondary" type="button" disabled>Export Pack</button>
+        </nav>
+      </header>
+
+      <section class="editor-main">
+        <aside class="editor-asset-panel" aria-label="Asset Library">
+          <section class="editor-section">
+            <div class="editor-section-head">
+              <h2>Asset Library</h2>
+              <span id="editor-asset-count">0</span>
+            </div>
+            <form class="editor-import-form" id="editor-import-form">
+              <label>
+                <span>Kind</span>
+                <select id="editor-import-kind">
+                  <option value="character_pack">Character Pack</option>
+                  <option value="scene_pack">Scene Pack</option>
+                </select>
+              </label>
+              <label>
+                <span>Job ID</span>
+                <input id="editor-import-job-id" type="text" autocomplete="off" />
+              </label>
+              <label>
+                <span>Asset ID</span>
+                <input id="editor-import-asset-id" type="text" autocomplete="off" />
+              </label>
+              <button id="editor-import-job" type="submit" disabled>Import</button>
+            </form>
+            <div class="editor-asset-list" id="editor-asset-list" aria-live="polite"></div>
+          </section>
+        </aside>
+
+        <section class="editor-stage-panel" aria-label="Scene Stage">
+          <header class="editor-stage-toolbar">
+            <div>
+              <span id="editor-active-scene-label">No project</span>
+              <strong id="editor-active-scene-name">Scene Stage</strong>
+            </div>
+            <div class="editor-stage-tools">
+              <button id="editor-tool-select" class="secondary active" type="button" aria-pressed="true">Select</button>
+              <button id="editor-toggle-grid" class="secondary" type="button" aria-pressed="true">Grid</button>
+              <button id="editor-toggle-snap" class="secondary" type="button" aria-pressed="true">Snap</button>
+              <label class="editor-snap-control">
+                <span>Snap</span>
+                <input id="editor-snap-size" type="number" min="1" max="256" step="1" value="16" />
+              </label>
+            </div>
+          </header>
+          <div
+            class="editor-stage"
+            id="editor-stage"
+            tabindex="0"
+            data-playtest-running="false"
+            aria-label="Scene Stage. Use WASD or arrow keys while playtest is running."
+            aria-keyshortcuts="W A S D ArrowUp ArrowDown ArrowLeft ArrowRight Escape"
+          >
+            <canvas class="editor-scene-canvas" id="editor-scene-canvas" aria-hidden="true"></canvas>
+            <div class="editor-stage-grid" aria-hidden="true"></div>
+            <div class="editor-stage-empty" id="editor-stage-empty">No project loaded</div>
+            <div class="editor-layer-preview" id="editor-layer-preview" aria-label="Scene layers"></div>
+            <aside class="editor-playtest-hud" id="editor-playtest-hud" aria-label="Playtest status" hidden>
+              <div class="editor-playtest-hud-keys" id="editor-playtest-hud-keys">
+                <kbd>WASD</kbd>
+                <span>or Arrow keys</span>
+              </div>
+              <dl class="editor-playtest-hud-readout">
+                <div>
+                  <dt>Clip</dt>
+                  <dd id="editor-playtest-hud-clip">-</dd>
+                </div>
+                <div>
+                  <dt>Direction</dt>
+                  <dd id="editor-playtest-hud-direction">-</dd>
+                </div>
+                <div>
+                  <dt>Position</dt>
+                  <dd id="editor-playtest-hud-coordinates">0, 0</dd>
+                </div>
+              </dl>
+              <button class="secondary" id="editor-playtest-hud-stop" type="button">Stop</button>
+            </aside>
+            <div
+              class="editor-visually-hidden"
+              id="editor-stage-live"
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+            ></div>
+          </div>
+          <section class="editor-bottom-panel" aria-label="Layers and Timeline">
+            <div class="editor-panel-tabs" role="tablist" aria-label="Editor panels">
+              <button class="active" type="button" data-editor-panel="layers">Layers</button>
+              <button type="button" data-editor-panel="timeline">Timeline</button>
+              <button type="button" data-editor-panel="flow">Flow</button>
+              <button type="button" data-editor-panel="repair">Repair</button>
+              <button type="button" data-editor-panel="playtest">Playtest</button>
+              <button type="button" data-editor-panel="export">Export</button>
+              <button type="button" data-editor-panel="quality">Quality</button>
+              <button type="button" data-editor-panel="logs">Logs</button>
+            </div>
+            <div class="editor-panel-body" id="editor-panel-body"></div>
+          </section>
+        </section>
+
+        <aside class="editor-inspector-panel" aria-label="Inspector">
+          <section class="editor-section">
+            <div class="editor-section-head">
+              <h2>Inspector</h2>
+              <span id="editor-status-pill" data-status="idle">idle</span>
+            </div>
+            <div class="editor-inspector" id="editor-inspector"></div>
+          </section>
+        </aside>
+      </section>
+    </main>
+    <div class="editor-toast" id="editor-toast" role="status" aria-live="polite"></div>
+    <script type="module" src="./src/editor-app.js"></script>
+  </body>
+</html>

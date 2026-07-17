@@ -1,0 +1,1452 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="MoteWeave 是本地优先的游戏角色、动作、场景与像素素材检查和导出工作流。"
+    />
+    <title>MoteWeave</title>
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="./src/v8.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="app-header">
+        <div class="brand-logo">MW</div>
+        <div class="brand-title">MoteWeave</div>
+        <nav class="tabs" aria-label="模块" data-i18n-aria-label="app.nav.modules">
+          <button class="tab-button" type="button" data-tab="prompts" data-i18n="app.nav.prompts">场景生成</button>
+          <button class="tab-button" type="button" data-tab="two-point-five-d" data-i18n="app.nav.tileset">2.5D Tileset</button>
+          <button class="tab-button" type="button" data-tab="sprite" data-i18n="app.nav.sprite">Sprite Sheet</button>
+          <button class="tab-button" id="motion-source-tab" type="button" data-tab="motion-source" aria-controls="motion-source" aria-selected="false" data-i18n="app.nav.motion">Motion Source</button>
+          <button class="tab-button active" type="button" data-tab="character-pack" data-i18n="app.nav.character">角色包</button>
+          <button class="tab-button" type="button" data-tab="project-pack" hidden data-i18n="app.nav.project">项目包</button>
+          <button class="tab-button" type="button" data-tab="qa" hidden data-i18n="app.nav.qa">检查表</button>
+        </nav>
+        <label class="language-switcher" for="language-select">
+          <span data-i18n="app.language">语言</span>
+          <select id="language-select" class="premium-select" autocomplete="off">
+            <option value="zh" data-i18n="app.language.zh">中文</option>
+            <option value="en" data-i18n="app.language.en">English</option>
+          </select>
+        </label>
+      </header>
+
+      <section class="workspace">
+
+    <section class="tab-panel" id="prompts" aria-labelledby="prompts-tab">
+      <div class="scene-v8-layout">
+        <aside class="scene-v8-sidebar" aria-label="场景生成设置">
+          <div class="scene-sidebar-scroll">
+            <form class="scene-control-section" id="scene-form">
+              <div class="scene-section-heading">
+                <h4>STEP 1: SCENE CONCEPT</h4>
+                <span class="scene-mini-badge">Auto-Idea</span>
+              </div>
+              <div class="scene-concept-card">
+                <label class="scene-inline-field">
+                  <span>Perspective View</span>
+                  <select id="scene-view" class="premium-select"></select>
+                </label>
+                <label class="scene-text-field">
+                  <span>Core Theme</span>
+                  <textarea id="scene-theme" rows="2" class="premium-input">雨夜温泉旅馆，木制走廊，暖色灯笼，石板路</textarea>
+                </label>
+                <label class="scene-text-field">
+                  <span>Composition</span>
+                  <textarea id="scene-composition" rows="2" class="premium-input">主建筑居中，入口和可通行路径清晰，边缘有竹林与水汽</textarea>
+                </label>
+                <label class="scene-text-field">
+                  <span>Art Style</span>
+                  <textarea id="scene-style" rows="2" class="premium-input">清晰像素块，低饱和暖光，统一调色</textarea>
+                </label>
+              </div>
+              <button id="generate-scene-prompts-btn" type="submit" class="scene-blue-action">Build Scene Prompt</button>
+              <textarea class="scene-prompt-output" id="scene-output" rows="5" readonly></textarea>
+            </form>
+
+            <section class="scene-control-section" aria-label="地图预览规则">
+              <div class="scene-section-divider"></div>
+              <h4>STEP 2: MAP PREVIEW RULES</h4>
+              <label class="scene-field scene-pattern-field">
+                <span>Map Pattern</span>
+                <select id="scene-preview-pattern" class="scene-hidden-select" aria-label="Map Pattern">
+                  <option value="island" selected>小岛边界</option>
+                  <option value="path">斜向路径</option>
+                  <option value="solid">整片地形</option>
+                  <option value="rule">规则生成</option>
+                </select>
+                <div class="scene-segmented-control" role="group" aria-label="Map Pattern">
+                  <button type="button" class="active" data-scene-pattern="island">Island</button>
+                  <button type="button" data-scene-pattern="path">Path</button>
+                  <button type="button" data-scene-pattern="solid">Solid</button>
+                  <button type="button" data-scene-pattern="rule">Rule</button>
+                </div>
+              </label>
+              <div class="scene-control-grid">
+                <label class="scene-field">
+                  <span>Grid Width</span>
+                  <input id="scene-preview-width" type="number" min="1" max="16" value="6" />
+                </label>
+                <label class="scene-field">
+                  <span>Grid Height</span>
+                  <input id="scene-preview-height" type="number" min="1" max="16" value="4" />
+                </label>
+              </div>
+              <div class="scene-control-grid">
+                <label class="scene-field scene-range-field">
+                  <span>Density <b id="scene-preview-density-value">0.5</b></span>
+                  <input id="scene-preview-density" type="range" min="0" max="1" step="0.05" value="0.5" />
+                </label>
+                <label class="scene-field scene-seed-field">
+                  <span>Random Seed</span>
+                  <span class="scene-seed-control">
+                    <input id="scene-preview-seed" type="number" step="1" value="1" />
+                    <button id="scene-preview-seed-randomize" type="button" aria-label="Randomize seed">↻</button>
+                  </span>
+                </label>
+              </div>
+            </section>
+
+            <details class="scene-advanced-fold">
+              <summary>Palette &amp; Edge Post-Processing</summary>
+              <div class="scene-correction-panel" aria-label="场景 Tile 校正">
+                <label class="checkbox-row">
+                  <input id="scene-preview-style-snap" type="checkbox" />
+                  <span>Palette snap</span>
+                </label>
+                <label class="scene-field">
+                  <span>Max colors</span>
+                  <input id="scene-preview-style-max-colors" type="number" min="1" max="64" value="16" />
+                </label>
+                <label class="checkbox-row">
+                  <input id="scene-preview-edge-condition" type="checkbox" />
+                  <span>Edge condition</span>
+                </label>
+                <div class="scene-control-grid">
+                  <label class="scene-field">
+                    <span>Band</span>
+                    <input id="scene-preview-edge-band" type="number" min="1" max="8" value="3" />
+                  </label>
+                  <label class="scene-field">
+                    <span>Mode</span>
+                    <select id="scene-preview-edge-condition-mode">
+                      <option value="edge-aware-v1" selected>edge-aware-v1</option>
+                      <option value="global-v0">global-v0</option>
+                    </select>
+                  </label>
+                </div>
+              </div>
+            </details>
+
+            <label class="scene-file-card">
+              <input id="scene-preview-tileset-file" type="file" accept="image/png,image/webp,image/jpeg" />
+              <span class="scene-file-main">Import local Tile Sheet</span>
+              <small>192x192 PNG/WebP/JPG, 4x4 cells, 48px cell with 32px runtime tile.</small>
+            </label>
+
+            <form class="scene-character-helper" id="character-form">
+              <h4>CHARACTER PROMPT HELPER</h4>
+              <label>Character Preset
+                <select id="character-preset" class="premium-select"></select>
+              </label>
+              <label class="premium-checkbox">
+                <input id="has-reference" type="checkbox" checked />
+                Add Reference Image to Prompt
+              </label>
+              <label>Description
+                <textarea id="character-description" rows="2" class="premium-input">银发女剑士</textarea>
+              </label>
+              <button type="submit" class="scene-secondary-action">Generate Char Prompt</button>
+              <textarea class="scene-prompt-output" id="character-output" rows="4" readonly></textarea>
+            </form>
+          </div>
+          <button id="scene-preview-process" class="scene-primary-action" type="button" disabled>Process &amp; Export Tiles</button>
+        </aside>
+
+        <section class="scene-stage" aria-label="场景 Tile 预览">
+          <header class="scene-toolbar">
+            <div class="scene-toolbar-title">
+              <h3>SCENE PREVIEW</h3>
+              <span id="scene-preview-status" data-status="idle">ready</span>
+            </div>
+            <div class="scene-toolbar-actions">
+              <button id="scene-preview-render" class="scene-secondary-action" type="button">Refresh</button>
+              <button id="scene-preview-export-open" class="scene-secondary-action" type="button" disabled>Export</button>
+              <button id="scene-preview-generate-live" class="scene-primary-small-action" type="button">Generate Tileset</button>
+            </div>
+          </header>
+          <div class="scene-stage-body">
+            <div class="scene-preview-canvas-wrap">
+              <canvas id="scene-preview-canvas" width="384" height="256" aria-label="场景 Tile map 预览"></canvas>
+              <div class="scene-generation-banner" id="scene-generation-banner">SCENE PREVIEW READY</div>
+            </div>
+            <div class="scene-variant-tabs" aria-label="场景变体">
+              <span class="active">Day</span>
+              <span>Night</span>
+              <span>Rain</span>
+            </div>
+            <aside class="scene-quality-card" id="scene-preview-export-summary" aria-label="场景质量报告" hidden></aside>
+            <div class="scene-export-scrim" id="scene-preview-export-scrim" hidden>
+              <section class="scene-export-modal" role="dialog" aria-modal="true" aria-labelledby="scene-preview-export-title">
+                <header class="scene-export-head">
+                  <div>
+                    <span id="scene-preview-export-title">Export Scene Pack</span>
+                    <small id="scene-preview-export-status">waiting</small>
+                  </div>
+                  <button id="scene-preview-export-close" class="scene-export-close" type="button" aria-label="Close export dialog">&times;</button>
+                </header>
+                <div class="scene-export-rows" id="scene-preview-links" aria-label="场景导出"></div>
+                <a class="scene-export-all is-disabled" id="scene-preview-export-all">Download Available (0)</a>
+              </section>
+            </div>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <section class="tab-panel" id="two-point-five-d" aria-labelledby="two-point-five-d-tab">
+      <div class="tileset-v8-layout">
+        <aside class="tileset-sidebar" aria-label="2.5D tileset settings">
+          <div class="tileset-sidebar-scroll">
+            <section class="tileset-control-section">
+              <div class="tileset-section-heading">
+                <h4>1. MATERIAL SOURCE</h4>
+                <span id="tileset-material-mode" class="tileset-mini-badge">procedural</span>
+              </div>
+              <label class="scene-file-card">
+                <input id="tileset-material-source" type="file" accept="image/png,image/webp,image/jpeg" />
+                <span class="scene-file-main">Import material source</span>
+                <small>Optional raw source; local normalizer and material slots own the final atlas.</small>
+              </label>
+              <div class="tileset-evidence-strip">
+                <span>Contract</span>
+                <strong>1024 x 1024</strong>
+                <span>Rule</span>
+                <strong>16 masks</strong>
+              </div>
+            </section>
+
+            <section class="tileset-control-section">
+              <div class="tileset-section-heading">
+                <h4>2. SOURCE BENCHMARK</h4>
+                <span id="tileset-provider-mode" class="tileset-mini-badge">guarded</span>
+              </div>
+              <label class="scene-field">
+                <span>Material Brief</span>
+                <textarea id="tileset-benchmark-description" class="tileset-benchmark-textarea" rows="3">mossy cliff grass blocks with cool stone side walls</textarea>
+              </label>
+              <div class="scene-control-grid">
+                <label class="scene-field">
+                  <span>Candidates</span>
+                  <select id="tileset-benchmark-candidate-count">
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="4" selected>4</option>
+                  </select>
+                </label>
+                <label class="scene-field">
+                  <span>Image Size</span>
+                  <select id="tileset-benchmark-image-size">
+                    <option value="1K" selected>1K</option>
+                    <option value="2K">2K</option>
+                  </select>
+                </label>
+              </div>
+              <div class="scene-control-grid">
+                <label class="scene-field">
+                  <span>Provider Type</span>
+                  <select id="tileset-runtime-provider">
+                    <option value="openrouter" selected>OpenRouter</option>
+                    <option value="gemini">Gemini</option>
+                    <option value="openrouter_compatible">OpenRouter-compatible</option>
+                  </select>
+                </label>
+                <label class="scene-field">
+                  <span>Model</span>
+                  <input id="tileset-runtime-model" type="text" autocomplete="off" placeholder="google/gemini-2.5-flash-image" />
+                </label>
+              </div>
+              <label id="tileset-runtime-base-url-field" class="scene-field" hidden>
+                <span>Base URL</span>
+                <input id="tileset-runtime-base-url" type="url" autocomplete="off" placeholder="https://api.example.com/v1/chat/completions" />
+              </label>
+              <label class="scene-field">
+                <span>API Key</span>
+                <div class="secret-input-wrap">
+                  <input id="tileset-runtime-api-key" class="premium-input" type="password" autocomplete="off" />
+                  <button id="tileset-toggle-api-key" class="secret-toggle" type="button" aria-label="Show API key" aria-pressed="false" title="Show API key"></button>
+                </div>
+              </label>
+              <div class="button-row compact-row">
+                <button id="tileset-save-provider-config" type="button" class="premium-btn">Use Provider</button>
+                <button id="tileset-clear-provider-config" type="button" class="secondary premium-btn">Clear</button>
+              </div>
+              <div class="scene-control-grid">
+                <label class="scene-field">
+                  <span>Max Calls</span>
+                  <input id="tileset-benchmark-max-calls" type="number" min="1" max="8" value="4" />
+                </label>
+                <label class="tileset-live-confirm">
+                  <input id="tileset-benchmark-confirm-live" type="checkbox" />
+                  <span>Confirm live quota</span>
+                </label>
+              </div>
+              <div class="button-row compact-row">
+                <button id="tileset-plan-benchmark" type="button" class="premium-btn secondary">Plan Benchmark</button>
+                <button id="tileset-run-benchmark" type="button" class="premium-btn">Run Live</button>
+              </div>
+              <small id="tileset-provider-config-status" class="provider-status">Local session provider not set</small>
+              <small id="tileset-provider-state" class="provider-status">Material source benchmark not configured</small>
+              <small id="tileset-benchmark-status" class="provider-status">Benchmark plan not generated</small>
+            </section>
+
+            <section class="tileset-control-section">
+              <h4>3. MAP CONTRACT</h4>
+              <div class="scene-control-grid">
+                <label class="scene-field">
+                  <span>Grid Width</span>
+                  <input id="tileset-map-width" type="number" min="3" max="16" value="8" />
+                </label>
+                <label class="scene-field">
+                  <span>Grid Height</span>
+                  <input id="tileset-map-height" type="number" min="3" max="16" value="6" />
+                </label>
+              </div>
+              <div class="scene-control-grid">
+                <label class="scene-field scene-range-field">
+                  <span>Density <b id="tileset-density-value">0.55</b></span>
+                  <input id="tileset-density" type="range" min="0" max="1" step="0.05" value="0.55" />
+                </label>
+                <label class="scene-field">
+                  <span>Seed</span>
+                  <input id="tileset-seed" type="number" step="1" value="170617" />
+                </label>
+              </div>
+              <div class="scene-control-grid">
+                <label class="scene-field">
+                  <span>Solver</span>
+                  <select id="tileset-map-solver">
+                    <option value="constraint" selected>constraint</option>
+                    <option value="seeded">seeded fallback</option>
+                  </select>
+                </label>
+                <label class="scene-field">
+                  <span>Border</span>
+                  <select id="tileset-map-border">
+                    <option value="empty" selected>empty</option>
+                    <option value="none">none</option>
+                  </select>
+                </label>
+              </div>
+            </section>
+
+            <section class="tileset-control-section">
+              <h4>4. MAP EDITOR</h4>
+              <div class="tileset-tool-row" role="group" aria-label="Map editor tools">
+                <button type="button" class="active" data-tileset-tool="paint" title="Paint terrain rectangle">Paint</button>
+                <button type="button" data-tileset-tool="erase" title="Erase terrain rectangle">Erase</button>
+                <button type="button" data-tileset-tool="corner-solid" title="Set corner solid">Corner +</button>
+                <button type="button" data-tileset-tool="corner-empty" title="Set corner empty">Corner -</button>
+              </div>
+              <div class="button-row compact-row">
+                <button id="tileset-clear-edits" type="button" class="secondary premium-btn">Clear edits</button>
+                <button id="tileset-reset-preview" type="button" class="secondary premium-btn">Reset preview</button>
+              </div>
+              <ol class="tileset-operation-list" id="tileset-operation-list" aria-label="Queued map edits"></ol>
+            </section>
+          </div>
+          <button id="tileset-build" class="scene-primary-action" type="button">Build 2.5D Tileset</button>
+        </aside>
+
+        <main class="tileset-workspace">
+          <header class="scene-toolbar">
+            <div class="scene-toolbar-title">
+              <h3>2.5D MAP EDITOR</h3>
+              <span id="tileset-status" data-status="idle">ready</span>
+            </div>
+            <div class="scene-toolbar-actions">
+              <button id="tileset-refresh-preview" class="scene-secondary-action" type="button">Refresh</button>
+            </div>
+          </header>
+          <div class="tileset-editor-surface">
+            <canvas id="tileset-editor-canvas" width="640" height="448" aria-label="2.5D terrain map editor"></canvas>
+            <div class="tileset-editor-help" id="tileset-editor-help">Drag on cells to paint or erase. Use corner tools on grid points.</div>
+          </div>
+        </main>
+
+        <aside class="tileset-result-panel" aria-label="2.5D export results">
+          <section class="tileset-result-card">
+            <div class="scene-quality-head">
+              <span>WORKFLOW STATUS</span>
+              <strong id="tileset-result-status">IDLE</strong>
+            </div>
+            <div class="tileset-result-metrics" id="tileset-result-metrics">
+              <span><small>Validation</small><b>—</b></span>
+              <span><small>LDtk</small><b>—</b></span>
+              <span><small>Editor ops</small><b>0</b></span>
+            </div>
+          </section>
+          <section class="tileset-result-card">
+            <div class="scene-quality-head">
+              <span>SOURCE BENCHMARK</span>
+              <strong id="tileset-benchmark-result-status">NOT RUN</strong>
+            </div>
+            <div class="tileset-result-metrics" id="tileset-benchmark-metrics">
+              <span><small>Calls</small><b>—</b></span>
+              <span><small>Candidates</small><b>—</b></span>
+              <span><small>Usable</small><b>—</b></span>
+            </div>
+            <div class="tileset-evidence-summary" id="tileset-benchmark-summary">
+              <p>Generate a dry-run plan before spending provider quota.</p>
+            </div>
+            <div class="tileset-export-links" id="tileset-benchmark-links"></div>
+          </section>
+          <figure class="tileset-preview-card">
+            <img id="tileset-map-preview" alt="2.5D map editor preview" hidden />
+            <figcaption id="tileset-preview-caption">Build to view validated map preview.</figcaption>
+          </figure>
+          <section class="tileset-result-card">
+            <div class="scene-quality-head">
+              <span>EXPORTS</span>
+              <strong id="tileset-export-count">0</strong>
+            </div>
+            <div class="tileset-export-links" id="tileset-export-links"></div>
+          </section>
+          <section class="tileset-result-card">
+            <div class="scene-quality-head">
+              <span>RELEASE EVIDENCE</span>
+              <strong id="tileset-evidence-status">—</strong>
+            </div>
+            <div class="tileset-evidence-summary" id="tileset-evidence-summary"></div>
+          </section>
+        </aside>
+      </div>
+    </section>
+
+
+    <section class="tab-panel" id="sprite" aria-labelledby="sprite-tab">
+  <div class="v8-layout-3col">
+    <!-- Left Column: Settings -->
+    <aside class="engine-sidebar premium-panel" style="width: 360px;">
+      <div class="engine-section">
+        <h4>1. ASSET DEFINITION</h4>
+      </div>
+      <form id="sprite-form" style="display: flex; flex-direction: column; gap: 24px;">
+        <!-- File Upload -->
+        <label class="file-upload-card" for="frame-files">
+          <input id="frame-files" type="file" accept="image/png,image/jpeg,image/webp" multiple />
+          <span class="file-icon">📁</span>
+          <span style="font-size: 13px; font-weight: 500;">Drop PNG/JPG/WebP sequences here</span>
+          <small style="color: var(--text-muted); font-size: 11px;">Select multiple files (Sorted by name)</small>
+        </label>
+
+        <div class="engine-section">
+          <h4>2. LAYOUT PARAMS</h4>
+
+          <div class="sprite-form-row">
+            <div>
+              <label style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px; display: block;">Target W</label>
+              <div class="input-with-suffix">
+                <input id="target-w" class="premium-input" type="number" min="1" value="256" />
+                <span class="suffix">px</span>
+              </div>
+            </div>
+            <div>
+              <label style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px; display: block;">Target H</label>
+              <div class="input-with-suffix">
+                <input id="target-h" class="premium-input" type="number" min="1" value="256" />
+                <span class="suffix">px</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="sprite-form-row" style="margin-top: 12px;">
+            <div>
+              <label style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px; display: block;">Padding</label>
+              <div class="input-with-suffix">
+                <input id="padding" class="premium-input" type="number" min="0" value="0" />
+                <span class="suffix">px</span>
+              </div>
+            </div>
+            <div>
+              <label style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px; display: block;">Spacing</label>
+              <div class="input-with-suffix">
+                <input id="spacing" class="premium-input" type="number" min="0" value="0" />
+                <span class="suffix">px</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="sprite-form-row" style="margin-top: 12px;">
+            <div>
+              <label style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px; display: block;">Columns</label>
+              <div class="input-with-suffix">
+                <input id="columns" class="premium-input" type="number" min="1" value="4" />
+                <span class="suffix">col</span>
+              </div>
+            </div>
+            <div>
+              <label style="font-size: 11px; color: var(--text-muted); margin-bottom: 6px; display: block;">Target FPS</label>
+              <div class="input-with-suffix">
+                <input id="fps" class="premium-input" type="number" min="1" value="12" />
+                <span class="suffix">fps</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="engine-section" style="margin-top: auto;">
+          <button id="generate-sheet" type="button" class="premium-btn primary-action" style="width: 100%; margin-bottom: 12px; background-color: var(--accent); color: #fff;">Generate Sheet</button>
+          <div class="metrics" id="sheet-metrics" style="background: rgba(255,255,255,0.02); padding: 12px; border-radius: 6px; font-size: 12px; color: var(--text-muted); border: 1px solid var(--border); display: flex; justify-content: space-between;">
+            <span>Frames: 0</span>
+            <span>Rows: 0</span>
+            <span>Size: 0x0</span>
+          </div>
+        </div>
+      </form>
+    </aside>
+
+    <!-- Center Column: Canvas -->
+    <main class="v8-workspace">
+      <header class="workspace-toolbar premium-toolbar">
+        <div class="toolbar-left">
+          <h3>WORKSPACE</h3>
+          <span class="playback-status" id="status-line">● Waiting for frames...</span>
+        </div>
+      </header>
+      <div class="canvas-container checkerboard-bg" style="align-items: center; justify-content: center; overflow: auto; padding: 40px;">
+        <canvas id="sheet-canvas" width="1" height="1" aria-label="Sprite Sheet 预览" style="box-shadow: 0 10px 40px rgba(0,0,0,0.5); max-width: 100%; object-fit: contain;"></canvas>
+      </div>
+    </main>
+
+    <!-- Right Column: Live Preview & Export -->
+    <aside class="engine-sidebar right-panel premium-panel" style="width: 360px;">
+      <div class="engine-section">
+        <h4>3. LIVE PREVIEW</h4>
+      </div>
+
+      <figure class="sprite-gif-preview" id="sprite-gif-preview-card" style="margin: 0; background: rgba(0,0,0,0.2); border: 1px solid var(--border); border-radius: 6px; padding: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 256px;" hidden>
+        <img id="sprite-gif-preview" alt="序列帧 GIF 预览" style="max-width: 100%; image-rendering: pixelated;" />
+      </figure>
+
+      <ol class="frame-list" id="frame-list" style="display: none;"></ol>
+
+      <div class="engine-section" style="margin-top: auto;">
+        <h4>4. EXPORT</h4>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <button id="download-png" type="button" class="premium-btn ghost" disabled>Download PNG</button>
+          <button id="download-json" type="button" class="premium-btn ghost" disabled>Download JSON</button>
+          <button id="download-gif" type="button" class="premium-btn ghost" disabled>Download GIF</button>
+          <button id="download-zip" type="button" class="premium-btn" disabled>Download ZIP</button>
+        </div>
+      </div>
+    </aside>
+  </div>
+</section>
+
+<section class="tab-panel" id="motion-source" aria-labelledby="motion-source-tab" hidden>
+  <div class="motion-source-shell">
+    <div class="motion-source-view-switch" role="group" aria-label="Motion Source view" data-i18n-aria-label="motion.view.label">
+      <span class="motion-source-view-label" data-i18n="motion.view.label">Motion Source view</span>
+      <div class="motion-source-view-buttons">
+        <button id="motion-source-view-guided" type="button" aria-pressed="true" data-i18n="motion.view.guided">Guided</button>
+        <button id="motion-source-view-advanced" type="button" aria-pressed="false" data-i18n="motion.view.advanced">Advanced</button>
+      </div>
+    </div>
+
+    <div class="motion-source-layout">
+      <aside
+        class="motion-source-sidebar motion-guide-sidebar premium-panel"
+        id="motion-source-guided-sidebar"
+        aria-label="Guided Motion Source steps"
+        data-i18n-aria-label="motion.guide.sidebarLabel"
+        tabindex="-1"
+      >
+        <section class="motion-guide-step" data-step="source" data-state="waiting" aria-labelledby="motion-guide-source-title">
+          <header class="motion-guide-step-head">
+            <span class="motion-guide-step-number" aria-hidden="true">1</span>
+            <div>
+              <h4 id="motion-guide-source-title" data-i18n="motion.guide.source.title">Source</h4>
+              <p data-i18n="motion.guide.source.description">Choose a local motion source and confirm its tool requirements.</p>
+            </div>
+            <span class="motion-guide-step-status" data-i18n="motion.status.waiting">Waiting</span>
+          </header>
+          <p
+            id="motion-guide-source-summary"
+            class="motion-guide-summary"
+            role="status"
+            aria-live="polite"
+            data-i18n="motion.guide.source.empty"
+          >No source selected.</p>
+          <div class="motion-guide-actions">
+            <button id="motion-guide-choose-source" type="button" class="premium-btn ghost" disabled data-i18n="motion.guide.source.choose">Choose source</button>
+            <button id="motion-guide-analyze" type="button" class="premium-btn" disabled data-i18n="motion.guide.source.analyze">Analyze</button>
+          </div>
+        </section>
+
+        <section class="motion-guide-step" data-step="select" data-state="waiting" aria-labelledby="motion-guide-select-title">
+          <header class="motion-guide-step-head">
+            <span class="motion-guide-step-number" aria-hidden="true">2</span>
+            <div>
+              <h4 id="motion-guide-select-title" data-i18n="motion.guide.select.title">Select</h4>
+              <p data-i18n="motion.guide.select.description">Preview candidates, then keep automatic authority or make an ordered manual selection.</p>
+            </div>
+            <span class="motion-guide-step-status" data-i18n="motion.status.waiting">Waiting</span>
+          </header>
+          <label>
+            <span data-i18n="motion.guide.action.label">Runtime action</span>
+            <select id="motion-guide-action" class="premium-select">
+              <option value="" selected disabled data-i18n="motion.guide.action.loading">Loading actions...</option>
+            </select>
+          </label>
+          <label>
+            <span data-i18n="motion.guide.target.label">Target frames</span>
+            <input id="motion-guide-target" type="number" min="1" max="16" value="4" class="premium-input" />
+          </label>
+          <label>
+            <span data-i18n="motion.guide.selectionMode.label">Selection authority</span>
+            <select id="motion-guide-selection-mode" class="premium-select">
+              <option value="auto" selected data-i18n="motion.option.auto">Auto</option>
+              <option value="manual" data-i18n="motion.option.manual">Manual</option>
+            </select>
+          </label>
+          <label>
+            <span data-i18n="motion.guide.selectionRecipe.label">Selection recipe</span>
+            <select id="motion-guide-selection-recipe" class="premium-select">
+              <option value="motion_selection_recipe_v2" selected data-i18n="motion.option.selectionV2">Motion Selection v2</option>
+              <option value="motion_selection_v1_compat" data-i18n="motion.option.selectionV1">v1 compatibility</option>
+            </select>
+          </label>
+          <div class="motion-guide-field-grid">
+            <label>
+              <span data-i18n="motion.guide.loop.label">Loop expectation</span>
+              <select id="motion-guide-loop-expectation" class="premium-select">
+                <option value="auto" selected data-i18n="motion.option.auto">Auto</option>
+                <option value="loop" data-i18n="motion.option.loop">Loop</option>
+                <option value="once" data-i18n="motion.option.once">Once</option>
+              </select>
+            </label>
+            <label>
+              <span data-i18n="motion.guide.temporalMatte.label">Temporal matte</span>
+              <select id="motion-guide-temporal-matte" class="premium-select" aria-describedby="motion-guide-temporal-matte-hint">
+                <option value="disabled" selected data-i18n="motion.option.disabled">Disabled</option>
+                <option value="evidence_only" data-i18n="motion.option.evidenceOnly">Evidence only</option>
+              </select>
+            </label>
+          </div>
+          <p id="motion-guide-temporal-matte-hint" class="motion-source-meta" data-i18n="motion.guide.temporalMatte.hint">Evidence only measures alpha flicker and never changes pixels.</p>
+          <div class="motion-guide-actions">
+            <button id="motion-guide-preview" type="button" class="premium-btn" disabled data-i18n="motion.guide.select.preview">Preview candidates</button>
+            <button id="motion-guide-restore-auto" type="button" class="premium-btn ghost" disabled data-i18n="motion.guide.select.restoreAuto">Restore Auto</button>
+          </div>
+        </section>
+
+        <section class="motion-guide-step" data-step="cleanup" data-state="waiting" aria-labelledby="motion-guide-cleanup-title">
+          <header class="motion-guide-step-head">
+            <span class="motion-guide-step-number" aria-hidden="true">3</span>
+            <div>
+              <h4 id="motion-guide-cleanup-title" data-i18n="motion.guide.cleanup.title">Clean &amp; Build</h4>
+              <p data-i18n="motion.guide.cleanup.description">Choose real cleanup settings and build one normalized action strip.</p>
+            </div>
+            <span class="motion-guide-step-status" data-i18n="motion.status.waiting">Waiting</span>
+          </header>
+          <label>
+            <span data-i18n="motion.guide.background.label">Background method</span>
+            <select id="motion-guide-background-method" class="premium-select">
+              <option value="key_color" selected data-i18n="motion.option.keyColor">Key color / flood</option>
+              <option value="external_rembg" data-i18n="motion.option.rembg">Local rembg / U2Net</option>
+            </select>
+          </label>
+          <label class="range-field">
+            <span><span data-i18n="motion.guide.tolerance.label">Tolerance</span> <b id="motion-guide-tolerance-value">24</b></span>
+            <input id="motion-guide-tolerance" type="range" min="0" max="80" value="24" />
+          </label>
+          <label>
+            <span data-i18n="motion.guide.pixelGrid.label">Pixel Grid recipe</span>
+            <select id="motion-guide-pixel-grid-recipe" class="premium-select">
+              <option value="disabled" selected data-i18n="motion.option.disabled">Disabled</option>
+              <option value="pixel_grid_v2_balanced" data-i18n="motion.option.gridBalanced">v2 Balanced (sRGB)</option>
+              <option value="pixel_grid_v2_detail_safe" data-i18n="motion.option.gridDetailSafe">v2 Detail-safe (sRGB)</option>
+              <option value="pixel_grid_v2_oklab" data-i18n="motion.option.gridOklab">v2 Detail-safe (OKLab)</option>
+            </select>
+          </label>
+          <div class="motion-guide-actions">
+            <button id="motion-guide-build" type="button" class="premium-btn" disabled data-i18n="motion.guide.cleanup.build">Build strip</button>
+            <button id="motion-guide-open-advanced" type="button" class="premium-btn ghost" data-i18n="motion.guide.cleanup.advanced">Advanced settings</button>
+          </div>
+        </section>
+
+        <section class="motion-guide-step" data-step="review" data-state="waiting" aria-labelledby="motion-guide-review-title">
+          <header class="motion-guide-step-head">
+            <span class="motion-guide-step-number" aria-hidden="true">4</span>
+            <div>
+              <h4 id="motion-guide-review-title" data-i18n="motion.guide.review.title">Review Evidence</h4>
+              <p data-i18n="motion.guide.review.description">Review bound report evidence before applying the strip.</p>
+            </div>
+            <span class="motion-guide-step-status" data-i18n="motion.status.waiting">Waiting</span>
+          </header>
+          <p id="motion-guide-review-summary" class="motion-guide-summary" data-i18n="motion.guide.review.empty">Build a strip to populate evidence.</p>
+          <div class="motion-guide-future-list" aria-label="Future capabilities" data-i18n-aria-label="motion.future.label">
+            <div class="motion-guide-future-row" id="motion-guide-future-semantic" aria-describedby="motion-guide-future-semantic-description">
+              <span>
+                <strong data-i18n="motion.future.semantic.title">Semantic phase recognition</strong>
+                <small id="motion-guide-future-semantic-description" data-i18n="motion.future.semantic.description">No semantic action labels are inferred in this workflow.</small>
+              </span>
+              <button type="button" disabled aria-describedby="motion-guide-future-semantic-description" data-i18n="motion.future.comingLater">Coming later</button>
+            </div>
+            <div class="motion-guide-future-row" id="motion-guide-future-adaptive" aria-describedby="motion-guide-future-adaptive-description">
+              <span>
+                <strong data-i18n="motion.future.adaptive.title">Adaptive candidates</strong>
+                <small id="motion-guide-future-adaptive-description" data-i18n="motion.future.adaptive.description">No automatic extra Provider spend is available.</small>
+              </span>
+              <button type="button" disabled aria-describedby="motion-guide-future-adaptive-description" data-i18n="motion.future.comingLater">Coming later</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="motion-guide-step" data-step="apply" data-state="waiting" aria-labelledby="motion-guide-apply-title">
+          <header class="motion-guide-step-head">
+            <span class="motion-guide-step-number" aria-hidden="true">5</span>
+            <div>
+              <h4 id="motion-guide-apply-title" data-i18n="motion.guide.apply.title">Apply &amp; Export</h4>
+              <p data-i18n="motion.guide.apply.description">Apply the reviewed strip to a normalized sheet and open real artifacts.</p>
+            </div>
+            <span class="motion-guide-step-status" data-i18n="motion.status.waiting">Waiting</span>
+          </header>
+          <p id="motion-guide-sheet-summary" class="motion-guide-summary" data-i18n="motion.guide.apply.noSheet">No target sheet selected.</p>
+          <button id="motion-guide-choose-sheet" type="button" class="premium-btn ghost" disabled data-i18n="motion.guide.apply.chooseSheet">Choose target sheet</button>
+          <label>
+            <span data-i18n="motion.guide.resample.label">Resample strategy</span>
+            <select id="motion-guide-resample" class="premium-select">
+              <option value="reject_mismatch" selected data-i18n="motion.option.rejectMismatch">Reject mismatch</option>
+              <option value="nearest_keyframes" data-i18n="motion.option.nearestKeyframes">Nearest keyframes</option>
+            </select>
+          </label>
+          <div class="motion-guide-actions">
+            <button id="motion-guide-apply" type="button" class="premium-btn" disabled data-i18n="motion.guide.apply.action">Apply strip</button>
+            <button id="motion-guide-open-artifacts" type="button" class="premium-btn ghost" data-i18n="motion.guide.apply.artifacts">Open artifacts</button>
+          </div>
+          <p class="motion-source-meta" data-i18n="motion.guide.apply.scope">Motion Source exports strips, sequence files, and an applied normalized sheet. Complete engine packs remain in Character Pack.</p>
+        </section>
+      </aside>
+
+      <aside
+        class="motion-source-sidebar premium-panel"
+        id="motion-source-advanced-sidebar"
+        aria-label="Advanced Motion Source settings"
+        data-i18n-aria-label="motion.advanced.sidebarLabel"
+        tabindex="-1"
+        hidden
+      >
+      <div class="engine-section">
+        <h4>1. SOURCE</h4>
+        <label class="file-upload-card">
+          <input id="motion-source-file" type="file" accept=".gif,.zip,image/png,image/webp,image/jpeg,video/mp4,video/quicktime,video/webm,video/x-matroska,video/x-msvideo,.mkv,.avi,.m4v" />
+          <span>Motion source</span>
+          <small id="motion-source-file-hint">GIF/ZIP up to 64MB, still image up to 32MB, or video up to 200MB with local FFmpeg available.</small>
+        </label>
+        <p id="motion-source-file-meta" class="motion-source-meta">No source selected.</p>
+        <p id="motion-source-identity" class="motion-source-meta">Source identity appears after upload.</p>
+        <p id="motion-source-ffmpeg-status" class="motion-source-meta">Checking local tools...</p>
+        <label class="file-upload-card">
+          <input id="motion-source-manifest-file" type="file" accept="application/json,.json" />
+          <span>Source-set manifest</span>
+          <small>Optional manifest for multi-action identity checks.</small>
+        </label>
+        <label class="file-upload-card">
+          <input id="motion-source-set-strip-files" type="file" accept="image/png,image/webp" multiple />
+          <span>Source-set strips</span>
+          <small>Use normalized strips that match manifest source names or ids.</small>
+        </label>
+      </div>
+
+      <div class="engine-section">
+        <h4>2. STRIP CONTRACT</h4>
+        <label class="inline-field">Runtime action
+          <select id="motion-source-action" class="premium-select">
+            <option value="" selected disabled data-i18n="motion.guide.action.loading">Loading actions...</option>
+          </select>
+        </label>
+        <div class="dual-control-row">
+          <label>Target frames
+            <input id="motion-source-target-frames" type="number" min="1" max="16" value="4" class="premium-input" />
+          </label>
+          <label>Stride
+            <input id="motion-source-stride" type="number" min="1" max="24" value="1" class="premium-input" />
+          </label>
+        </div>
+        <label>FPS
+          <input id="motion-source-fps" type="number" min="1" max="60" value="12" class="premium-input" />
+        </label>
+        <div class="dual-control-row">
+          <label>Start sec
+            <input id="motion-source-start-sec" type="number" min="0" step="0.1" value="0" class="premium-input" />
+          </label>
+          <label>End sec
+            <input id="motion-source-end-sec" type="number" min="0" step="0.1" value="" placeholder="auto" class="premium-input" />
+          </label>
+        </div>
+        <label>Max frames
+          <input id="motion-source-max-frames" type="number" min="1" max="64" value="64" class="premium-input" />
+        </label>
+        <label>Selection mode
+          <select id="motion-source-selection-mode" class="premium-select" aria-describedby="motion-source-selection-hint">
+            <option value="auto" selected>Auto</option>
+            <option value="manual">Manual</option>
+          </select>
+        </label>
+        <label>
+          <span data-i18n="motion.advanced.selectionRecipe">Selection recipe</span>
+          <select id="motion-source-selection-recipe" class="premium-select" aria-describedby="motion-source-selection-recipe-hint">
+            <option value="motion_selection_v1_compat" data-i18n="motion.option.selectionV1">v1 compatibility</option>
+            <option value="motion_selection_recipe_v2" selected data-i18n="motion.option.selectionV2">Motion Selection v2</option>
+          </select>
+        </label>
+        <label>
+          <span data-i18n="motion.advanced.loopExpectation">Loop expectation</span>
+          <select id="motion-source-loop-expectation" class="premium-select" disabled>
+            <option value="auto" selected data-i18n="motion.option.auto">Auto</option>
+            <option value="loop" data-i18n="motion.option.loop">Loop</option>
+            <option value="once" data-i18n="motion.option.once">Once</option>
+          </select>
+        </label>
+        <label>
+          <span data-i18n="motion.advanced.temporalMatte">Temporal matte</span>
+          <select id="motion-source-temporal-matte" class="premium-select" disabled>
+            <option value="disabled" selected data-i18n="motion.option.disabled">Disabled</option>
+            <option value="evidence_only" data-i18n="motion.option.evidenceOnly">Evidence only</option>
+          </select>
+        </label>
+        <p id="motion-source-selection-recipe-hint" class="motion-source-meta" data-i18n="motion.advanced.selectionRecipeHint">Loop expectation and temporal matte require Motion Selection v2.</p>
+        <button id="motion-source-restore-auto" type="button" class="premium-btn ghost">Restore automatic selection</button>
+        <p id="motion-source-selection-hint" class="motion-source-meta">Auto lets the local selector choose frames. Editing the picker switches to Manual.</p>
+      </div>
+
+      <div class="engine-section">
+        <h4>3. BACKGROUND</h4>
+        <label>Background method
+          <select id="motion-source-background-method" class="premium-select">
+            <option value="key_color" selected>Key color / flood</option>
+            <option value="external_rembg">Local rembg / U2Net</option>
+          </select>
+        </label>
+        <label>Key color RGB
+          <input id="motion-source-key-color" type="text" value="255,255,255" class="premium-input" />
+        </label>
+        <div class="motion-source-swatches" aria-label="Background swatches">
+          <button type="button" data-motion-key-color="255,255,255" style="--swatch:#ffffff" aria-label="White key color"></button>
+          <button type="button" data-motion-key-color="0,255,0" style="--swatch:#00ff00" aria-label="Green key color"></button>
+          <button type="button" data-motion-key-color="255,0,255" style="--swatch:#ff00ff" aria-label="Magenta key color"></button>
+          <button type="button" data-motion-key-color="0,0,255" style="--swatch:#0000ff" aria-label="Blue key color"></button>
+        </div>
+        <label class="range-field">Tolerance <span id="motion-source-tolerance-value">24</span>
+          <input id="motion-source-tolerance" type="range" min="0" max="80" value="24" />
+        </label>
+        <label class="checkbox-row">
+          <input id="motion-source-defringe" type="checkbox" checked />
+          <span>Defringe</span>
+        </label>
+        <label class="range-field">Static Y offset <span id="motion-source-static-offset-y-value">0</span>
+          <input id="motion-source-static-offset-y" type="range" min="-24" max="24" value="0" />
+        </label>
+        <label>Pixel Grid Recipe
+          <select id="motion-source-pixel-grid-recipe" class="premium-select" aria-describedby="motion-source-pixel-grid-hint">
+            <option value="disabled" selected>Disabled</option>
+            <option value="pixel_grid_v2_balanced">v2 Balanced (sRGB)</option>
+            <option value="pixel_grid_v2_detail_safe">v2 Detail-safe (sRGB)</option>
+            <option value="pixel_grid_v2_oklab">v2 Detail-safe (OKLab)</option>
+          </select>
+        </label>
+        <p id="motion-source-pixel-grid-hint" class="motion-source-meta">Optional local sequence consensus. OKLab changes palette matching only.</p>
+      </div>
+
+      <div class="engine-section">
+        <h4>4. APPLY</h4>
+        <label class="file-upload-card">
+          <input id="motion-source-sheet-file" type="file" accept="image/png,image/webp" />
+          <span>Target normalized sheet</span>
+          <small>Existing character sheet that receives the selected action.</small>
+        </label>
+        <label class="file-upload-card">
+          <input id="motion-source-strip-file" type="file" accept="image/png,image/webp" />
+          <span>Edited strip override</span>
+          <small>Optional; otherwise the latest built strip is used.</small>
+        </label>
+        <label>Resample strategy
+          <select id="motion-source-resample-strategy" class="premium-select">
+            <option value="reject_mismatch" selected>reject_mismatch</option>
+            <option value="nearest_keyframes">nearest_keyframes</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="motion-source-actions">
+        <button id="motion-source-analyze" type="button" class="premium-btn ghost" disabled>Analyze</button>
+        <button id="motion-source-preview-frames" type="button" class="premium-btn ghost" disabled>Preview Frames</button>
+        <button id="motion-source-build-strip" type="button" class="premium-btn" disabled>Build Strip</button>
+        <button id="motion-source-apply-strip" type="button" class="premium-btn" disabled>Apply Strip</button>
+        <button id="motion-source-analyze-set" type="button" class="premium-btn ghost" disabled>Analyze Set</button>
+        <button id="motion-source-apply-set" type="button" class="premium-btn" disabled>Apply Set</button>
+        <button id="motion-source-cancel" type="button" class="premium-btn ghost" disabled>Cancel current job</button>
+        <button id="motion-source-resume" type="button" class="premium-btn ghost" disabled>Resume polling</button>
+      </div>
+    </aside>
+
+    <main class="motion-source-workspace">
+      <header class="workspace-toolbar premium-toolbar">
+        <div class="toolbar-left">
+          <h3>MOTION SOURCE</h3>
+          <span class="playback-status" id="motion-source-status" data-status="idle" role="status" aria-live="polite" aria-atomic="true">waiting</span>
+        </div>
+        <div class="motion-guide-toolbar-actions" aria-label="Guided job actions" data-i18n-aria-label="motion.toolbar.actions">
+          <button id="motion-guide-cancel" type="button" class="premium-btn ghost" hidden disabled data-i18n="motion.toolbar.cancel">Cancel</button>
+          <button id="motion-guide-resume" type="button" class="premium-btn ghost" hidden disabled data-i18n="motion.toolbar.resume">Resume</button>
+        </div>
+      </header>
+      <section class="motion-source-preview-grid">
+        <figure>
+          <figcaption>Frame preview</figcaption>
+          <img id="motion-source-frame-preview-sheet" alt="Motion frame preview sheet" hidden />
+        </figure>
+        <figure>
+          <figcaption>Contact sheet</figcaption>
+          <img id="motion-source-contact-sheet" alt="Motion source contact sheet" hidden />
+        </figure>
+        <figure>
+          <figcaption>Normalized strip</figcaption>
+          <img id="motion-source-strip-preview" alt="Normalized motion strip" hidden />
+        </figure>
+        <figure>
+          <figcaption>Applied sheet</figcaption>
+          <img id="motion-source-apply-preview" alt="Applied normalized sheet" hidden />
+        </figure>
+      </section>
+      <section class="motion-evidence-hud" aria-label="Motion evidence" data-i18n-aria-label="motion.hud.label">
+        <article class="motion-evidence-card" id="motion-hud-source" data-state="not-run">
+          <h4 data-i18n="motion.hud.source">Source</h4>
+          <p data-i18n="motion.hud.notRun">Not run</p>
+        </article>
+        <article class="motion-evidence-card" id="motion-hud-selection" data-state="not-run">
+          <h4 data-i18n="motion.hud.selection">Selection</h4>
+          <p data-i18n="motion.hud.notRun">Not run</p>
+        </article>
+        <article class="motion-evidence-card" id="motion-hud-loop" data-state="not-run">
+          <h4 data-i18n="motion.hud.loop">Loop / Phase</h4>
+          <p data-i18n="motion.hud.notRun">Not run</p>
+        </article>
+        <article class="motion-evidence-card" id="motion-hud-cleanup" data-state="not-run">
+          <h4 data-i18n="motion.hud.cleanup">Cleanup</h4>
+          <p data-i18n="motion.hud.notRun">Not run</p>
+        </article>
+        <article class="motion-evidence-card" id="motion-hud-grid" data-state="not-run">
+          <h4 data-i18n="motion.hud.grid">Pixel Grid</h4>
+          <p data-i18n="motion.hud.notRun">Not run</p>
+        </article>
+        <article class="motion-evidence-card" id="motion-hud-binding" data-state="not-run">
+          <h4 data-i18n="motion.hud.binding">Binding</h4>
+          <p data-i18n="motion.hud.notRun">Not run</p>
+        </article>
+      </section>
+      <section class="motion-source-report-grid">
+        <div class="motion-source-report-panel">
+          <h4>Report</h4>
+          <pre id="motion-source-report"></pre>
+        </div>
+        <div class="motion-source-report-panel">
+          <h4>Selected frames</h4>
+          <ol id="motion-source-selected-list"></ol>
+        </div>
+        <div class="motion-source-report-panel motion-source-frame-panel">
+          <h4>Frame picker</h4>
+          <div id="motion-source-frame-picker" class="motion-source-frame-picker"></div>
+        </div>
+      </section>
+    </main>
+
+    <aside class="motion-source-artifacts premium-panel" id="motion-source-artifacts" aria-label="Motion source artifacts" tabindex="-1">
+      <div class="engine-section">
+        <h4>ARTIFACTS</h4>
+        <div id="motion-source-links" class="motion-source-links"></div>
+      </div>
+    </aside>
+    </div>
+  </div>
+</section>
+
+                                <section class="tab-panel active" id="character-pack" aria-labelledby="character-pack-tab">
+          <div class="v8-layout">
+  <!-- LEFT SIDEBAR -->
+  <aside class="engine-sidebar premium-panel" id="character-pack-form">
+    <!-- 1. ASSET DEFINITION (SHARED) -->
+    <div class="engine-section" data-track="shared">
+      <h4 data-i18n="character.asset.title">1. ASSET DEFINITION</h4>
+      <div class="segmented-control" id="character-pack-track-toggle">
+        <button type="button" class="segment active" data-track="local" data-i18n="character.asset.localUpload">Local Upload</button>
+        <button type="button" class="segment" data-track="ai"><span class="icon">✨</span> <span data-i18n="character.asset.aiGeneration">AI Generation</span></button>
+      </div>
+      <label class="inline-field"><span data-i18n="character.asset.name">Asset Name</span>
+        <input id="character-pack-name" type="text" value="sample_hero" class="premium-input" />
+      </label>
+      <label data-track="ai" hidden><span data-i18n="character.asset.description">Asset Description</span>
+        <textarea id="character-pack-description" rows="3" class="premium-input">银发女剑士，深蓝披风，细长单手剑，金色护肩，小体型</textarea>
+      </label>
+    </div>
+
+    <!-- 2. SOURCE FILES (LOCAL ONLY) -->
+    <div class="engine-section" data-track="local">
+      <h4 data-i18n="character.source.title">2. SOURCE FILES</h4>
+      <label class="inline-field"><span data-i18n="character.source.targetLayout">Target Layout</span>
+        <select id="character-pack-source-layout" class="premium-select">
+          <option value="topdown_rpg_v0" selected data-i18n="character.layout.topdown">8x8 标准序列帧</option>
+          <option value="fixed_region_motion_v0" data-i18n="character.layout.fixedRegion">固定区域动作源图</option>
+        </select>
+      </label>
+      <div class="file-upload-card">
+        <input id="character-pack-file" type="file" accept="image/png,image/jpeg,image/webp" />
+        <div class="file-card-content">
+          <span class="file-drop-main"><span aria-hidden="true">📁</span> <span data-i18n="character.source.dropSheet">Drop Character Sprite Sheet</span></span>
+          <span class="file-drop-sub" data-i18n="character.source.supportedFiles">PNG, WebP, JPG supported</span>
+        </div>
+      </div>
+      <div class="file-upload-card optional">
+        <input id="character-pack-black-file" type="file" accept="image/png,image/jpeg,image/webp" />
+        <div class="file-card-content">
+          <span class="file-drop-optional"><span aria-hidden="true">📁</span> <span data-i18n="character.source.dropBlackMatte">Drop Black-Matte Pairing (Optional)</span></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. AI GENERATION (AI ONLY) -->
+    <div class="engine-section ai-generation-section" data-track="ai" hidden>
+      <h4 data-i18n="character.generation.title">2. AI GENERATION</h4>
+      <div>
+        <div class="param-grid">
+          <label><span data-i18n="character.generation.t2iMode">T2I Mode</span>
+            <select id="character-pack-t2i-mode" class="premium-select">
+              <option value="production_sheet_v0" selected data-i18n="character.generation.productionSheet">Production Sheet</option>
+              <option value="quality_character_v0" data-i18n="character.generation.qualityCharacter">Quality Character</option>
+            </select>
+          </label>
+          <label><span data-i18n="character.generation.characterPreset">Character Preset</span>
+            <select id="character-pack-character-preset" class="premium-select">
+              <option value="rpg_humanoid_v0" selected data-i18n="character.preset.rpgHumanoid">RPG Humanoid</option>
+              <option value="animal_companion_v0" data-i18n="character.preset.animalCompanion">Animal Companion</option>
+              <option value="monster_creature_v0" data-i18n="character.preset.monsterCreature">Monster Creature</option>
+              <option value="xianxia_hero_v0" data-i18n="character.preset.xianxiaHero">Xianxia Hero</option>
+              <option value="chibi_big_pixel_v0" data-i18n="character.preset.chibiBigPixel">Chibi Big Pixel</option>
+              <option value="two_to_one_character_v0" data-i18n="character.preset.twoToOne">2:1 Character Art</option>
+            </select>
+          </label>
+          <label><span data-i18n="character.generation.layout">Generation Layout</span>
+            <select id="character-pack-generation-layout" class="premium-select">
+              <option value="fixed_region_motion_v0" selected data-i18n="character.layout.fixedRegion">固定区域动作源图</option>
+              <option value="topdown_rpg_v0" data-i18n="character.layout.topdown">8x8 标准序列帧</option>
+            </select>
+          </label>
+          <label><span data-i18n="character.generation.outputSize">Output Size</span>
+            <select id="character-pack-image-size" class="premium-select">
+              <option value="1K">1K (1024x1024)</option>
+              <option value="2K" selected>2K (2048x2048)</option>
+            </select>
+          </label>
+          <label><span data-i18n="character.generation.candidates">Candidates</span>
+            <select id="character-pack-candidate-count" class="premium-select">
+              <option value="1" selected>1</option>
+              <option value="2">2</option>
+              <option value="4">4</option>
+              <option value="6">6</option>
+            </select>
+          </label>
+          <label><span data-i18n="character.generation.seed">Seed</span>
+            <input id="character-pack-seed" class="premium-input" type="number" placeholder="auto" data-i18n-placeholder="character.generation.seedPlaceholder" />
+          </label>
+        </div>
+        <div class="ref-slot-row" aria-label="AI 参考图槽" data-i18n-aria-label="character.generation.refSlots">
+          <label class="ref-slot">
+            <input id="character-pack-reference-file" type="file" accept="image/png,image/jpeg,image/webp" />
+            <span data-i18n="character.generation.styleRef">+ Style Ref</span>
+          </label>
+          <label class="ref-slot">
+            <input id="character-pack-palette-file" type="file" accept="image/png,image/jpeg,image/webp" />
+            <span data-i18n="character.generation.palette">+ Palette</span>
+          </label>
+          <span class="ref-slot is-builtin" title="内置动作模板自动附加" data-i18n-title="character.generation.templateTitle" data-i18n="character.generation.template">Template ✓</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. PRE-PROCESSING (SHARED) -->
+    <div class="engine-section" data-track="shared">
+      <h4 data-i18n="character.preprocess.title">3. PRE-PROCESSING</h4>
+      <label><span data-i18n="character.preprocess.backgroundMode">Background Mode</span>
+        <select id="character-pack-background" class="premium-select">
+          <option value="flood_edge" selected data-i18n="character.background.floodEdge">Auto (Flood & Edge)</option>
+          <option value="flood" data-i18n="character.background.flood">Flood Fill (Solid Color)</option>
+          <option value="dual_matte" data-i18n="character.background.dualMatte">Dual Matte (Base + Black)</option>
+          <option value="alpha" data-i18n="character.background.alpha">Keep Original Alpha</option>
+        </select>
+      </label>
+
+      <div class="slider-row">
+        <label><span data-i18n="character.preprocess.tolerance">Tolerance</span> <span class="val" id="character-pack-bg-tolerance-value">24</span>
+          <input id="character-pack-bg-tolerance" type="range" min="0" max="80" step="1" value="24" class="premium-slider" />
+        </label>
+      </div>
+
+      <details class="adv-fold">
+        <summary data-i18n="character.cleanup.advanced">◨ ADVANCED CLEANUP</summary>
+        <div class="slider-row">
+          <label><span data-i18n="character.cleanup.minAlpha">Min Alpha</span> <span class="val" id="character-pack-cleanup-min-alpha-value">18</span>
+            <input id="character-pack-cleanup-min-alpha" type="range" min="0" max="80" step="1" value="18" class="premium-slider" />
+          </label>
+        </div>
+        <label class="premium-checkbox">
+          <input id="character-pack-component-cleanup" type="checkbox" checked />
+          <span class="checkmark"></span>
+          <span data-i18n="character.cleanup.componentCleanup">Component Cleanup (Denoise)</span>
+        </label>
+        <div class="param-grid">
+          <label><span data-i18n="character.cleanup.minArea">Min Area (px)</span>
+            <input id="character-pack-component-cleanup-min-area" type="number" min="1" max="64" value="4" class="premium-input" />
+          </label>
+          <label><span data-i18n="character.cleanup.minAreaRatio">Min Area Ratio</span>
+            <input id="character-pack-component-cleanup-min-area-ratio" type="number" min="0" max="0.25" step="0.01" value="0" class="premium-input" />
+          </label>
+        </div>
+      </details>
+
+      <div class="param-grid">
+        <label class="premium-checkbox">
+          <input id="character-pack-style-report" type="checkbox" />
+          <span class="checkmark"></span>
+          <span data-i18n="character.style.report">Style Report</span>
+        </label>
+        <label class="premium-checkbox">
+          <input id="character-pack-pixel-finishing" type="checkbox" />
+          <span class="checkmark"></span>
+          <span data-i18n="character.style.pixelFinishing">Pixel Finishing</span>
+        </label>
+        <label class="premium-checkbox">
+          <input id="character-pack-pixel-outline" type="checkbox" checked />
+          <span class="checkmark"></span>
+          <span data-i18n="character.style.outline">Outline</span>
+        </label>
+        <label><span data-i18n="character.style.maxColors">Max Colors</span>
+          <input id="character-pack-style-max-colors" type="number" min="2" max="64" value="16" class="premium-input" />
+        </label>
+        <label><span data-i18n="character.style.outlineMode">Outline Mode</span>
+          <select id="character-pack-pixel-outline-mode" class="premium-select">
+            <option value="outer" selected data-i18n="character.outline.outer">Outer</option>
+            <option value="inner" data-i18n="character.outline.inner">Inner</option>
+            <option value="both" data-i18n="character.outline.both">Both</option>
+          </select>
+        </label>
+      </div>
+    </div>
+
+    <!-- 4. SLICING & ANCHORS (LOCAL ONLY) -->
+    <div class="engine-section" data-track="local">
+      <h4 data-i18n="character.slicing.title">4. SLICING & ANCHORS</h4>
+      <div class="slicing-control-grid">
+        <label class="slicing-control-field"><span data-i18n="character.slicing.autoGrid">Auto Grid</span>
+          <select id="character-pack-auto-grid" class="premium-select">
+            <option value="smart" selected data-i18n="character.slicing.smart">Smart (Trim &amp; Pad)</option>
+            <option value="strict" data-i18n="character.slicing.strict">Strict (Even Division)</option>
+          </select>
+        </label>
+        <button id="character-pack-reslice" type="button" class="secondary premium-btn" disabled data-i18n="character.slicing.reslice">Re-slice</button>
+        <button id="character-pack-manual-grid" type="button" class="secondary premium-btn" data-i18n="character.slicing.manual">Manual</button>
+        <button id="character-pack-reset-grid" type="button" class="secondary premium-btn" data-i18n="character.slicing.reset">Reset</button>
+      </div>
+
+      <div class="slider-row">
+        <label><span data-i18n="character.slicing.anchorX">Global Anchor X</span> <span class="val" id="character-pack-anchor-x-value">0</span>
+          <input id="character-pack-anchor-x" type="range" min="-16" max="16" step="1" value="0" class="premium-slider" />
+        </label>
+        <label><span data-i18n="character.slicing.anchorY">Global Anchor Y</span> <span class="val" id="character-pack-anchor-y-value">0</span>
+          <input id="character-pack-anchor-y" type="range" min="-16" max="16" step="1" value="0" class="premium-slider" />
+        </label>
+      </div>
+
+      <details class="adv-fold">
+        <summary><span data-i18n="character.slicing.frameNudge">◨ ADV. FRAME NUDGE</span> <span id="character-pack-adjustment-summary" class="badge">0 frames</span></summary>
+        
+        <div class="slider-row">
+          <label><span data-i18n="character.slicing.nudgeX">Nudge X</span> <span class="val" id="character-pack-frame-nudge-x-value">0</span>
+            <input id="character-pack-frame-nudge-x" type="range" min="-16" max="16" step="1" value="0" class="premium-slider" />
+          </label>
+          <label><span data-i18n="character.slicing.nudgeY">Nudge Y</span> <span class="val" id="character-pack-frame-nudge-y-value">0</span>
+            <input id="character-pack-frame-nudge-y" type="range" min="-16" max="16" step="1" value="0" class="premium-slider" />
+          </label>
+        </div>
+        <select id="character-pack-adjust-frame" class="premium-select"></select>
+        <div class="button-row compact-row">
+          <button id="character-pack-save-frame-adjustment" type="button" class="secondary" data-i18n="character.slicing.save">Save</button>
+          <button id="character-pack-clear-frame-adjustment" type="button" class="secondary" data-i18n="character.slicing.clear">Clear</button>
+        </div>
+      </details>
+    </div>
+
+    <details class="adv-fold" data-track="local">
+      <summary data-i18n="character.correction.fold">◨ CORRECTION, MOTION &amp; PREVIEW</summary>
+      <!-- 5. CORRECTION & MOTION (LOCAL ONLY) -->
+      <div class="engine-section" data-track="local">
+        <h4 data-i18n="character.correction.title">5. CORRECTION &amp; MOTION</h4>
+        <label class="premium-checkbox">
+          <input id="character-pack-auto-correct" type="checkbox" checked />
+          <span class="checkmark"></span>
+          <span data-i18n="character.correction.autoCorrect">Auto-Correct (Center &amp; Crop)</span>
+        </label>
+        <label class="premium-checkbox">
+          <input id="character-pack-motion-stabilize" type="checkbox" checked />
+          <span class="checkmark"></span>
+          <span data-i18n="character.correction.motionStabilize">Motion Stabilize</span>
+        </label>
+        <div class="param-grid">
+          <label><span data-i18n="character.correction.maxShift">Max Shift (px)</span>
+            <input id="character-pack-motion-max-shift" type="number" min="0" max="8" value="2" class="premium-input" />
+          </label>
+        </div>
+        <label><span data-i18n="character.correction.animationLock">Animation Lock (No Stabilization)</span>
+          <select id="character-pack-locked-animations" class="premium-select" multiple></select>
+        </label>
+      </div>
+
+      <!-- 6. PREVIEW CONTROLS (LOCAL ONLY) -->
+      <div class="engine-section" data-track="local">
+        <h4 data-i18n="character.preview.title">6. PREVIEW CONTROLS</h4>
+        <label><span data-i18n="character.preview.backgroundColor">Background Color</span>
+          <input id="character-pack-preview-bg" type="color" value="#3a3c42" class="premium-input color-picker" />
+        </label>
+      </div>
+    </details>
+
+    <!-- 4. OUTPUT PROVIDER (AI ONLY) -->
+    <div class="engine-section" data-track="ai" hidden>
+      <h4 data-i18n="character.provider.title">4. OUTPUT PROVIDER</h4>
+      <div class="param-grid">
+        <label><span data-i18n="character.provider.type">Provider Type</span>
+          <select id="character-pack-runtime-provider" class="premium-select">
+            <option value="openrouter" selected>OpenRouter</option>
+            <option value="gemini">Gemini</option>
+            <option value="openrouter_compatible">OpenRouter-compatible</option>
+          </select>
+        </label>
+        <label><span data-i18n="character.provider.model">Model</span>
+          <input id="character-pack-runtime-model" class="premium-input" type="text" autocomplete="off" placeholder="google/gemini-2.5-flash-image" />
+        </label>
+      </div>
+      <label id="character-pack-runtime-base-url-field" hidden><span data-i18n="character.provider.baseUrl">Base URL</span>
+        <input id="character-pack-runtime-base-url" class="premium-input" type="url" autocomplete="off" placeholder="https://api.example.com/v1/chat/completions" />
+      </label>
+      <label><span data-i18n="character.provider.apiKey">API Key</span>
+        <div class="secret-input-wrap">
+          <input id="character-pack-runtime-api-key" class="premium-input" type="password" autocomplete="off" />
+          <button id="character-pack-toggle-api-key" class="secret-toggle" type="button" aria-label="Show API key" title="Show API key" aria-pressed="false"></button>
+        </div>
+      </label>
+      <div class="button-row compact-row">
+        <button id="character-pack-save-provider-config" type="button" class="premium-btn" data-i18n="character.provider.use">Use Provider</button>
+        <button id="character-pack-clear-provider-config" type="button" class="secondary premium-btn" data-i18n="character.provider.clear">Clear</button>
+      </div>
+      <select id="character-pack-provider-preset" class="premium-select" disabled hidden aria-hidden="true" tabindex="-1"><option value="" data-i18n="character.provider.detecting">检测中...</option></select>
+      <small id="character-pack-provider-config-status" class="provider-status">Local session provider not set</small>
+      <small id="gemini-state" class="provider-status">检查 AI 状态...</small>
+    </div>
+
+    <button id="process-character-pack" type="button" class="action-button primary premium-btn primary-action" data-track="local"><span aria-hidden="true">🚀</span> <span data-i18n="character.action.processLocal">Process Local Sheet</span></button>
+    <button id="generate-character-pack" type="button" class="action-button primary premium-btn primary-action" data-track="ai" hidden><span aria-hidden="true">✨</span> <span data-i18n="character.action.generateAi">AI Generate Sheet</span></button>
+
+  </aside>
+
+  <!-- RIGHT WORKSPACE (Vast Pro Canvas Area) -->
+  <main class="v8-workspace">
+    <!-- WORKSPACE TOOLBAR -->
+    <header class="workspace-toolbar premium-toolbar">
+      <div class="toolbar-left">
+        <h3 data-i18n="character.workspace.title">WORKSPACE</h3>
+        <span class="ws-badge" data-i18n="character.workspace.autoGrid">Auto Grid</span>
+        <span class="playback-status" id="character-pack-status" data-status="idle">idle</span>
+      </div>
+      <div class="toolbar-right">
+        <label><span data-i18n="character.workspace.animation">Animation</span>
+          <select id="character-pack-animation" class="premium-select" disabled></select>
+        </label>
+      </div>
+    </header>
+
+    <!-- CANVAS CONTAINER -->
+    <div class="canvas-container pro-canvas-bg">
+      <canvas id="character-pack-playground" width="384" height="192" tabindex="0"></canvas>
+      <span class="playing-pill" id="character-pack-preview-state" data-state="idle">idle</span>
+
+      <!-- QUALITY REPORT OVERLAY -->
+      <div class="quality-report-hud premium-glass" id="character-pack-quality">
+        <!-- Quality report injected by JS -->
+      </div>
+
+      <img id="character-pack-source-preview" class="character-pack-preview" alt="Source Preview" data-i18n-alt="character.preview.sourceAlt" hidden />
+      <img id="character-pack-normalized-preview" class="character-pack-preview" alt="Normalized Preview" data-i18n-alt="character.preview.normalizedAlt" hidden />
+      <img id="character-pack-debug-preview" class="character-pack-preview" alt="Debug Overlay" data-i18n-alt="character.preview.debugAlt" hidden />
+      <div id="character-pack-cutline-layer" class="cutline-layer" hidden></div>
+    </div>
+
+    <!-- ACTION GALLERY (Bottom Dock) -->
+    <div class="action-gallery-dock premium-panel">
+      <div class="gallery-header">
+        <h4 data-i18n="character.gallery.title">ACTION GALLERY</h4>
+        <div class="gallery-actions">
+          <span class="action-repair-status" id="character-pack-repair-status" data-status="idle">完成一个角色包后可修复当前动作</span>
+          <button class="secondary premium-btn" id="character-pack-repair-plan" type="button" disabled data-i18n="character.repair.plan">Repair Plan</button>
+          <button class="secondary premium-btn" id="character-pack-repair-run" type="button" disabled data-i18n="character.repair.runOne">Run 1 Call</button>
+          <button class="secondary premium-btn" data-i18n="character.project.save">Save Project</button>
+          <button class="primary premium-btn" id="character-pack-export-open" type="button" data-i18n="character.export.open">Export</button>
+        </div>
+      </div>
+      <div id="character-pack-links" class="gallery-links-container">
+        <!-- Action gifs rendered here by JS -->
+      </div>
+    </div>
+  </main>
+
+  <!-- EXPORT MODAL (click Export to open) -->
+  <div class="export-modal-scrim" id="character-pack-export-scrim" hidden>
+    <div class="export-modal" role="dialog" aria-modal="true" aria-labelledby="character-pack-export-title">
+      <div class="export-modal-head">
+        <div class="export-modal-head-text">
+          <h3 id="character-pack-export-title" data-i18n="character.export.title">Export Character Pack</h3>
+          <p data-i18n="character.export.subtitle">Choose engine formats to download</p>
+        </div>
+        <button class="export-modal-close" id="character-pack-export-close" type="button" aria-label="关闭" data-i18n-aria-label="character.export.close">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        </button>
+      </div>
+      <div class="export-divider"></div>
+      <div class="export-rows" id="character-pack-export-rows">
+        <div class="export-row" data-export-key="godot_npc_zip_url">
+          <div class="export-row-left"><span class="export-name">Godot</span><span class="export-fmt">npc.json + .tres</span></div>
+          <a class="export-dl" download hidden aria-label="下载 Godot" data-i18n-aria-label="character.export.downloadGodot"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></a>
+        </div>
+        <div class="export-row" data-export-key="rpgmaker_zip_url">
+          <div class="export-row-left"><span class="export-name">RPG Maker</span><span class="export-fmt" data-i18n="character.export.rpgMakerFormat">character sheet</span></div>
+          <a class="export-dl" download hidden aria-label="下载 RPG Maker" data-i18n-aria-label="character.export.downloadRpgMaker"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></a>
+        </div>
+        <div class="export-row" data-export-key="ocad_zip_url">
+          <div class="export-row-left"><span class="export-name">OCAD</span><span class="export-fmt" data-i18n="character.export.ocadFormat">一图全动作</span></div>
+          <a class="export-dl" download hidden aria-label="下载 OCAD" data-i18n-aria-label="character.export.downloadOcad"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></a>
+        </div>
+        <div class="export-row" data-export-key="editor_metadata_url">
+          <div class="export-row-left"><span class="export-name">Aseprite</span><span class="export-fmt">JSON tags + slices</span></div>
+          <a class="export-dl" download hidden aria-label="下载 Aseprite JSON" data-i18n-aria-label="character.export.downloadEditorJson"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></a>
+        </div>
+        <div class="export-row" data-export-key="zip_url">
+          <div class="export-row-left"><span class="export-name">Multi-res PNG</span><span class="export-fmt">16 · 32 · 48 · 96</span></div>
+          <a class="export-dl" download hidden aria-label="下载完整包" data-i18n-aria-label="character.export.downloadFullPack"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></a>
+        </div>
+        <div class="export-scale-row">
+          <span class="export-fmt" data-i18n="character.export.scales">Export scales</span>
+          <div class="export-scale-group" aria-label="导出尺寸">
+            <label class="checkbox-row"><input id="character-pack-export-1x" type="checkbox" value="1" checked /> 1x</label>
+            <label class="checkbox-row"><input id="character-pack-export-2x" type="checkbox" value="2" checked /> 2x</label>
+            <label class="checkbox-row"><input id="character-pack-export-3x" type="checkbox" value="3" /> 3x</label>
+            <label class="checkbox-row"><input id="character-pack-export-4x" type="checkbox" value="4" /> 4x</label>
+          </div>
+        </div>
+        <div class="export-row is-soon">
+          <div class="export-row-left"><span class="export-name">Phaser</span><span class="export-fmt">atlas JSON</span></div>
+          <span class="export-soon" data-i18n="character.export.soon">Soon</span>
+        </div>
+        <div class="export-row is-soon">
+          <div class="export-row-left"><span class="export-name">Unity</span><span class="export-fmt">.anim + .meta</span></div>
+          <span class="export-soon" data-i18n="character.export.soon">Soon</span>
+        </div>
+      </div>
+      <div class="export-divider"></div>
+      <button class="export-download-all" id="character-pack-export-all" type="button" disabled>
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span id="character-pack-export-all-label" data-i18n="character.export.downloadAvailable" data-i18n-var-count="0">Download Available (0)</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+          <section class="benchmark-gallery-panel" aria-label="本地 benchmark gallery" style="display: none;">
+            <div class="panel-title">
+              <h3 data-i18n="character.benchmark.title">Benchmark Gallery</h3>
+              <span id="character-pack-benchmark-status">等待刷新</span>
+            </div>
+            <div class="button-row compact-row">
+              <button id="refresh-benchmark-gallery" type="button" class="secondary" data-i18n="character.benchmark.refresh">刷新</button>
+            </div>
+            <div id="character-pack-benchmark-gallery" class="benchmark-gallery-list">暂无 benchmark 记录。</div>
+          </section>
+        </section>
+
+        <section class="tab-panel" id="project-pack" aria-labelledby="project-pack-tab">
+          <div class="section-head">
+            <div>
+              <h2>项目包导出</h2>
+              <p>把已完成的角色包和场景包组合成一个带 manifest 的项目 ZIP。</p>
+            </div>
+            <button id="project-pack-build" type="button">生成项目包</button>
+          </div>
+
+          <div class="project-pack-layout">
+            <form class="tool-panel project-pack-panel" id="project-pack-form">
+              <div class="panel-title">
+                <h3>输入</h3>
+                <span id="project-pack-status">waiting</span>
+              </div>
+              <label>
+                Project ID
+                <input id="project-pack-id" type="text" value="demo_project" />
+              </label>
+              <label>
+                Character Job
+                <input id="project-pack-character-job" type="text" placeholder="job_..." />
+              </label>
+              <label>
+                Scene Job
+                <input id="project-pack-scene-job" type="text" placeholder="job_..." />
+              </label>
+              <div class="button-row">
+                <button id="project-pack-sync-current" type="button" class="secondary">使用当前结果</button>
+              </div>
+            </form>
+            <div class="preview-panel">
+              <div class="panel-title">
+                <h3>结果</h3>
+                <span id="project-pack-result-status">idle</span>
+              </div>
+              <div class="quality-summary project-pack-summary" id="project-pack-summary"></div>
+              <div class="download-links project-pack-links" id="project-pack-links"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="tab-panel" id="qa" aria-labelledby="qa-tab">
+          <div class="section-head">
+            <div>
+              <h2>验收检查表</h2>
+              <p>生成后逐项检查，避免把插画当成可用游戏资产。</p>
+            </div>
+          </div>
+          <div class="checklist">
+            <label><input type="checkbox" /> 每个格子尺寸一致，角色不漂移、不忽大忽小。</label>
+            <label><input type="checkbox" /> GIF 或动画预览中，走路、攻击、倒地、跳跃等动作顺序正确。</label>
+            <label><input type="checkbox" /> 背景为纯白或透明，没有水印、文字、网格、边框残留。</label>
+            <label><input type="checkbox" /> 用 Sprite Sheet 拆分工具验证列数和行数正确，必要时检查重复帧。</label>
+            <label><input type="checkbox" /> 已在 RPGMaker、Godot 或 Unity 中确认碰撞、锚点、朝向和帧速正常。</label>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="./src/app.js"></script>
+
+  </body>
+</html>

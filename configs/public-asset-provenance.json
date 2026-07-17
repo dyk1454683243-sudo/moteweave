@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "assets": [
+    {
+      "path": "templates/fixed_region_motion_template_v1.png",
+      "kind": "structural_template",
+      "source_rights": "repository_owned",
+      "generator": "scripts/create-fixed-region-motion-assets.mjs",
+      "sha256": "338c3b8ae7587d9ed00debbb128222cb5cba850bc76f815bd1f47a2efdb45ce2",
+      "release_status": "approved"
+    },
+    {
+      "path": "templates/motion_template_ocha_8x8.png",
+      "kind": "structural_template",
+      "source_rights": "repository_owned",
+      "generator": "scripts/create-topdown-structural-template.mjs",
+      "sha256": "7710cf9058207382a52a910be165a2668c0ba6e5783784c7011046883aef97ff",
+      "release_status": "approved"
+    },
+    {
+      "path": "test/fixtures/character-pack/local-image-golden/ocad-sheet/fixed_region_sample_hero.png",
+      "kind": "test_fixture",
+      "source_rights": "repository_owned",
+      "generator": "scripts/create-fixed-region-motion-assets.mjs",
+      "sha256": "08b0c20b545a1a4110cad80a6843bc63941d7964dbde639a79e1fedc3a51a180",
+      "release_status": "approved"
+    },
+    {
+      "path": "test/fixtures/character-pack/topdown_rpg_v0_sample_hero.png",
+      "kind": "test_fixture",
+      "source_rights": "repository_owned",
+      "generator": "scripts/create-character-pack-fixture.mjs",
+      "sha256": "bc63993a7e7dc00b16cf87c1e56641eec4646a102e9abd22325f2ae52eb69329",
+      "release_status": "approved"
+    },
+    {
+      "path": "website/og.png",
+      "kind": "website_social_image",
+      "source_rights": "repository_owned",
+      "generator": "scripts/create-website-og.mjs",
+      "sha256": "99f396585f6d528757778a620e02581d43dbb02709f51832df644dff06b8e65f",
+      "release_status": "approved"
+    }
+  ]
+}

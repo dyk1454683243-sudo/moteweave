@@ -1,0 +1,60 @@
+name: Public Preview CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-preview-validation
+  cancel-in-progress: false
+
+env:
+  CHARACTER_IMAGE_API_KEY: ""
+  CHARACTER_PROVIDER_PRESETS: ""
+  GEMINI_API_KEY: ""
+  GOOGLE_API_KEY: ""
+  OPENROUTER_API_KEY: ""
+  OPENROUTER_PROVIDER_PRESETS: ""
+
+jobs:
+  verify:
+    name: Node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        node:
+          - 22
+          - 24
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Verify public release contract
+        run: npm run release:check
+
+      - name: Verify public website
+        run: npm run site:check
+
+      - name: Run complete guarded test suite
+        run: npm test
+
+      - name: Run provider-free local smoke on primary Node
+        if: matrix.node == 24
+        run: npm run smoke:local

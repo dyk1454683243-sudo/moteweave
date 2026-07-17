@@ -1,0 +1,35 @@
+{
+  "profile": "topdown_rpg_v0",
+  "grid": {
+    "columns": 8,
+    "rows": 8,
+    "source_cell_size": {
+      "w": 192,
+      "h": 192
+    }
+  },
+  "expected_frame_count": 64,
+  "expected_status": "pass",
+  "expected_anchor": {
+    "x": 48,
+    "y": 88
+  },
+  "expected_animations": [
+    "idle_down",
+    "idle_up",
+    "idle_left",
+    "idle_right",
+    "walk_down",
+    "walk_up",
+    "walk_left",
+    "walk_right",
+    "attack_down",
+    "attack_up",
+    "attack_left",
+    "attack_right",
+    "hurt",
+    "happy",
+    "sit",
+    "talk"
+  ]
+}

@@ -1,0 +1,24 @@
+node_modules/
+.npm-cache/
+.env
+.DS_Store
+generated/
+output/
+workspace/
+.playwright-cli/
+.worktrees/
+
+# Local scratch / one-off automation leftovers (see docs/runbooks/github-release-readiness.md)
+# Root-level Python patch scripts were one-shot UI migration helpers, never project source.
+/*.py
+/fix_ai_toggle.js
+/index.html.bak
+/deep_parsed_sprite.txt
+/ui_prototype.html
+/v8.html
+/v8_character_pack.html
+/scripts/smoke-v8-ui.mjs
+.claude/settings.local.json
+
+# User-authorized local-only test fixtures (named-IP characters; never commit, delete after testing)
+/test/fixtures/character-pack/local-image-golden/ocad-sheet/ocad_*.jpg

@@ -1,0 +1,158 @@
+{
+  "schema_version": 1,
+  "contract_version": "two_point_five_d_tileset_contract_v1",
+  "id": "two_point_five_d_block_autotile_v1",
+  "canvas": {
+    "width": 1024,
+    "height": 1024
+  },
+  "atlas": {
+    "mode": "strict_atlas",
+    "strict_size": [1024, 1024],
+    "tile_cell_size": [64, 64],
+    "allow_padding_in_strict_atlas": false,
+    "runtime_extrude_padding": 1
+  },
+  "rule_profile": {
+    "id": "corner_mask_16",
+    "type": "corner_mask",
+    "occupied_grid": {
+      "columns": 4,
+      "rows": 4
+    },
+    "masks": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
+    "empty_mask": 0,
+    "solid_mask": 15,
+    "transition_masks": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
+    "connectable_edges": ["north", "east", "south", "west"],
+    "tile_classes": ["empty", "solid", "transition", "decoration"]
+  },
+  "projection": {
+    "type": "orthographic_2_5d",
+    "logical_tile_size": [32, 32],
+    "sprite_cell_size": [64, 64],
+    "pivot": "bottom_center",
+    "fixed_height_px": 24,
+    "height_levels": [1]
+  },
+  "schema": {
+    "name": "two_point_five_d_block_autotile",
+    "version": 1,
+    "supports": [
+      "top_face",
+      "front_face",
+      "side_face",
+      "outer_corner",
+      "inner_corner",
+      "edge_trim",
+      "transition_overlay",
+      "decals"
+    ]
+  },
+  "terrain_types": ["grass", "dirt", "stone", "snow", "sand", "water"],
+  "materials": {
+    "mode": "procedural",
+    "slots": {
+      "top_material": "grass_top",
+      "side_material": "dirt_side",
+      "edge_material": "grass_edge",
+      "corner_material": "grass_corner",
+      "transition_detail": "grass_to_dirt_edge",
+      "shadow_material": "soft_contact_shadow",
+      "decal_material": "optional_decal"
+    },
+    "procedural_profile": {
+      "id": "local_grass_block_materials_v0",
+      "generator": "procedural_material_v0",
+      "seed": 170617,
+      "pattern_size": [16, 16],
+      "materials": {
+        "grass_top": {
+          "role": "top",
+          "base": "#5f9f4c",
+          "highlight": "#8fca63",
+          "shadow": "#3f7438",
+          "detail": "#c7d66c"
+        },
+        "dirt_side": {
+          "role": "side",
+          "base": "#6e4b32",
+          "highlight": "#8d6844",
+          "shadow": "#4a3024",
+          "detail": "#b08455"
+        },
+        "grass_edge": {
+          "role": "edge",
+          "base": "#b6d46d",
+          "highlight": "#d7e88b",
+          "shadow": "#719b45",
+          "detail": "#f0f0a0"
+        },
+        "grass_corner": {
+          "role": "corner",
+          "base": "#79b957",
+          "highlight": "#a6d96a",
+          "shadow": "#4b7f3b",
+          "detail": "#d7e88b"
+        },
+        "grass_to_dirt_edge": {
+          "role": "transition",
+          "base": "#8f7f45",
+          "highlight": "#c7d66c",
+          "shadow": "#5f4a32",
+          "detail": "#6e4b32"
+        },
+        "soft_contact_shadow": {
+          "role": "shadow",
+          "base": "#242820",
+          "highlight": "#303528",
+          "shadow": "#161a15",
+          "detail": "#1d2119"
+        },
+        "optional_decal": {
+          "role": "decal",
+          "base": "#d7e88b",
+          "highlight": "#f0f0a0",
+          "shadow": "#8fca63",
+          "detail": "#ffffff"
+        }
+      }
+    }
+  },
+  "palette": {
+    "mode": "limited",
+    "max_colors": 32,
+    "allow_semi_transparent_pixels": false
+  },
+  "collision": {
+    "mode": "logical_footprint",
+    "shape": "rect",
+    "size": [32, 32],
+    "visual_outline_drives_collision": false
+  },
+  "exports": {
+    "strict_atlas_png": true,
+    "runtime_padded_atlas_png": true,
+    "metadata_json": true,
+    "tiled_json": true,
+    "tiled_tsx": true,
+    "map_rule_profile_json": true,
+    "tile_map_json": true,
+    "map_editor_workflow_json": true,
+    "ldtk_project_json": true,
+    "ldtk_auto_layer_rules_json": true,
+    "ldtk_workflow_validation_json": true,
+    "workflow_release_evidence_json": true,
+    "consumer_package_audit_json": true,
+    "import_validation_json": true,
+    "release_demo_manifest_json": true,
+    "release_demo_readme_md": true,
+    "release_demo_pack_zip": true,
+    "external_tool_probe_json": true,
+    "external_import_smoke_json": true,
+    "external_roundtrip_validation_json": true,
+    "external_roundtrip_checklist_md": true,
+    "validation_report": true,
+    "preview_map": true
+  }
+}
