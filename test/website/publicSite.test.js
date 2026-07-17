@@ -7,6 +7,9 @@ import { fileURLToPath } from 'node:url'
 const testDir = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.resolve(testDir, '..', '..')
 const websiteRoot = path.join(projectRoot, 'website')
+const homepageUrl = 'https://moteweave.pages.dev/'
+const repositoryUrl = 'https://github.com/dyk1454683243-sudo/moteweave'
+const releaseUrl = `${repositoryUrl}/releases/tag/v0.5.0-preview.1`
 
 async function readWebsiteFile(name) {
   return readFile(path.join(websiteRoot, name), 'utf8')
@@ -31,8 +34,25 @@ test('public site keeps a standalone static asset boundary', async () => {
   assert.doesNotMatch(html, /\bsrc=["']https?:\/\//i)
   assert.deepEqual(
     [...html.matchAll(/\bhref=["'](https?:\/\/[^"']+)/gi)].map((match) => match[1]),
-    ['https://moteweave.pages.dev/'],
+    [homepageUrl, releaseUrl, repositoryUrl],
   )
+})
+
+test('public site links only to the approved source repository and prerelease', async () => {
+  const html = await readWebsiteFile('index.html')
+  const callsToAction = [
+    { label: '获取源码预发布', url: releaseUrl },
+    { label: '查看 GitHub 源码', url: repositoryUrl },
+  ]
+
+  for (const { label, url } of callsToAction) {
+    const escapedUrl = url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const anchor = html.match(new RegExp(`<a\\b[^>]*href="${escapedUrl}"[^>]*>[\\s\\S]*?<\\/a>`))
+    assert.ok(anchor, `${label} must link to ${url}`)
+    assert.match(anchor[0], /target="_blank"/)
+    assert.match(anchor[0], /rel="noopener noreferrer"/)
+    assert.match(anchor[0], new RegExp(label))
+  }
 })
 
 test('public site does not expose hosted product capabilities', async () => {
