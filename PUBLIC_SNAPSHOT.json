@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "release_version": "0.5.0-preview.1",
-  "source_commit": "3b764cae6e61fe0b19b13f1db8b6388b04bf4999",
+  "source_commit": "2925884ea7987e0fc1e3b2c15c299f9a5ce74df0",
   "release_config_sha256": "b02dc58ba0bbf16f2f1b7282ee1d0d3189d0e380b4d4f64528ea72f87ca31962",
   "manifest_sha256": "becc2b1d879730322a0a26d8afbb86a11970beec7dc2afec89734a776bb3eecc",
   "files": [
@@ -505,8 +505,8 @@
     },
     {
       "path": "docs/roadmap/p0-p2-technical-upgrade-plan.md",
-      "sha256": "582ce47feddb9b7716b03f9c966b2cacb9cf1411f2ce6be6eb24e5c0fe67faae",
-      "size": 27277,
+      "sha256": "c7968cf8dd503f59825ea405f0e6786978760da708b492649afd41a6391c7346",
+      "size": 27723,
       "mode": "644"
     },
     {
@@ -793,8 +793,8 @@
     },
     {
       "path": "docs/superpowers/plans/2026-07-17-public-preview-release-readiness.md",
-      "sha256": "d3acad385e00f176f78e0ac66f772b34d13f869de930fd7f973294b14a164435",
-      "size": 9890,
+      "sha256": "42d0bb52dc97141761d953419a248a2e68b1354183ec263d80a247da5b9bb3de",
+      "size": 10528,
       "mode": "644"
     },
     {

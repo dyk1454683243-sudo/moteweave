@@ -151,6 +151,13 @@ RSS and `3` peak processes.
 Status: in progress under
 `docs/superpowers/plans/2026-07-17-public-preview-release-readiness.md`.
 
+Private checkpoint complete on 2026-07-17: the history-independent
+`dyk1454683243-sudo/moteweave` mirror remains private, serial Node 22/24 CI is
+green, and a separate clean clone passed locked install, release verification,
+`1541 / 1541` tests, and provider-free smoke. P0 remains in progress pending
+explicit public-visibility approval, post-public anonymous clone/archive
+verification, the `v0.5.0-preview.1` prerelease, and website cutover.
+
 - Release `v0.5.0-preview.1` as a source-only GitHub prerelease from a new,
   history-free public snapshot repository.
 - Keep the private repository as the Preview engineering source of truth and

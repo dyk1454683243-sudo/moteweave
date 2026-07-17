@@ -53,9 +53,20 @@ approval gates.
 | 0. Plan and release contract | Record the release topology and produce 3-5 checked brand candidates | None | Project lead approves display name, slug, repository name, and Pages project name | Complete: `MoteWeave` / `moteweave` |
 | 1. Unique private baseline | Combine website/A-E work with Frame Repair Live Quality Gate | None | Both source heads are ancestors of one clean integration commit | Complete: `6f4e0b4` |
 | 2. IP, asset, naming, and privacy closure | Replace unproven assets, neutralize sample naming, remove personal paths, complete provenance | Phase 1 | No active unproven binary, tracked named-IP sample, real local path, or unexplained attribution gap | Complete: `94c01dd` plus deterministic MoteWeave OG |
-| 3. Release metadata and automation | Align version/install claims and add release checks, export, and CI | Phases 0-2 | Node 22/24 checks, complete tests, site check, and local smoke pass provider-free | In progress: implementation complete, final verification pending |
-| 4. Clean public snapshot | Create and validate a new private GitHub snapshot, then request visibility approval | Phase 3 | Anonymous clone/install/archive checks pass after public approval | Pending |
+| 3. Release metadata and automation | Align version/install claims and add release checks, export, and CI | Phases 0-2 | Node 22/24 checks, complete tests, site check, and local smoke pass provider-free | Complete: Node 22/24 CI, site, full-suite, and Node 24 smoke gates pass provider-free |
+| 4. Clean public snapshot | Create and validate a new private GitHub snapshot, then request visibility approval | Phase 3 | Anonymous clone/install/archive checks pass after public approval | In progress: private mirror and clean-clone gates pass; public visibility approval is pending |
 | 5. Website cutover | Deploy final-brand website from Git integration and add real source/Release CTA | Phase 4 | Website, repository, version, canonical URL, and OG metadata agree | Pending |
+
+Private-review checkpoint on 2026-07-17:
+
+- `dyk1454683243-sudo/moteweave` exists as a private, history-independent
+  snapshot mirror;
+- serial Node 22/24 CI passed release, site, complete-test, and Node 24
+  provider-free smoke gates;
+- a separate authenticated clean clone passed locked install, release check,
+  `1541 / 1541` tests, and provider-free local smoke;
+- Provider calls remained `0`; repository visibility, tag, prerelease, anonymous
+  clone/archive verification, and Pages cutover remain unexecuted approval gates.
 
 Estimated engineering time is 7-12 working days, excluding brand approval,
 external legal advice, GitHub/Cloudflare access recovery, and later Provider
