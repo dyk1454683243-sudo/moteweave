@@ -156,11 +156,11 @@ history-independent `dyk1454683243-sudo/moteweave` mirror is public with
 protected `main`; serial Node 22/24 CI, authenticated and anonymous install,
 release verification, full tests, provider-free smoke, and source-archive
 checks passed. The `v0.5.0-preview.1` tag and source-only prerelease are live.
-The Git-integrated production site at `https://moteweave.pages.dev/` serves
-protected `main` commit `34f44d472b2f56f12d2a2884243a51b47d5f8179` and
-passed its production checks. The retained `https://gametool.pages.dev/`
-project provides a verified path-preserving HTTP `302` transition. Provider
-calls remained `0`.
+The Git-integrated production cutover at `https://moteweave.pages.dev/` was
+verified from protected `main` commit
+`34f44d472b2f56f12d2a2884243a51b47d5f8179` and passed its production checks.
+The retained `https://gametool.pages.dev/` project provides a verified
+path-preserving HTTP `302` transition. Provider calls remained `0`.
 
 - Release `v0.5.0-preview.1` as a source-only GitHub prerelease from a new,
   history-free public snapshot repository.
