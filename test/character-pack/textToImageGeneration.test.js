@@ -6,7 +6,12 @@ import { encodeRgbaPng } from '../../src/character-pack/imageCodec.js'
 import {
   runProductionSheetTextToImage,
   runQualityCharacterTextToImage,
+  scoreQualityCharacterCandidate,
 } from '../../src/character-pack/textToImageGeneration.js'
+import {
+  CHARACTER_QUALITY_CLOSURE_GATE_IDS,
+  CHARACTER_QUALITY_CLOSURE_MODE,
+} from '../../src/character-pack/qualityClosureGate.js'
 
 function makeTinyCharacterImage() {
   const image = { width: 8, height: 8, data: new Uint8ClampedArray(8 * 8 * 4) }
@@ -72,11 +77,32 @@ function generated(candidateIndex, buffer = Buffer.from('png')) {
   }
 }
 
+function passingQualityClosure() {
+  return {
+    mode: CHARACTER_QUALITY_CLOSURE_MODE,
+    status: 'pass',
+    release_ready: true,
+    gates: CHARACTER_QUALITY_CLOSURE_GATE_IDS.map((id) => ({ id, status: 'pass' })),
+  }
+}
+
+function warningQualityClosure() {
+  const closure = passingQualityClosure()
+  return {
+    ...closure,
+    status: 'warning',
+    release_ready: false,
+    gates: closure.gates.map((gate) => (
+      gate.id === 'motion_consistency' ? { ...gate, status: 'warning' } : gate
+    )),
+  }
+}
+
 function productionDebugReport({
   layout = 'topdown_rpg_v0',
   validation = { status: 'pass', warnings: [], blocking_errors: [], metrics: {} },
   sourceQuality = null,
-  qualityClosure = { status: 'pass', release_ready: true, gates: [] },
+  qualityClosure = passingQualityClosure(),
 } = {}) {
   return {
     source_layout: { id: layout },
@@ -181,7 +207,7 @@ test('production sheet text-to-image candidate selection penalizes weak fixed-re
   assert.ok(weak.score < clean.score)
 })
 
-test('production sheet publishes a release-ready candidate instead of a tied diagnostic winner', async () => {
+test('production sheet publishes an eligible candidate even when a blocked diagnostic candidate scores higher', async () => {
   const result = await runProductionSheetTextToImage({
     description: 'blue wizard',
     preset: 'topdown_rpg_v0',
@@ -192,9 +218,17 @@ test('production sheet publishes a release-ready candidate instead of a tied dia
       return {
         candidateIndex: index,
         debugReport: productionDebugReport({
+          validation: {
+            status: 'pass',
+            warnings: [],
+            blocking_errors: [],
+            metrics: index === 2
+              ? { duplicate_frames: { unexpected_group_count: 1 } }
+              : {},
+          },
           qualityClosure: index === 1
-            ? { status: 'warning', release_ready: false, gates: [{ id: 'motion_consistency', status: 'warning' }] }
-            : { status: 'pass', release_ready: true, gates: [] },
+            ? warningQualityClosure()
+            : passingQualityClosure(),
         }),
         files: {},
       }
@@ -206,6 +240,7 @@ test('production sheet publishes a release-ready candidate instead of a tied dia
   assert.equal(result.candidateSelection.release_ready, true)
   assert.equal(result.result.candidateIndex, 2)
   assert.equal(result.result.generationReleaseGate.release_ready, true)
+  assert.ok(result.candidateSelection.candidates[0].score > result.candidateSelection.candidates[1].score)
 })
 
 test('production sheet returns diagnostic-only evidence when every processed candidate is blocked', async () => {
@@ -216,7 +251,7 @@ test('production sheet returns diagnostic-only evidence when every processed can
     generateSource: async ({ candidateIndex }) => generated(candidateIndex),
     processSheet: async () => ({
       debugReport: productionDebugReport({
-        qualityClosure: { status: 'warning', release_ready: false, gates: [{ id: 'motion_consistency', status: 'warning' }] },
+        qualityClosure: warningQualityClosure(),
       }),
       files: {},
     }),
@@ -227,6 +262,61 @@ test('production sheet returns diagnostic-only evidence when every processed can
   assert.equal(result.candidateSelection.artifact_disposition, 'diagnostic_only')
   assert.equal(result.releaseReady, false)
   assert.equal(result.result.generationReleaseGate.release_ready, false)
+})
+
+test('quality character candidate scoring preserves missing hard metrics for fail-closed evaluation', () => {
+  const base = {
+    styleReport: {
+      metrics: {
+        visible_pixel_count: 1000,
+        unique_color_count: 8,
+      },
+    },
+    finishReport: {
+      palette_snap: { changed_pixel_ratio: 0.2 },
+      outline: { outline_pixel_ratio: 0.02 },
+      quality_spec: {
+        bbox: { x: 32, y: 16, w: 48, h: 80 },
+        metrics: {
+          bbox_width_ratio: 0.375,
+          bbox_height_ratio: 0.625,
+          bbox_area_ratio: 0.2344,
+          center_offset_ratio: 0,
+          edge_margin_ratio: 0.125,
+        },
+      },
+    },
+  }
+  const cases = [
+    ['visible_pixel_count', (input) => delete input.styleReport.metrics.visible_pixel_count],
+    ['bbox_width_ratio', (input) => delete input.finishReport.quality_spec.metrics.bbox_width_ratio],
+    ['bbox_height_ratio', (input) => delete input.finishReport.quality_spec.metrics.bbox_height_ratio],
+    ['bbox_area_ratio', (input) => delete input.finishReport.quality_spec.metrics.bbox_area_ratio],
+    ['center_offset_ratio', (input) => delete input.finishReport.quality_spec.metrics.center_offset_ratio],
+    ['edge_margin_ratio', (input) => delete input.finishReport.quality_spec.metrics.edge_margin_ratio],
+  ]
+
+  for (const [metric, removeMetric] of cases) {
+    const input = structuredClone(base)
+    removeMetric(input)
+    const result = scoreQualityCharacterCandidate(input)
+    assert.equal(result.release_ready, false, metric)
+    assert.equal(result.metrics[metric], null, metric)
+    assert.ok(result.blocking_errors.includes(`quality_character_metrics_missing:${metric}`), metric)
+  }
+
+  const nonFiniteCases = [
+    ['visible_pixel_count', Number.NaN, (input, value) => { input.styleReport.metrics.visible_pixel_count = value }],
+    ['bbox_width_ratio', Number.POSITIVE_INFINITY, (input, value) => { input.finishReport.quality_spec.metrics.bbox_width_ratio = value }],
+  ]
+  for (const [metric, value, setMetric] of nonFiniteCases) {
+    const input = structuredClone(base)
+    setMetric(input, value)
+    const result = scoreQualityCharacterCandidate(input)
+    assert.equal(result.release_ready, false, metric)
+    assert.equal(result.metrics[metric], null, metric)
+    assert.ok(result.blocking_errors.includes(`quality_character_metrics_missing:${metric}`), metric)
+  }
 })
 
 test('production sheet reports local candidate processing failures as post-processing failures', async () => {

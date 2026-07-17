@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import { buildDebugReport } from '../../src/character-pack/processReport.js'
 import { TOPDOWN_RPG_V0 } from '../../src/character-pack/profile.js'
 import {
+  CHARACTER_QUALITY_CLOSURE_GATE_IDS,
   CHARACTER_QUALITY_CLOSURE_MODE,
   buildCharacterQualityClosure,
 } from '../../src/character-pack/qualityClosureGate.js'
@@ -88,6 +89,9 @@ test('character quality closure localizes opaque white-edge halo frames', () => 
   const haloGate = closure.gates.find((gate) => gate.id === 'background_halo')
 
   assert.equal(closure.mode, CHARACTER_QUALITY_CLOSURE_MODE)
+  assert.equal(closure.status, 'warning')
+  assert.equal(closure.release_ready, false)
+  assert.deepEqual(closure.gates.map((gate) => gate.id), CHARACTER_QUALITY_CLOSURE_GATE_IDS)
   assert.equal(haloGate.status, 'warning')
   assert.equal(haloGate.action, 'local_halo_cleanup')
   assert.deepEqual(haloGate.frames.map((item) => item.frame), [0])

@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.5.0-preview.2] - 2026-07-17
+
+### Fixed
+
+- Quality Character candidate evidence now preserves missing and non-finite hard
+  metrics so release eligibility fails closed instead of treating absent values
+  as numeric zero.
+- Production-sheet release evidence now requires the canonical closure mode and
+  exactly one of each required background, alignment, motion, and prop-side
+  gate before an artifact can be published.
+
+This source-only update adds no Provider calls, semantic judgment, npm package,
+installer, bundled external tool, or hosted processing.
+
 ## [0.5.0-preview.1] - 2026-07-17
 
 ### Added

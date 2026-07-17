@@ -1,6 +1,12 @@
 import { getAnimationFrameIndexes } from './profile.js'
 
 export const CHARACTER_QUALITY_CLOSURE_MODE = 'character_frame_quality_closure_v1'
+export const CHARACTER_QUALITY_CLOSURE_GATE_IDS = Object.freeze([
+  'background_halo',
+  'alignment_consistency',
+  'motion_consistency',
+  'prop_side_consistency',
+])
 
 const DEFAULTS = Object.freeze({
   haloScoreWarning: 0.01,

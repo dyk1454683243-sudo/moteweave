@@ -18,6 +18,11 @@ Its approved execution order is:
 2. P0 Motion Source Correctness & Safety. `Implemented and provider-free
    guarded-verified on 2026-07-16.`
 
+The Generation P0 remains complete. Its narrow 2026-07-17 fail-closed
+conformance follow-up is complete and recorded in
+`docs/superpowers/plans/2026-07-17-generation-release-gate-p0-hardening.md`;
+it does not reopen candidate spending, semantic judgment, or Provider scope.
+
 The project lead subsequently authorized sequential implementation of C, D,
 then E. Pixel Grid v2 is complete in implementation commit `0a6353a`; Motion
 Selection v2 is complete in implementation commit `f6a6a03` after guarded
@@ -161,6 +166,18 @@ verified from protected `main` commit
 `34f44d472b2f56f12d2a2884243a51b47d5f8179` and passed its production checks.
 The retained `https://gametool.pages.dev/` project provides a verified
 path-preserving HTTP `302` transition. Provider calls remained `0`.
+
+The follow-up `v0.5.0-preview.2` snapshot is in progress under
+`docs/superpowers/plans/2026-07-17-public-preview-2-release-readiness.md`. It
+publishes only the completed Generation Release Gate fail-closed hardening on
+top of the release-safe MoteWeave baseline. It does not reopen Provider,
+semantic, adaptive-candidate, packaging, or hosted-service scope, and it leaves
+the accepted `v0.5.0-preview.1` tag immutable.
+
+Its provider-free local candidate is verified: focused, site/OG, source and
+snapshot release checks, locked install, `1543 / 1543` exported-snapshot tests,
+and local smoke passed. The public mirror, tag, prerelease, and production site
+remain unchanged pending the final publication approval.
 
 - Release `v0.5.0-preview.1` as a source-only GitHub prerelease from a new,
   history-free public snapshot repository.

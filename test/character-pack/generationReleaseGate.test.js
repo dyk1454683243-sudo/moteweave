@@ -9,6 +9,10 @@ import {
   QUALITY_CHARACTER_RELEASE_THRESHOLDS,
   resolveGenerationArtifactDisposition,
 } from '../../src/character-pack/generationReleaseGate.js'
+import {
+  CHARACTER_QUALITY_CLOSURE_GATE_IDS,
+  CHARACTER_QUALITY_CLOSURE_MODE,
+} from '../../src/character-pack/qualityClosureGate.js'
 import { FIXED_REGION_MOTION_LAYOUT_ID } from '../../src/character-pack/sourceLayouts.js'
 
 function passingValidation() {
@@ -16,7 +20,12 @@ function passingValidation() {
 }
 
 function passingClosure() {
-  return { status: 'pass', release_ready: true, gates: [] }
+  return {
+    mode: CHARACTER_QUALITY_CLOSURE_MODE,
+    status: 'pass',
+    release_ready: true,
+    gates: CHARACTER_QUALITY_CLOSURE_GATE_IDS.map((id) => ({ id, status: 'pass' })),
+  }
 }
 
 function passingProductionDebugReport(overrides = {}) {
@@ -181,6 +190,20 @@ test('production release gate fails closed when required evidence is missing', (
       expected: 'quality_closure.evidence_missing',
     },
     {
+      name: 'quality closure mode',
+      debugReport: passingProductionDebugReport({
+        quality_closure: { ...passingClosure(), mode: null },
+      }),
+      expected: 'quality_closure.mode_missing',
+    },
+    {
+      name: 'quality closure canonical mode',
+      debugReport: passingProductionDebugReport({
+        quality_closure: { ...passingClosure(), mode: 'unknown_closure' },
+      }),
+      expected: 'quality_closure.mode_unsupported',
+    },
+    {
       name: 'quality closure status',
       debugReport: passingProductionDebugReport({ quality_closure: { release_ready: true, gates: [] } }),
       expected: 'quality_closure.status_missing',
@@ -194,6 +217,28 @@ test('production release gate fails closed when required evidence is missing', (
       name: 'quality closure gate evidence',
       debugReport: passingProductionDebugReport({ quality_closure: { status: 'pass', release_ready: true } }),
       expected: 'quality_closure.gates_missing',
+    },
+    {
+      name: 'quality closure complete canonical gate set',
+      debugReport: passingProductionDebugReport({
+        quality_closure: { ...passingClosure(), gates: [] },
+      }),
+      expected: 'quality_closure.gates_invalid',
+    },
+    {
+      name: 'quality closure unique canonical gate ids',
+      debugReport: passingProductionDebugReport({
+        quality_closure: {
+          ...passingClosure(),
+          gates: [
+            { id: 'background_halo', status: 'pass' },
+            { id: 'alignment_consistency', status: 'pass' },
+            { id: 'motion_consistency', status: 'pass' },
+            { id: 'motion_consistency', status: 'pass' },
+          ],
+        },
+      }),
+      expected: 'quality_closure.gates_invalid',
     },
   ]
 

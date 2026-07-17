@@ -9,7 +9,7 @@ const projectRoot = path.resolve(testDir, '..', '..')
 const websiteRoot = path.join(projectRoot, 'website')
 const homepageUrl = 'https://moteweave.pages.dev/'
 const repositoryUrl = 'https://github.com/dyk1454683243-sudo/moteweave'
-const releaseUrl = `${repositoryUrl}/releases/tag/v0.5.0-preview.1`
+const releaseUrl = `${repositoryUrl}/releases/tag/v0.5.0-preview.2`
 
 async function readWebsiteFile(name) {
   return readFile(path.join(websiteRoot, name), 'utf8')
@@ -129,7 +129,7 @@ test('public page includes baseline accessibility and capability truth', async (
   assert.match(html, /完整 WFC/)
   assert.match(html, /AI 生成只是可选路径/)
   assert.match(html, /MoteWeave/)
-  assert.match(html, /0\.5\.0-preview\.1/)
+  assert.match(html, /0\.5\.0-preview\.2/)
 })
 
 test('site script parses and security headers block network and form actions', async () => {

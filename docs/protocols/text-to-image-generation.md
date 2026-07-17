@@ -153,8 +153,13 @@ diagnostic-only result.
 
 `production_sheet_v0` uses policy `strict_live_generation_v1`: validation must
 be clean `pass`; fixed-region source quality must be clean `pass`; and
-`quality_closure.release_ready` must be true. Non-fixed layouts record source
-quality as not applicable. Missing required evidence fails closed.
+quality closure must use mode `character_frame_quality_closure_v1`, have clean
+`pass` status, set `release_ready` true, and contain exactly one passing gate
+for each canonical id: `background_halo`, `alignment_consistency`,
+`motion_consistency`, and `prop_side_consistency`. Non-fixed layouts record
+source quality as not applicable. Missing or unsupported closure mode, empty,
+duplicate, incomplete, or non-passing gate evidence, and all other missing
+required evidence fail closed.
 
 `quality_character_v0` blocks empty subjects, score below `600`, visible pixels
 above `220000`, bbox width above `0.72`, height above `0.86`, area above `0.42`,
