@@ -1,7 +1,7 @@
 # Public Preview Release Readiness
 
 **Date:** 2026-07-17
-**Status:** In progress
+**Status:** Complete
 **Owner:** Project lead
 **Integration branch:** `codex/public-preview-release-readiness`
 **Integrated baseline:** `6f4e0b4`
@@ -24,9 +24,9 @@ The Preview remains source-only:
   billing, and desktop packaging deferred.
 
 The project lead approved `MoteWeave` with the public slug `moteweave` on
-2026-07-17. The public repository, source-only prerelease, and website cutover
-were each approved through separate gates. The Git-integrated Pages deployment
-and old-site transition remain in progress until their production checks pass.
+2026-07-17. The public repository, source-only prerelease, final-brand website,
+and reversible legacy-site transition each passed its separately approved
+release gate.
 
 ## 2. Fixed Safety Boundaries
 
@@ -55,7 +55,7 @@ and old-site transition remain in progress until their production checks pass.
 | 2. IP, asset, naming, and privacy closure | Replace unproven assets, neutralize sample naming, remove personal paths, complete provenance | Phase 1 | No active unproven binary, tracked named-IP sample, real local path, or unexplained attribution gap | Complete: `94c01dd` plus deterministic MoteWeave OG |
 | 3. Release metadata and automation | Align version/install claims and add release checks, export, and CI | Phases 0-2 | Node 22/24 checks, complete tests, site check, and local smoke pass provider-free | Complete: Node 22/24 CI, site, full-suite, and Node 24 smoke gates pass provider-free |
 | 4. Clean public snapshot | Create and validate a new private GitHub snapshot, then request visibility approval | Phase 3 | Anonymous clone/install/archive checks pass after public approval | Complete: public mirror, protected `main`, anonymous verification, tag, and source-only prerelease pass |
-| 5. Website cutover | Deploy final-brand website from Git integration and add real source/Release CTA | Phase 4 | Website, repository, version, canonical URL, and OG metadata agree | In progress: deployment and old-site transition approved; production checks pending |
+| 5. Website cutover | Deploy final-brand website from Git integration and add real source/Release CTA | Phase 4 | Website, repository, version, canonical URL, OG metadata, and legacy-site transition agree | Complete: production `moteweave.pages.dev` serves `34f44d4`; retained `gametool.pages.dev` provides a verified path-preserving `302` transition |
 
 Public-release checkpoint on 2026-07-17:
 
@@ -67,8 +67,19 @@ Public-release checkpoint on 2026-07-17:
   checks, full tests, and provider-free local smoke;
 - `v0.5.0-preview.1` is a source-only GitHub prerelease whose tag points to the
   verified public snapshot commit;
-- Provider calls remained `0`; only the Git-integrated Pages production checks
-  and reversible old-site transition remain open.
+- PR #1 preview deployment `056576d9` at `146045c` passed before merge;
+- production deployment `ce6769f3-2dd6-4134-8789-df5e1ec60593` at
+  `https://moteweave.pages.dev/` was built from protected public `main` commit
+  `34f44d472b2f56f12d2a2884243a51b47d5f8179`; its main-branch Node 22/24 CI,
+  HTTP `200`, repository/Release CTA, canonical and OG metadata, security
+  headers, desktop/mobile layout, and capability boundaries passed;
+- the retained Direct Upload deployment
+  `745c01cc-a256-450f-9497-34fc6263b4c9` at
+  `https://gametool.pages.dev/` returns path-preserving HTTP `302` redirects to
+  `https://moteweave.pages.dev/` for `/` and
+  `/legacy/probe?source=cutover`, while the new site returns HTTP `200` without
+  redirecting back;
+- Provider calls remained `0`; all release-readiness phases are complete.
 
 Estimated engineering time is 7-12 working days, excluding brand approval,
 external legal advice, GitHub/Cloudflare access recovery, and later Provider
