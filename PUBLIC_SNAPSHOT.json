@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "release_version": "0.5.0-preview.1",
-  "source_commit": "67ef62d1561ebf4164d8144b7a027ee291c52e1e",
+  "source_commit": "9ab18e35b13d52854e1012c6d6c88d75c8f79d85",
   "release_config_sha256": "b02dc58ba0bbf16f2f1b7282ee1d0d3189d0e380b4d4f64528ea72f87ca31962",
   "manifest_sha256": "becc2b1d879730322a0a26d8afbb86a11970beec7dc2afec89734a776bb3eecc",
   "files": [
@@ -505,8 +505,8 @@
     },
     {
       "path": "docs/roadmap/p0-p2-technical-upgrade-plan.md",
-      "sha256": "8505840aa6468be9134d69fd171feccba91139e57614bf342f70fd28c9719950",
-      "size": 27757,
+      "sha256": "41da85da43789781c348044cbb621877da6a8416cfac01b85e0a98509c647dc0",
+      "size": 28382,
       "mode": "644"
     },
     {
@@ -565,8 +565,8 @@
     },
     {
       "path": "docs/runbooks/github-release-readiness.md",
-      "sha256": "af24379fac387fc131736087becbb760f36486d9cc30ccfb83462b76bd81361e",
-      "size": 5352,
+      "sha256": "5242c3540aa7ba894b4941229dcd2d51778079f18fa1cecb01747ef1cac01aca",
+      "size": 5756,
       "mode": "644"
     },
     {
@@ -793,8 +793,8 @@
     },
     {
       "path": "docs/superpowers/plans/2026-07-17-public-preview-release-readiness.md",
-      "sha256": "d3c6518bbd7d3f672f3c2793f83c064ff9a28bb42af7cf9edeaf8ca8a5b5f93e",
-      "size": 10768,
+      "sha256": "3d5025ebbfcfcdcc9b5799d8ac24e05955c9cd227bcd25c3b5747ed1acdedfb3",
+      "size": 11470,
       "mode": "644"
     },
     {

@@ -148,16 +148,19 @@ RSS and `3` peak processes.
 
 ## P0: Release And Repository Readiness
 
-Status: in progress under
+Status: complete on 2026-07-17 under
 `docs/superpowers/plans/2026-07-17-public-preview-release-readiness.md`.
 
-Public source-preview checkpoint complete on 2026-07-17: the
+Public source-preview and website cutover completed on 2026-07-17: the
 history-independent `dyk1454683243-sudo/moteweave` mirror is public with
 protected `main`; serial Node 22/24 CI, authenticated and anonymous install,
 release verification, full tests, provider-free smoke, and source-archive
 checks passed. The `v0.5.0-preview.1` tag and source-only prerelease are live.
-P0 remains in progress only for the Git-integrated Pages production checks and
-the reversible old-site transition.
+The Git-integrated production site at `https://moteweave.pages.dev/` serves
+protected `main` commit `34f44d472b2f56f12d2a2884243a51b47d5f8179` and
+passed its production checks. The retained `https://gametool.pages.dev/`
+project provides a verified path-preserving HTTP `302` transition. Provider
+calls remained `0`.
 
 - Release `v0.5.0-preview.1` as a source-only GitHub prerelease from a new,
   history-free public snapshot repository.
@@ -193,7 +196,13 @@ Done when:
 - the new repository passes private clean-clone review before explicit approval
   changes it to public;
 - the final-brand website links only to the real public repository and
-  prerelease.
+  prerelease;
+- the final-brand Git-integrated Pages production deployment is built from
+  protected `main`, returns HTTP `200`, and passes repository/Release CTA,
+  canonical URL, OG metadata, security-header, responsive-layout, and
+  capability-boundary checks;
+- the retained legacy Pages project returns a verified path-preserving HTTP
+  `302` transition for both root and nested paths, with no reverse redirect.
 
 ## P1: Scene Quality Evidence And API Boundaries
 

@@ -127,8 +127,15 @@ FFmpeg, rembg, model, plugin, or generated sample pack.
 - Create a new final-brand Git-integrated Cloudflare Pages project.
 - Deploy and verify repository/Release links, canonical URL, OG image, responsive
   layout, and capability boundaries.
+- Treat a branch-preview deployment as pre-merge evidence only. Close the
+  cutover only after production is deployed from protected `main`.
+- Record the final production deployment id and source commit in the normative
+  release plan.
 - After explicit approval, update the old site to a temporary notice or `302`
   transition.
+- Verify that `/` and at least one nested legacy path return HTTP `302` with the
+  expected path-preserving `Location`, and that the new site does not redirect
+  back.
 - Do not delete the old Pages project in this release.
 
 ## 10. Claim Boundaries
