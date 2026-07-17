@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.5.0-preview.1] - Unreleased
+## [0.5.0-preview.1] - 2026-07-17
 
 ### Added
 

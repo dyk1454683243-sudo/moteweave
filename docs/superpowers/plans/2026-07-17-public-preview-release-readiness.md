@@ -24,9 +24,9 @@ The Preview remains source-only:
   billing, and desktop packaging deferred.
 
 The project lead approved `MoteWeave` with the public slug `moteweave` on
-2026-07-17. Public repository visibility, the final release tag, and the final
-website cutover remain blocked behind their separate verification and explicit
-approval gates.
+2026-07-17. The public repository, source-only prerelease, and website cutover
+were each approved through separate gates. The Git-integrated Pages deployment
+and old-site transition remain in progress until their production checks pass.
 
 ## 2. Fixed Safety Boundaries
 
@@ -54,19 +54,21 @@ approval gates.
 | 1. Unique private baseline | Combine website/A-E work with Frame Repair Live Quality Gate | None | Both source heads are ancestors of one clean integration commit | Complete: `6f4e0b4` |
 | 2. IP, asset, naming, and privacy closure | Replace unproven assets, neutralize sample naming, remove personal paths, complete provenance | Phase 1 | No active unproven binary, tracked named-IP sample, real local path, or unexplained attribution gap | Complete: `94c01dd` plus deterministic MoteWeave OG |
 | 3. Release metadata and automation | Align version/install claims and add release checks, export, and CI | Phases 0-2 | Node 22/24 checks, complete tests, site check, and local smoke pass provider-free | Complete: Node 22/24 CI, site, full-suite, and Node 24 smoke gates pass provider-free |
-| 4. Clean public snapshot | Create and validate a new private GitHub snapshot, then request visibility approval | Phase 3 | Anonymous clone/install/archive checks pass after public approval | In progress: private mirror and clean-clone gates pass; public visibility approval is pending |
-| 5. Website cutover | Deploy final-brand website from Git integration and add real source/Release CTA | Phase 4 | Website, repository, version, canonical URL, and OG metadata agree | Pending |
+| 4. Clean public snapshot | Create and validate a new private GitHub snapshot, then request visibility approval | Phase 3 | Anonymous clone/install/archive checks pass after public approval | Complete: public mirror, protected `main`, anonymous verification, tag, and source-only prerelease pass |
+| 5. Website cutover | Deploy final-brand website from Git integration and add real source/Release CTA | Phase 4 | Website, repository, version, canonical URL, and OG metadata agree | In progress: deployment and old-site transition approved; production checks pending |
 
-Private-review checkpoint on 2026-07-17:
+Public-release checkpoint on 2026-07-17:
 
-- `dyk1454683243-sudo/moteweave` exists as a private, history-independent
-  snapshot mirror;
+- `dyk1454683243-sudo/moteweave` is a public, history-independent snapshot
+  mirror with protected `main`;
 - serial Node 22/24 CI passed release, site, complete-test, and Node 24
   provider-free smoke gates;
-- a separate authenticated clean clone passed locked install, release check,
-  `1541 / 1541` tests, and provider-free local smoke;
-- Provider calls remained `0`; repository visibility, tag, prerelease, anonymous
-  clone/archive verification, and Pages cutover remain unexecuted approval gates.
+- authenticated and anonymous clean clones passed locked install, release
+  checks, full tests, and provider-free local smoke;
+- `v0.5.0-preview.1` is a source-only GitHub prerelease whose tag points to the
+  verified public snapshot commit;
+- Provider calls remained `0`; only the Git-integrated Pages production checks
+  and reversible old-site transition remain open.
 
 Estimated engineering time is 7-12 working days, excluding brand approval,
 external legal advice, GitHub/Cloudflare access recovery, and later Provider
