@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "release_version": "0.5.0-preview.1",
-  "source_commit": "656a1b5115dc2df097a7b8bf4dc18c5e2d15c64c",
+  "source_commit": "3b764cae6e61fe0b19b13f1db8b6388b04bf4999",
   "release_config_sha256": "b02dc58ba0bbf16f2f1b7282ee1d0d3189d0e380b4d4f64528ea72f87ca31962",
   "manifest_sha256": "becc2b1d879730322a0a26d8afbb86a11970beec7dc2afec89734a776bb3eecc",
   "files": [
@@ -3397,8 +3397,8 @@
     },
     {
       "path": "test/motion-source/guardedToolRunner.test.js",
-      "sha256": "0cb7a8d82929609fdc4d999c0c54967ad53c89cbc241c534e5b1359eb65c3b77",
-      "size": 7997,
+      "sha256": "7e37028c39bb2a78b401b6526e56d873bf4272a7da77e65283aa01228a76d67d",
+      "size": 8201,
       "mode": "644"
     },
     {
@@ -3481,8 +3481,8 @@
     },
     {
       "path": "test/resourceGuard.test.js",
-      "sha256": "39553a79cd9cb80506398e53289711b8ec2f4b2f4e1200e7a05f7b0e991b410c",
-      "size": 9967,
+      "sha256": "b55e31606094653da4ac7ea1ecba544679f5f24b1441acf5dfd2b1aed3e8c03c",
+      "size": 10411,
       "mode": "644"
     },
     {
