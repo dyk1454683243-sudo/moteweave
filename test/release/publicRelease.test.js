@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { execFile } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import {
   access,
@@ -11,12 +12,15 @@ import {
 } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
+import { promisify } from 'node:util'
 
 import {
   checkPublicRelease,
   exportPublicSnapshot,
   validateExportDestination,
 } from '../../scripts/public-release.mjs'
+
+const execFileAsync = promisify(execFile)
 
 async function writeFixtureFile(root, relativePath, content) {
   const filePath = path.join(root, relativePath)
@@ -25,7 +29,7 @@ async function writeFixtureFile(root, relativePath, content) {
   return relativePath
 }
 
-async function releaseFixture() {
+async function releaseFixture({ requiredAncestors = [] } = {}) {
   const root = await mkdtemp(path.join(os.tmpdir(), 'public-release-check-'))
   const brand = 'MoteWeave'
   const slug = 'moteweave'
@@ -41,6 +45,7 @@ async function releaseFixture() {
     release_version: '0.5.0-preview.1',
     source_only: true,
     npm_publish: false,
+    required_ancestors: requiredAncestors,
     privacy: {
       synthetic_home_path_allowlist: [
         {
@@ -172,7 +177,7 @@ test('public snapshot export copies only included regular files and writes a led
 })
 
 test('exported snapshot passes without Git and detects file tampering', async () => {
-  const fixture = await releaseFixture()
+  const fixture = await releaseFixture({ requiredAncestors: ['f'.repeat(40)] })
   const destination = path.join(os.tmpdir(), `public-release-snapshot-${randomUUID()}`)
   await exportPublicSnapshot({
     rootDir: fixture.root,
@@ -184,6 +189,23 @@ test('exported snapshot passes without Git and detects file tampering', async ()
 
   const clean = await checkPublicRelease({ rootDir: destination })
   assert.equal(clean.status, 'pass', JSON.stringify(clean.issues))
+
+  await execFileAsync('git', ['init'], { cwd: destination })
+  const uncommittedRepository = await checkPublicRelease({ rootDir: destination })
+  assert.equal(uncommittedRepository.status, 'fail')
+  assert.equal(uncommittedRepository.source_mode, 'source')
+  assert.equal(uncommittedRepository.issues.some((item) => item.code === 'source.required_ancestor_missing'), true)
+
+  await execFileAsync('git', ['add', '.'], { cwd: destination })
+  await execFileAsync('git', [
+    '-c', 'user.name=MoteWeave Test',
+    '-c', 'user.email=moteweave@example.invalid',
+    '-c', 'commit.gpgsign=false',
+    'commit', '-m', 'test: initialize public snapshot',
+  ], { cwd: destination })
+  const initializedRepository = await checkPublicRelease({ rootDir: destination })
+  assert.equal(initializedRepository.status, 'pass', JSON.stringify(initializedRepository.issues))
+  assert.equal(initializedRepository.source_mode, 'snapshot')
 
   await writeFile(path.join(destination, 'scripts/example.js'), 'tampered\n')
   const tampered = await checkPublicRelease({ rootDir: destination })

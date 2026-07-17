@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "release_version": "0.5.0-preview.1",
-  "source_commit": "f1486811f48c89cfc237e104ea1ccc70f5fa58c9",
+  "source_commit": "656a1b5115dc2df097a7b8bf4dc18c5e2d15c64c",
   "release_config_sha256": "b02dc58ba0bbf16f2f1b7282ee1d0d3189d0e380b4d4f64528ea72f87ca31962",
   "manifest_sha256": "becc2b1d879730322a0a26d8afbb86a11970beec7dc2afec89734a776bb3eecc",
   "files": [
@@ -979,8 +979,8 @@
     },
     {
       "path": "scripts/public-release.mjs",
-      "sha256": "ffcf14fcdd65ef61f5e767c66ba0a4884df9edda6a0b8cd6d0473645d4d088ce",
-      "size": 28170,
+      "sha256": "08c48def084c5d1dfc4f8c099e2f26995eafec0bad9c015111c861bae0ee3b33",
+      "size": 28769,
       "mode": "644"
     },
     {
@@ -3475,8 +3475,8 @@
     },
     {
       "path": "test/release/publicRelease.test.js",
-      "sha256": "2306c6c42ed1af1406ccc0de9d25f5f6773f53f1a7871f870a745291647fb9e7",
-      "size": 9359,
+      "sha256": "b302ac52b2b35e9657e48a81b5bf727b5adc902f2665b93099afdefb2114dbf7",
+      "size": 10519,
       "mode": "644"
     },
     {

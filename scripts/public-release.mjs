@@ -299,7 +299,23 @@ async function inventoryForCheck(rootDir, trackedFiles, releaseConfigBuffer, sna
   if (await isGitWorktree(rootDir)) {
     const issues = []
     const dirty = await gitText(rootDir, ['status', '--porcelain=v1', '-z', '--untracked-files=all'])
-    if (dirty) issues.push(issue('source.dirty_worktree', 'release source worktree has staged, unstaged, or untracked changes'))
+    if (dirty) issues.push(issue('source.dirty_worktree', 'release worktree has staged, unstaged, or untracked changes'))
+    let committedSnapshotLedger = false
+    try {
+      await gitText(rootDir, ['cat-file', '-e', `HEAD:${SNAPSHOT_LEDGER_PATH}`])
+      committedSnapshotLedger = true
+    } catch {
+      // A ledger must be committed in HEAD before it can identify a Git worktree as a public snapshot mirror.
+    }
+    if (committedSnapshotLedger) {
+      const snapshot = await verifySnapshotLedger(rootDir, releaseConfigBuffer, snapshotManifestBuffer)
+      return {
+        mode: 'snapshot',
+        files: snapshot.files,
+        issues: [...issues, ...snapshot.issues],
+        ledger: snapshot.ledger,
+      }
+    }
     return { mode: 'source', files: await listTrackedFiles(rootDir), issues }
   }
   const snapshot = await verifySnapshotLedger(rootDir, releaseConfigBuffer, snapshotManifestBuffer)
