@@ -7,6 +7,7 @@ import {
   analyzeMotionSourceSet,
   applyMotionSourceSet,
   applyMotionStrip,
+  buildMotionEnginePacksFromAppliedSheet,
   buildMotionStrip,
   cancelMotionSourceJob,
   createMotionOperationId,
@@ -19,6 +20,12 @@ import {
   uploadMotionSource,
   waitForMotionSourceJob,
 } from './motionSource/api.js'
+import {
+  assertMotionEnginePackResult,
+  buildMotionApplyContextCommit,
+  motionEnginePackBindingCurrent,
+  motionEnginePackExportReadiness,
+} from './motionSource/enginePackExportState.js'
 import {
   isMotionBuildBindingCurrent,
   isMotionPreviewBindingCurrent,
@@ -37,7 +44,7 @@ const GIF_ZIP_EXT = /\.(gif|zip)$/i
 const MAX_VIDEO_BYTES = 200 * 1024 * 1024
 const MAX_GIF_ZIP_BYTES = 64 * 1024 * 1024
 const MAX_RASTER_BYTES = 32 * 1024 * 1024
-const TERMINAL_JOB_STATUSES = new Set(['done', 'failed_post_processing', 'failed_model_error', 'failed_safety_filter'])
+const TERMINAL_JOB_STATUSES = new Set(['done', 'failed_quality_gate', 'failed_post_processing', 'failed_model_error', 'failed_safety_filter'])
 const MOTION_PIXEL_GRID_RECIPES = new Set([
   'pixel_grid_v2_balanced',
   'pixel_grid_v2_detail_safe',
@@ -92,6 +99,7 @@ const MOTION_GUIDED_CONTROL_SELECTORS = [
   '#motion-guide-choose-sheet',
   '#motion-guide-resample',
   '#motion-guide-apply',
+  '#motion-guide-build-engine-packs',
   '#motion-guide-open-artifacts',
 ]
 const MOTION_RELEASE_RETRY_DELAYS_MS = Object.freeze([0, 250, 1000, 4000])
@@ -407,6 +415,14 @@ function syncActionButtons() {
   const previewCurrent = previewBindingCurrent(options)
   const previewArtifactError = artifactErrorFor('preview')
   const applyCompatibility = currentApplyCompatibility(options)
+  const enginePackReadiness = motionEnginePackExportReadiness({
+    applyJob: state.motionSource.jobs.apply,
+    applyReport: state.motionSource.reports.apply,
+    applyResultStale: state.motionSource.applyResultStale,
+    applyArtifactError: artifactErrorFor('apply'),
+    enginePackBinding: state.motionSource.enginePackBinding,
+    enginePackJob: state.motionSource.jobs.enginePacks,
+  })
   const manualBlocked = selectionMode() === 'manual' && (
     !hasManualFrames ||
     !previewCurrent ||
@@ -433,11 +449,13 @@ function syncActionButtons() {
     !applyCompatibility.allowed
   $('#motion-source-analyze-set').disabled = uiBusy || !hasManifest || !hasSourceSetStrips
   $('#motion-source-apply-set').disabled = uiBusy || !hasSheet || !hasManifest || !hasSourceSetStrips
+  $('#motion-source-build-engine-packs').disabled = uiBusy || !enginePackReadiness.ready
 
   const guidedAnalyze = $('#motion-guide-analyze')
   const guidedPreview = $('#motion-guide-preview')
   const guidedBuild = $('#motion-guide-build')
   const guidedApply = $('#motion-guide-apply')
+  const guidedEnginePacks = $('#motion-guide-build-engine-packs')
   const guidedRestore = $('#motion-guide-restore-auto')
   const chooseSource = $('#motion-guide-choose-source')
   const chooseSheet = $('#motion-guide-choose-sheet')
@@ -495,6 +513,7 @@ function syncActionButtons() {
       Boolean(previewArtifactError)
   }
   if (guidedApply) guidedApply.disabled = $('#motion-source-apply-strip').disabled
+  if (guidedEnginePacks) guidedEnginePacks.disabled = $('#motion-source-build-engine-packs').disabled
   if (guidedRestore) {
     guidedRestore.disabled = uiBusy || state.motionSource.frameCandidates.length === 0
   }
@@ -1110,6 +1129,12 @@ function renderLinks(job = {}) {
     ['Frames ZIP', 'frames.zip', job.frames_zip_url],
     ['Apply report', 'apply_motion_strip_report.json', job.apply_motion_strip_report_url],
     ['Applied sheet', 'applied_normalized_sheet.png', job.applied_normalized_sheet_url],
+    ['Reprocessed sheet', 'normalized_sheet.png', job.normalized_sheet_url],
+    ['Export validation report', 'debug_report.json', job.debug_report_url],
+    ['Character Pack', 'character_pack.zip', job.zip_url],
+    ['Godot package', 'godot_npc_pack.zip', job.godot_npc_zip_url],
+    ['RPG Maker package', 'rpgmaker_pack.zip', job.rpgmaker_zip_url],
+    ['OCAD package', 'ocad_pack.zip', job.ocad_zip_url],
     ['Source set', 'motion_source_set_report.json', job.motion_source_set_report_url],
     ['Identity gate', 'identity_consistency_report.json', job.identity_consistency_report_url],
     ['Set apply report', 'motion_source_set_apply_report.json', job.motion_source_set_apply_report_url],
@@ -1217,14 +1242,17 @@ function resetMotionSourceDerivedState() {
     state.motionSource.artifactErrors[storeKey] = {}
   }
   state.motionSource.applyResultStale = false
+  state.motionSource.enginePackBinding = null
   state.motionSource.reports.analysis = null
   state.motionSource.reports.preview = null
   state.motionSource.reports.build = null
   state.motionSource.reports.apply = null
+  state.motionSource.reports.enginePacks = null
   state.motionSource.jobs.analysis = null
   state.motionSource.jobs.preview = null
   state.motionSource.jobs.build = null
   state.motionSource.jobs.apply = null
+  state.motionSource.jobs.enginePacks = null
   renderImage('#motion-source-frame-preview-sheet', null)
   renderImage('#motion-source-contact-sheet', null)
   renderImage('#motion-source-strip-preview', null)
@@ -1341,11 +1369,22 @@ function assertBoundMotionArtifact(handle, artifact) {
 }
 
 function renderCommittedMotionArtifacts() {
+  const enginePackJob = motionEnginePackBindingCurrent(
+    state.motionSource.enginePackBinding,
+    {
+      applyJob: state.motionSource.jobs.apply,
+      applyResultStale: state.motionSource.applyResultStale,
+      enginePackJob: state.motionSource.jobs.enginePacks,
+    }
+  )
+    ? state.motionSource.jobs.enginePacks
+    : {}
   renderLinks({
     ...(state.motionSource.jobs.analysis ?? {}),
     ...(state.motionSource.jobs.preview ?? {}),
     ...(state.motionSource.jobs.build ?? {}),
     ...(state.motionSource.jobs.apply ?? {}),
+    ...enginePackJob,
     ...(state.motionSource.jobs.set ?? {}),
     ...(state.motionSource.jobs.setApply ?? {}),
   })
@@ -1390,6 +1429,17 @@ async function renderMotionJob(job, handle, { signal } = {}) {
         'normalized_motion_strip_url',
       ],
       apply: ['apply_motion_strip_report_url', 'applied_normalized_sheet_url'],
+      enginePacks: [
+        'debug_report_url',
+        'normalized_sheet_url',
+        'animations_url',
+        'metadata_url',
+        'editor_metadata_url',
+        'zip_url',
+        'godot_npc_zip_url',
+        'rpgmaker_zip_url',
+        'ocad_zip_url',
+      ],
       set: ['identity_consistency_report_url'],
       setApply: ['motion_source_set_apply_report_url', 'applied_normalized_sheet_url'],
     }
@@ -1465,19 +1515,42 @@ async function renderMotionJob(job, handle, { signal } = {}) {
       await fetchImageArtifact(job.applied_normalized_sheet_url, { signal })
       if (!motionOperationMatches(handle, job)) return false
       clearArtifactError(handle.storeKey)
-      state.motionSource.reports.setApply = report
+      clearArtifactError('apply')
+      clearArtifactError('enginePacks')
+      Object.assign(state.motionSource, buildMotionApplyContextCommit(
+        state.motionSource,
+        { kind: 'set', job, report }
+      ))
       handle.evidenceReport = report
       renderJson('#motion-source-report', report)
-      state.motionSource.jobs.setApply = job
     } else if (handle.storeKey === 'apply' && job.apply_motion_strip_report_url) {
       const report = await fetchJsonArtifact(job.apply_motion_strip_report_url, { signal })
       if (!motionOperationMatches(handle, job)) return false
       await fetchImageArtifact(job.applied_normalized_sheet_url, { signal })
       if (!motionOperationMatches(handle, job)) return false
       clearArtifactError(handle.storeKey)
-      state.motionSource.reports.apply = report
-      state.motionSource.jobs.apply = job
-      state.motionSource.applyResultStale = false
+      clearArtifactError('setApply')
+      clearArtifactError('enginePacks')
+      Object.assign(state.motionSource, buildMotionApplyContextCommit(
+        state.motionSource,
+        { kind: 'single', job, report }
+      ))
+      handle.evidenceReport = report
+      renderJson('#motion-source-report', report)
+    } else if (handle.storeKey === 'enginePacks' && job.debug_report_url) {
+      const report = await fetchJsonArtifact(job.debug_report_url, { signal })
+      if (!motionOperationMatches(handle, job)) return false
+      await fetchImageArtifact(job.normalized_sheet_url, { signal })
+      if (!motionOperationMatches(handle, job)) return false
+      const binding = assertMotionEnginePackResult({
+        job,
+        debugReport: report,
+        inputBinding: handle.enginePackInputBinding,
+      })
+      clearArtifactError(handle.storeKey)
+      state.motionSource.reports.enginePacks = report
+      state.motionSource.jobs.enginePacks = job
+      state.motionSource.enginePackBinding = binding
       handle.evidenceReport = report
       renderJson('#motion-source-report', report)
     } else if (handle.storeKey === 'set' && job.identity_consistency_report_url) {
@@ -1590,7 +1663,7 @@ function announceTerminalJob(handle, job) {
         bindingCurrent: buildBindingCurrent(),
         artifactError: handle.artifactError,
       })
-    } else if (['analysis', 'apply', 'setApply'].includes(handle.storeKey)) {
+    } else if (['analysis', 'apply', 'enginePacks', 'setApply'].includes(handle.storeKey)) {
       evidence = mapMotionReportOutcome({
         job,
         report: handle.evidenceReport,
@@ -1648,7 +1721,7 @@ function beginUiOperation(handle) {
   return controller
 }
 
-async function runJob(label, starter, storeKey) {
+async function runJob(label, starter, storeKey, handleOptions = {}) {
   const handle = {
     bound: false,
     kind: 'generic',
@@ -1657,6 +1730,7 @@ async function runJob(label, starter, storeKey) {
     starter,
     jobId: null,
     status: 'queued',
+    ...handleOptions,
   }
   const controller = beginUiOperation(handle)
   if (!controller) return
@@ -2225,6 +2299,36 @@ function startMotionApply() {
   )
 }
 
+function startMotionEnginePacks() {
+  const readiness = motionEnginePackExportReadiness({
+    applyJob: state.motionSource.jobs.apply,
+    applyReport: state.motionSource.reports.apply,
+    applyResultStale: state.motionSource.applyResultStale,
+    applyArtifactError: artifactErrorFor('apply'),
+    enginePackBinding: state.motionSource.enginePackBinding,
+    enginePackJob: state.motionSource.jobs.enginePacks,
+  })
+  if (!readiness.ready) {
+    const message = t('motion.guide.enginePacksUnavailable')
+    setStatus(message, 'warning')
+    showToast(message)
+    syncActionButtons()
+    return null
+  }
+  const payload = {
+    applyJob: state.motionSource.jobs.apply,
+    applyReport: state.motionSource.reports.apply,
+    applyResultStale: state.motionSource.applyResultStale,
+    applyArtifactError: artifactErrorFor('apply'),
+  }
+  return runJob(
+    t('motion.guide.enginePacks.action'),
+    (signal) => buildMotionEnginePacksFromAppliedSheet(payload, { signal }),
+    'enginePacks',
+    { enginePackInputBinding: readiness.binding }
+  )
+}
+
 export function initMotionSourceTab() {
   if (!$('#motion-source')) return
   populateMotionActions()
@@ -2245,6 +2349,8 @@ export function initMotionSourceTab() {
   $('#motion-guide-build').addEventListener('click', () => startMotionBuild({ guided: true }))
   $('#motion-source-apply-strip').addEventListener('click', startMotionApply)
   $('#motion-guide-apply').addEventListener('click', startMotionApply)
+  $('#motion-source-build-engine-packs').addEventListener('click', startMotionEnginePacks)
+  $('#motion-guide-build-engine-packs').addEventListener('click', startMotionEnginePacks)
   $('#motion-source-analyze-set').addEventListener('click', () => {
     const payload = {
       manifestFile: state.motionSource.manifestFile,

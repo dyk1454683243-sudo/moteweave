@@ -16,6 +16,7 @@ import {
 import { refreshBenchmarkGallery } from './benchmarkGalleryView.js'
 import { renderCharacterPackJob } from './jobRenderer.js'
 import { refreshGeminiState } from './providerStatus.js'
+import { buildCharacterProcessingRequestOptions } from './processingRequestOptions.js'
 import { FIXED_REGION_MOTION_LAYOUT_ID } from '../../character-pack/sourceLayoutIds.js'
 import {
   clearActionRepairPlan,
@@ -47,6 +48,17 @@ function localFixedRegionStagingOptions(sourceLayout) {
     fixedRegionCropBottom: 4,
     fixedRegionMatteTolerance: 80,
   }
+}
+
+function processingRequestOptions({ generation = false } = {}) {
+  return buildCharacterProcessingRequestOptions({
+    backgroundMode: $('#character-pack-background')?.value ?? 'auto',
+    cleanupMinAlpha: $('#character-pack-cleanup-min-alpha')?.value,
+    componentCleanupMinArea: $('#character-pack-component-cleanup-min-area')?.value,
+    componentCleanupMinAreaRatio: $('#character-pack-component-cleanup-min-area-ratio')?.value,
+    motionStabilizationMaxShift: $('#character-pack-motion-max-shift')?.value,
+    generation,
+  })
 }
 
 async function handleCharacterPackFile(file) {
@@ -98,7 +110,7 @@ async function handleProcessCharacterPack() {
     let job = await processCharacterSheet(file, {
       name: $('#character-pack-name').value,
       description: '',
-      backgroundMode: $('#character-pack-background').value,
+      ...processingRequestOptions(),
       ...getCharacterPackTuningOptions(),
       sourceLayout,
       ...localFixedRegionStagingOptions(sourceLayout),
@@ -106,16 +118,8 @@ async function handleProcessCharacterPack() {
       manualOverrides: getManualOverridesForRequest(),
       autoCorrect: $('#character-pack-auto-correct')?.checked ?? true,
       componentCleanup: $('#character-pack-component-cleanup')?.checked ?? true,
-      minAlpha: Number($('#character-pack-cleanup-min-alpha')?.value ?? 18),
-      minArea: Number($('#character-pack-component-cleanup-min-area')?.value ?? 4),
-      minAreaRatio: Number($('#character-pack-component-cleanup-min-area-ratio')?.value ?? 0),
       motionStabilize: $('#character-pack-motion-stabilize')?.checked ?? true,
-      motionMaxShift: Number($('#character-pack-motion-max-shift')?.value ?? 2),
       ...pixelFinishingOptions(),
-      export1x: $('#character-pack-export-1x')?.checked ?? true,
-      export2x: $('#character-pack-export-2x')?.checked ?? true,
-      export3x: $('#character-pack-export-3x')?.checked ?? false,
-      export4x: $('#character-pack-export-4x')?.checked ?? false,
     }, state.characterPack.blackFile)
     job = await waitForJob(job, (current) => setCharacterPackStatus(formatJobStatus(current), current.status))
     await renderCharacterPackJob(job)
@@ -142,7 +146,7 @@ async function handleGenerateCharacterPack() {
       description: $('#character-pack-description').value,
       t2iMode: $('#character-pack-t2i-mode')?.value ?? 'production_sheet_v0',
       characterPreset: $('#character-pack-character-preset')?.value ?? 'rpg_humanoid_v0',
-      backgroundMode: $('#character-pack-background').value === 'dual_matte' ? 'flood' : $('#character-pack-background').value,
+      ...processingRequestOptions({ generation: true }),
       ...getCharacterPackTuningOptions(),
       imageSize: $('#character-pack-image-size').value,
       candidateCount,
@@ -155,16 +159,8 @@ async function handleGenerateCharacterPack() {
       paletteFile: state.characterPack.paletteFile,
       autoCorrect: $('#character-pack-auto-correct')?.checked ?? true,
       componentCleanup: $('#character-pack-component-cleanup')?.checked ?? true,
-      minAlpha: Number($('#character-pack-cleanup-min-alpha')?.value ?? 18),
-      minArea: Number($('#character-pack-component-cleanup-min-area')?.value ?? 4),
-      minAreaRatio: Number($('#character-pack-component-cleanup-min-area-ratio')?.value ?? 0),
       motionStabilize: $('#character-pack-motion-stabilize')?.checked ?? true,
-      motionMaxShift: Number($('#character-pack-motion-max-shift')?.value ?? 2),
       ...pixelFinishingOptions(),
-      export1x: $('#character-pack-export-1x')?.checked ?? true,
-      export2x: $('#character-pack-export-2x')?.checked ?? true,
-      export3x: $('#character-pack-export-3x')?.checked ?? false,
-      export4x: $('#character-pack-export-4x')?.checked ?? false,
     })
     job = await waitForJob(job, (current) => setCharacterPackStatus(formatJobStatus(current), current.status))
     await renderCharacterPackJob(job)

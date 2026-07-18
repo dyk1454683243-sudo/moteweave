@@ -1,7 +1,7 @@
 # Public Preview Release Readiness
 
 **Date:** 2026-07-17
-**Status:** Complete
+**Status:** Complete; historical release evidence, closed to new development
 **Owner:** Project lead
 **Integration branch:** `codex/public-preview-release-readiness`
 **Integrated baseline:** `6f4e0b4`

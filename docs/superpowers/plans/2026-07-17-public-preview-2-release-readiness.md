@@ -2,7 +2,7 @@
 
 **Date:** 2026-07-17
 
-**Status:** Local candidate verified; publication approval pending
+**Status:** Complete; public preview, protected main, and production website verified
 
 **Owner:** Project lead
 
@@ -67,8 +67,8 @@ The behavior contract and focused verification are recorded in
 | 1. Integration | Apply the reviewed P0 hardening to the release-safe MoteWeave baseline | Hardening tests and protocol remain intact; release-safe assets are unchanged | Complete: `09ed8b6` |
 | 2. Metadata | Align config, package, lockfile, README, changelog, website, and tests | Every active preview version and Release CTA names preview.2 | Complete: `efbb996` |
 | 3. Provider-free verification | Run focused, release, site, full-suite, and local smoke checks through the repository supervisor | All checks pass within resource ceilings with zero Provider calls | Complete locally |
-| 4. Snapshot review | Export to a new empty directory, verify ledger, install and test a clean checkout, then prepare a public-mirror PR | Export and clean-checkout evidence pass; public main remains unchanged until approval | Local snapshot complete; public PR not created |
-| 5. Publication | After explicit approval, tag the verified public candidate, create the prerelease, then merge the exact tagged tree and verify Pages | Tag, prerelease, source archives, protected main tree, production website, canonical metadata, and CTA agree | Blocked on final approval |
+| 4. Snapshot review | Export to a new empty directory, verify ledger, install and test a clean checkout, then prepare a public-mirror PR | Export and clean-checkout evidence pass; public main remains unchanged until approval | Complete: public PR `#4` reviewed and passed branch, PR, and tag CI |
+| 5. Publication | After explicit approval, tag the verified public candidate, create the prerelease, then merge the exact tagged tree and verify Pages | Tag, prerelease, source archives, protected main tree, production website, canonical metadata, and CTA agree | Complete: `v0.5.0-preview.2` and production Pages verified |
 
 ## 5. Verification Order
 
@@ -126,7 +126,53 @@ Local release preparation completed provider-free on 2026-07-17:
   paths: P0 code/protocol/tests, release metadata/ledger/docs, and the versioned
   website/OG surface only.
 
-GitHub authentication is available, the public mirror remains unchanged, and
-`v0.5.0-preview.1` remains the only public prerelease. Creating the preview.2
-public branch/PR, tag, prerelease, and production Pages update waits for the
-project lead's final approval.
+Publication completed after explicit project-lead approval on 2026-07-17:
+
+- public PR [#4](https://github.com/dyk1454683243-sudo/moteweave/pull/4)
+  merged the reviewed candidate; its head was `21cd29e`, and protected
+  `main@5a28665` has the identical tree `19ceaf4`;
+- the unchanged `v0.5.0-preview.1` ref remains at `96078b5`; the new
+  `v0.5.0-preview.2` ref points to the reviewed candidate `21cd29e`;
+- the source-only GitHub
+  [prerelease](https://github.com/dyk1454683243-sudo/moteweave/releases/tag/v0.5.0-preview.2)
+  is live with no uploaded assets, and its generated tar/zip source archives
+  resolve successfully;
+- branch, pull-request, tag, and protected-main Node 22/24 matrices passed. The
+  final protected-main run was `29562396703`; Node 24 also passed the
+  provider-free local smoke;
+- `https://moteweave.pages.dev/` returns HTTP `200`, advertises
+  `v0.5.0-preview.2`, links to the live prerelease, and exposes the approved
+  canonical/OG metadata and fail-closed security headers;
+- `https://gametool.pages.dev/` still returns a path- and query-preserving HTTP
+  `302` to the MoteWeave site;
+- a credential-free shallow clone of public `main` passed snapshot-mode release
+  checking with `632` tracked files, `631` exported files, and zero issues. Its
+  guarded locked install added `25` packages in `1.978s` at `131,904 KiB` peak
+  RSS, and its guarded local smoke passed in `4.431s` at `715,888 KiB` peak RSS
+  and `3` peak processes with `0` Provider calls;
+- the downloaded tag archive reports package `moteweave@0.5.0-preview.2`, keeps
+  `private: true`, and contains the `631`-file ledger bound to private source
+  commit `91bb57e`.
+
+No Provider secret was configured or called, no private history entered the
+public mirror, and no npm package, installer, third-party binary, or release
+asset was published.
+
+## 8. Release-Line Disposition
+
+The unique current private release-engineering comparison baseline for Preview
+3 is `codex/public-preview-2-release-readiness@7ff88c1`. This is the private
+publication-record commit, not the public tag commit. The complete immutable
+Preview 2 evidence mapping is:
+
+- private publication record: `7ff88c1`;
+- private snapshot source recorded by the ledger: `91bb57e`;
+- public `v0.5.0-preview.2` tag candidate: `21cd29e`;
+- protected public `main`: `5a28665`; and
+- shared public candidate/main tree: `19ceaf4`.
+
+`codex/public-preview-release-readiness@5de4be0` and
+`<workspace>/.worktrees/public-preview-release-readiness` are closed to new
+development, export, release verification, and publication. They remain
+read-only historical Preview 1 evidence. Post-release documentation does not
+move any accepted tag or redefine the evidence mapping above.

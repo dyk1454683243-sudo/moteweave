@@ -727,9 +727,10 @@
           </label>
           <div class="motion-guide-actions">
             <button id="motion-guide-apply" type="button" class="premium-btn" disabled data-i18n="motion.guide.apply.action">Apply strip</button>
+            <button id="motion-guide-build-engine-packs" type="button" class="premium-btn" disabled data-i18n="motion.guide.enginePacks.action">Build character &amp; engine packs</button>
             <button id="motion-guide-open-artifacts" type="button" class="premium-btn ghost" data-i18n="motion.guide.apply.artifacts">Open artifacts</button>
           </div>
-          <p class="motion-source-meta" data-i18n="motion.guide.apply.scope">Motion Source exports strips, sequence files, and an applied normalized sheet. Complete engine packs remain in Character Pack.</p>
+          <p class="motion-source-meta" data-i18n="motion.guide.apply.scope">After Apply, reprocess the applied sheet locally to build Character and engine packages. This may re-encode pixels and never calls a Provider.</p>
         </section>
       </aside>
 
@@ -888,6 +889,7 @@
         <button id="motion-source-preview-frames" type="button" class="premium-btn ghost" disabled>Preview Frames</button>
         <button id="motion-source-build-strip" type="button" class="premium-btn" disabled>Build Strip</button>
         <button id="motion-source-apply-strip" type="button" class="premium-btn" disabled>Apply Strip</button>
+        <button id="motion-source-build-engine-packs" type="button" class="premium-btn" disabled>Build Character &amp; Engine Packs</button>
         <button id="motion-source-analyze-set" type="button" class="premium-btn ghost" disabled>Analyze Set</button>
         <button id="motion-source-apply-set" type="button" class="premium-btn" disabled>Apply Set</button>
         <button id="motion-source-cancel" type="button" class="premium-btn ghost" disabled>Cancel current job</button>
@@ -1083,10 +1085,10 @@
       <h4 data-i18n="character.preprocess.title">3. PRE-PROCESSING</h4>
       <label><span data-i18n="character.preprocess.backgroundMode">Background Mode</span>
         <select id="character-pack-background" class="premium-select">
-          <option value="flood_edge" selected data-i18n="character.background.floodEdge">Auto (Flood & Edge)</option>
+          <option value="auto" selected data-i18n="character.background.floodEdge">Auto (Flood & Edge)</option>
           <option value="flood" data-i18n="character.background.flood">Flood Fill (Solid Color)</option>
           <option value="dual_matte" data-i18n="character.background.dualMatte">Dual Matte (Base + Black)</option>
-          <option value="alpha" data-i18n="character.background.alpha">Keep Original Alpha</option>
+          <option value="passthrough" data-i18n="character.background.alpha">Keep Original Alpha</option>
         </select>
       </label>
 
@@ -1207,7 +1209,7 @@
         </label>
         <div class="param-grid">
           <label><span data-i18n="character.correction.maxShift">Max Shift (px)</span>
-            <input id="character-pack-motion-max-shift" type="number" min="0" max="8" value="2" class="premium-input" />
+            <input id="character-pack-motion-max-shift" type="number" min="0" max="4" value="2" class="premium-input" />
           </label>
         </div>
         <label><span data-i18n="character.correction.animationLock">Animation Lock (No Stabilization)</span>
@@ -1343,17 +1345,12 @@
           <a class="export-dl" download hidden aria-label="下载 Aseprite JSON" data-i18n-aria-label="character.export.downloadEditorJson"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></a>
         </div>
         <div class="export-row" data-export-key="zip_url">
-          <div class="export-row-left"><span class="export-name">Multi-res PNG</span><span class="export-fmt">16 · 32 · 48 · 96</span></div>
+          <div class="export-row-left"><span class="export-name">Multi-res PNG</span><span class="export-fmt">16 · 32 · 48 · 64 · 96</span></div>
           <a class="export-dl" download hidden aria-label="下载完整包" data-i18n-aria-label="character.export.downloadFullPack"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></a>
         </div>
         <div class="export-scale-row">
           <span class="export-fmt" data-i18n="character.export.scales">Export scales</span>
-          <div class="export-scale-group" aria-label="导出尺寸">
-            <label class="checkbox-row"><input id="character-pack-export-1x" type="checkbox" value="1" checked /> 1x</label>
-            <label class="checkbox-row"><input id="character-pack-export-2x" type="checkbox" value="2" checked /> 2x</label>
-            <label class="checkbox-row"><input id="character-pack-export-3x" type="checkbox" value="3" /> 3x</label>
-            <label class="checkbox-row"><input id="character-pack-export-4x" type="checkbox" value="4" /> 4x</label>
-          </div>
+          <span class="export-fmt" data-i18n="character.export.fixedSizes">96 · 64 · 48 · 32 · 16 px · Fixed</span>
         </div>
         <div class="export-row is-soon">
           <div class="export-row-left"><span class="export-name">Phaser</span><span class="export-fmt">atlas JSON</span></div>

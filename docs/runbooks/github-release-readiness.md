@@ -8,7 +8,9 @@ Normative plans:
 - `docs/superpowers/plans/2026-07-17-public-preview-release-readiness.md` for
   the initial public snapshot;
 - `docs/superpowers/plans/2026-07-17-public-preview-2-release-readiness.md` for
-  the current update.
+  the accepted Preview 2 update;
+- `docs/superpowers/plans/2026-07-18-public-preview-3-release-readiness.md` for
+  the current private readiness candidate.
 
 ## 1. Human Approval Gates
 
@@ -29,6 +31,14 @@ public on the user's behalf without explicit approval.
 ## 2. Private Baseline
 
 - Work only from the dedicated release worktree and branch.
+- Before starting a later Preview, use the latest completed release plan to
+  identify one exact private comparison baseline, then create a new dedicated
+  branch and worktree. Do not resume work in an earlier release worktree.
+- Treat completed release worktrees as read-only historical evidence: do not
+  develop, stage, export, rerun release verification, or publish from them.
+- Record the private publication baseline, private snapshot source, public tag
+  candidate, protected public main, and public tree as separate identities.
+  Never describe one of these commits as another.
 - Confirm the intended feature heads are ancestors of the release commit.
 - Run `git status --short`.
 - Do not stage unrelated untracked files from another worktree.
@@ -82,6 +92,12 @@ Run in order:
 4. `npm test`;
 5. `npm run smoke:local`.
 
+For Preview 3 and later first-user-path releases, also run
+`npm run first-user:local` after local smoke. Run it again from the fresh
+exported snapshot and on the primary Node 24 CI job. It must report Provider
+availability false, zero calls, local-only requests, and parsed release
+packages.
+
 No Provider secret may be configured for these checks. Do not run live
 generation.
 
@@ -109,6 +125,8 @@ and peak process count.
 - For an update to the existing public mirror, copy only the deterministic
   exported snapshot delta onto a dedicated public branch and open a pull
   request. Never merge private history into the public repository.
+- Before pushing that public branch or opening its pull request, obtain
+  project-lead approval bound to the exact private release commit and tree.
 - Enable read-only-default CI with Node 22/24 serial jobs.
 - Verify branch protection and CI.
 - Clone the candidate public branch into a separate clean directory and repeat

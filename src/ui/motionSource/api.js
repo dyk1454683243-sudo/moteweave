@@ -1,4 +1,9 @@
-const TERMINAL_JOB_STATUSES = new Set(['done', 'failed_post_processing', 'failed_model_error', 'failed_safety_filter'])
+import {
+  buildMotionEnginePackProcessingOptions,
+  motionEnginePackExportReadiness,
+} from './enginePackExportState.js'
+
+const TERMINAL_JOB_STATUSES = new Set(['done', 'failed_quality_gate', 'failed_post_processing', 'failed_model_error', 'failed_safety_filter'])
 const DEFAULT_RELEASE_REQUEST_TIMEOUT_MS = 3000
 const DEFAULT_ARTIFACT_FETCH_TIMEOUT_MS = 10000
 
@@ -328,6 +333,31 @@ export async function applyMotionStrip({ sheetFile, stripFile, stripUrl, options
     sheet_base64: await blobToBase64(sheetFile, { signal }),
     strip_base64: stripBase64,
     options,
+  }, { signal })
+}
+
+export async function buildMotionEnginePacksFromAppliedSheet({
+  applyJob,
+  applyReport,
+  applyResultStale = false,
+  applyArtifactError = null,
+}, { signal } = {}) {
+  const readiness = motionEnginePackExportReadiness({
+    applyJob,
+    applyReport,
+    applyResultStale,
+    applyArtifactError,
+  })
+  if (!readiness.ready) {
+    throw Object.assign(
+      new Error(`Applied Motion sheet is not ready for engine package processing: ${readiness.reason}`),
+      { code: readiness.reason }
+    )
+  }
+  return postJson('/api/process-sheet', {
+    source_base64: await urlToBase64(readiness.binding.applied_sheet_url, { signal }),
+    source_black_base64: null,
+    options: buildMotionEnginePackProcessingOptions(),
   }, { signal })
 }
 
