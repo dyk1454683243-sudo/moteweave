@@ -306,7 +306,8 @@ try {
     'id="character-pack-repair-status"',
     'id="character-pack-repair-plan"',
     'id="character-pack-repair-run"',
-    'id="character-pack-export-1x"',
+    'data-i18n="character.export.fixedSizes"',
+    '96 · 64 · 48 · 32 · 16 px · Fixed',
 
     'id="character-pack-provider-preset"',
     'id="character-pack-palette-file"',

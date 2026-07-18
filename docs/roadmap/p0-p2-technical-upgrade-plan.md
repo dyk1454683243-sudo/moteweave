@@ -167,17 +167,47 @@ verified from protected `main` commit
 The retained `https://gametool.pages.dev/` project provides a verified
 path-preserving HTTP `302` transition. Provider calls remained `0`.
 
-The follow-up `v0.5.0-preview.2` snapshot is in progress under
+The follow-up `v0.5.0-preview.2` snapshot completed on 2026-07-17 under
 `docs/superpowers/plans/2026-07-17-public-preview-2-release-readiness.md`. It
 publishes only the completed Generation Release Gate fail-closed hardening on
-top of the release-safe MoteWeave baseline. It does not reopen Provider,
-semantic, adaptive-candidate, packaging, or hosted-service scope, and it leaves
-the accepted `v0.5.0-preview.1` tag immutable.
+top of the release-safe MoteWeave baseline. It did not reopen Provider,
+semantic, adaptive-candidate, packaging, or hosted-service scope, and the
+accepted `v0.5.0-preview.1` ref remains unchanged at `96078b5`.
 
-Its provider-free local candidate is verified: focused, site/OG, source and
-snapshot release checks, locked install, `1543 / 1543` exported-snapshot tests,
-and local smoke passed. The public mirror, tag, prerelease, and production site
-remain unchanged pending the final publication approval.
+Public PR `#4`, the source-only `v0.5.0-preview.2` prerelease, generated source
+archives, protected `main@5a28665`, and the Git-integrated production site all
+passed. The tagged candidate and protected main share tree `19ceaf4`; public
+branch, PR, tag, and main Node 22/24 CI passed. A credential-free clone passed
+release checking, guarded locked install, and provider-free smoke. The new site
+serves the preview.2 CTA and canonical/OG metadata over HTTP `200`, while the
+legacy site retains its path-preserving HTTP `302`. Provider calls remained
+`0`.
+
+The provider-free first-user acceptance follow-up completed on 2026-07-18
+under
+`docs/superpowers/plans/2026-07-18-provider-free-first-user-acceptance.md`,
+with its decision recorded in
+`docs/decisions/2026-07-18-provider-free-first-user-acceptance.md`. It closes
+real Character UI request-truth gaps and adds a fail-closed Motion
+reprocess/re-export action on the private engineering line. The guarded local
+journey passed with zero Provider calls, parsed all four package families, and
+the full suite passed `1555/1555`. Preview 3 readiness planning is GO, while
+publication remains NO-GO pending an exact candidate, clean release gates, and
+fresh project-lead approval. Preview 2 and all public surfaces remain unchanged.
+
+The sole Preview 3 comparison baseline is the completed Preview 2 private
+publication record `7ff88c1`. Preview 2 remains bound to private snapshot source
+`91bb57e`, public tag candidate `21cd29e`, protected public `main@5a28665`, and
+shared public tree `19ceaf4`. Preview 1 and Preview 2 release worktrees are
+closed to new development and retained as read-only historical evidence.
+
+Private `v0.5.0-preview.3` readiness now proceeds under
+`docs/superpowers/plans/2026-07-18-public-preview-3-release-readiness.md` from
+accepted feature head `e8a4b93`. The scope is limited to the verified
+provider-free first-user UI and Motion reprocess/re-export delta. Semantic PR
+`#18` remains excluded. Private candidate assembly and clean snapshot evidence
+are approved; any public mirror branch/PR, tag, prerelease, merge, or Pages
+update remains NO-GO until its separately defined approval gate.
 
 - Release `v0.5.0-preview.1` as a source-only GitHub prerelease from a new,
   history-free public snapshot repository.
@@ -206,8 +236,8 @@ Done when:
   commit;
 - the public snapshot contains no unproven asset, real secret, personal path,
   ignored artifact directory, untracked scratch file, or private Git history;
-- README, package metadata, lockfile, CHANGELOG, website metadata, and
-  `v0.5.0-preview.1` agree;
+- README, package metadata, lockfile, CHANGELOG, website metadata, and the
+  active target release version agree;
 - guarded Node 22/24 tests, release checks, site checks, and local smoke pass
   provider-free from a fresh exported snapshot;
 - the new repository passes private clean-clone review before explicit approval

@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.5.0-preview.3] - 2026-07-18
+
+### Added
+
+- Added an explicit Motion Apply reprocess/re-export action that exposes real
+  Character, Godot, RPG Maker, and OCAD packages only after current, bound,
+  unblocked local evidence passes.
+- Added a guarded provider-free first-user acceptance command covering import,
+  Character processing, Motion Selection v2, Pixel Grid v2, Apply, and all four
+  package families.
+
+### Fixed
+
+- Character UI requests now use the implemented background modes, canonical
+  cleanup and stabilization fields, the supported motion-shift range, and the
+  fixed `96/64/48/32/16` package sizes.
+- Motion single-strip and set-apply contexts are mutually exclusive, and stale,
+  malformed, or cross-job Apply and package evidence fails closed.
+
+Motion package generation reprocesses the applied sheet and may re-encode
+pixels; this release does not claim exact repacking. The source-only update adds
+no Provider calls, semantic release gate, npm package, installer, bundled
+external tool, or hosted processing.
+
 ## [0.5.0-preview.2] - 2026-07-17
 
 ### Fixed

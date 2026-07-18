@@ -3,7 +3,7 @@
 MoteWeave turns uploaded or optionally AI-generated game art into inspectable,
 previewable, and exportable character, motion, scene, and tile assets.
 
-Current preview version: `0.5.0-preview.2`.
+Current preview version: `0.5.0-preview.3`.
 
 ## Contributing
 
@@ -37,6 +37,12 @@ Implemented:
 - Source layout selector: `topdown_rpg_v0` 8x8 uniform input or `fixed_region_motion_v0` one-image fixed-region motion input. Historical `ocad_motion_v0` metadata remains readable as a legacy alias.
 - Fixed-region source action semantics are preserved in reports and overlays while normalized runtime actions stay compatible with `topdown_rpg_v0`.
 - Upload-first sheet processing with background cleanup, grid correction, normalization, validation, debug overlays, row GIF previews, and ZIP export.
+- Character UI processing controls bind the implemented background, cleanup,
+  stabilization, and fixed `96/64/48/32/16` output-size options without
+  disconnected scale controls.
+- A current, unblocked Motion Apply result can be explicitly reprocessed into
+  Character, Godot, RPG Maker, and OCAD packages. This local step may re-encode
+  pixels and does not call a Provider.
 - Multi-resolution normalized sheet outputs: 96, 64, 48, 32, and 16 px frame sizes.
 - Editor metadata export: `editor_metadata.json` records frame tags, frame rectangles, attachment points, visible bounds, and source provenance.
 - Browser playable preview using `normalized_sheet.png` plus `animations.json`.
@@ -110,6 +116,7 @@ are already green:
 ```bash
 npm test
 npm run smoke:local
+npm run first-user:local
 ```
 
 The focused profile allows 1024 MiB of V8 old space and 1536 MiB of process-tree RSS for 60 seconds. `npm test` and `npm run smoke:local` use the full profile with 2048 MiB of V8 old space and 4096 MiB of process-tree RSS. Do not bypass the guard or run overlapping test suites. A legitimate need for a higher ceiling must be reviewed before changing these values.

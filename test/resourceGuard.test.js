@@ -240,6 +240,11 @@ test('package test and local smoke scripts always run through the resource guard
   assert.match(packageJson.scripts['test:focused'], /--max-old-space-mib 1024/)
   assert.match(packageJson.scripts['smoke:local'], /run-with-resource-guard\.mjs/)
   assert.match(packageJson.scripts['smoke:local'], /--max-rss-mib 4096/)
+  assert.match(packageJson.scripts['first-user:local'], /run-with-resource-guard\.mjs/)
+  assert.match(packageJson.scripts['first-user:local'], /--max-old-space-mib 2048/)
+  assert.match(packageJson.scripts['first-user:local'], /--max-rss-mib 4096/)
+  assert.match(packageJson.scripts['first-user:local'], /--timeout-ms 900000/)
+  assert.match(packageJson.scripts['first-user:local'], /run-first-user-acceptance\.mjs/)
 })
 
 test('resource guard reports its limits, elapsed time, and peak process-tree RSS', async () => {

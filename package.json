@@ -1,6 +1,6 @@
 {
   "name": "moteweave",
-  "version": "0.5.0-preview.2",
+  "version": "0.5.0-preview.3",
   "private": true,
   "license": "MIT",
   "type": "module",
@@ -40,6 +40,7 @@
     "quality:local-golden": "node scripts/character-pack-cli.mjs benchmark local-images --gate-layer local-golden",
     "quality:release": "node scripts/character-pack-cli.mjs benchmark local-images --gate-layer release",
     "smoke:local": "node scripts/run-with-resource-guard.mjs --max-old-space-mib 2048 --max-rss-mib 4096 --timeout-ms 600000 --poll-ms 500 -- node scripts/run-local-smoke.mjs",
+    "first-user:local": "node scripts/run-with-resource-guard.mjs --max-old-space-mib 2048 --max-rss-mib 4096 --timeout-ms 900000 --poll-ms 500 -- node scripts/run-first-user-acceptance.mjs",
     "smoke:openrouter": "node scripts/run-with-resource-guard.mjs --max-old-space-mib 2048 --max-rss-mib 4096 --timeout-ms 900000 --poll-ms 500 -- node scripts/smoke-openrouter-generate.mjs"
   },
   "dependencies": {

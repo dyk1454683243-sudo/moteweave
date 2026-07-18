@@ -58,3 +58,7 @@ jobs:
       - name: Run provider-free local smoke on primary Node
         if: matrix.node == 24
         run: npm run smoke:local
+
+      - name: Run provider-free first-user acceptance on primary Node
+        if: matrix.node == 24
+        run: npm run first-user:local

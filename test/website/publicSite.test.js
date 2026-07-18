@@ -9,7 +9,7 @@ const projectRoot = path.resolve(testDir, '..', '..')
 const websiteRoot = path.join(projectRoot, 'website')
 const homepageUrl = 'https://moteweave.pages.dev/'
 const repositoryUrl = 'https://github.com/dyk1454683243-sudo/moteweave'
-const releaseUrl = `${repositoryUrl}/releases/tag/v0.5.0-preview.2`
+const releaseUrl = `${repositoryUrl}/releases/tag/v0.5.0-preview.3`
 
 async function readWebsiteFile(name) {
   return readFile(path.join(websiteRoot, name), 'utf8')
@@ -28,7 +28,14 @@ test('public site keeps a standalone static asset boundary', async () => {
 
   assert.match(html, /href="\.\/styles\.css"/)
   assert.match(html, /src="\.\/site\.js"/)
-  assert.match(html, /content="https:\/\/moteweave\.pages\.dev\/og\.png"/)
+  assert.match(
+    html,
+    /property="og:image" content="https:\/\/moteweave\.pages\.dev\/og\.png\?v=0\.5\.0-preview\.3"/
+  )
+  assert.match(
+    html,
+    /name="twitter:image" content="https:\/\/moteweave\.pages\.dev\/og\.png\?v=0\.5\.0-preview\.3"/
+  )
   assert.match(html, /property="og:image:width" content="1200"/)
   assert.match(html, /property="og:image:height" content="630"/)
   assert.doesNotMatch(html, /\bsrc=["']https?:\/\//i)
@@ -129,7 +136,7 @@ test('public page includes baseline accessibility and capability truth', async (
   assert.match(html, /完整 WFC/)
   assert.match(html, /AI 生成只是可选路径/)
   assert.match(html, /MoteWeave/)
-  assert.match(html, /0\.5\.0-preview\.2/)
+  assert.match(html, /0\.5\.0-preview\.3/)
 })
 
 test('site script parses and security headers block network and form actions', async () => {

@@ -38,7 +38,7 @@
       "kind": "website_social_image",
       "source_rights": "repository_owned",
       "generator": "scripts/create-website-og.mjs",
-      "sha256": "8bcd9aa0cba3fd75701c7c5b08dab57b20da3a666dee59e75f086c35e58e2a46",
+      "sha256": "a94ef13205e4b87056b13588e5e8036bc76cf62f8af5306eb49b61b115ee0b25",
       "release_status": "approved"
     }
   ]
