@@ -119,6 +119,24 @@ test('public copy avoids restricted branding and unsupported release claims', as
   }
 })
 
+test('public site local-run commands stay copyable and match the source Preview', async () => {
+  const [html, script] = await Promise.all([
+    readWebsiteFile('index.html'),
+    readWebsiteFile('site.js'),
+  ])
+
+  assert.match(html, /id="local-commands"/)
+  assert.match(
+    html,
+    /git clone https:\/\/github\.com\/dyk1454683243-sudo\/moteweave\.git/,
+  )
+  assert.match(html, /npm ci/)
+  assert.match(html, /npm start/)
+  assert.match(script, /function localInstallCommands\(/)
+  assert.match(script, /localCommands\?\.innerText/)
+  assert.doesNotMatch(script, /npm install\\nnpm start/)
+})
+
 test('public page includes baseline accessibility and capability truth', async () => {
   const [html, css] = await Promise.all([
     readWebsiteFile('index.html'),

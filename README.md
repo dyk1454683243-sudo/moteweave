@@ -3,11 +3,22 @@
 MoteWeave turns uploaded or optionally AI-generated game art into inspectable,
 previewable, and exportable character, motion, scene, and tile assets.
 
+This GitHub repository is a **public source Preview**: a reviewed, source-only
+snapshot of a private engineering line. Clone it and run it locally. It is not
+a hosted upload service, an npm package, or the private development history.
+
 Current preview version: `0.5.0-preview.3`.
+
+- Public site: https://moteweave.pages.dev/
+- Source tag: https://github.com/dyk1454683243-sudo/moteweave/releases/tag/v0.5.0-preview.3
+- Changelog: `CHANGELOG.md`
 
 ## Contributing
 
-Contributors and AI agents must read `AGENTS.md` before making changes. Attribution and naming guardrails are tracked in `ATTRIBUTIONS.md`.
+Public contributions are not promised. For local run steps, Preview versus
+private-line boundaries, and triage notes for humans and AI tools, read
+`CONTRIBUTING.md` and `AGENTS.md` before making changes. Attribution and naming
+guardrails are tracked in `ATTRIBUTIONS.md`.
 
 Current focus:
 

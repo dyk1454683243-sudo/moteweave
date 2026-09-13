@@ -31,6 +31,7 @@ const TEXT_ROOT_FILES = new Set([
   'AGENTS.md',
   'ATTRIBUTIONS.md',
   'CHANGELOG.md',
+  'CONTRIBUTING.md',
   'LICENSE',
   'README.md',
 ])

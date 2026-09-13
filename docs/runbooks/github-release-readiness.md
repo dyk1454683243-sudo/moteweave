@@ -10,7 +10,11 @@ Normative plans:
 - `docs/superpowers/plans/2026-07-17-public-preview-2-release-readiness.md` for
   the accepted Preview 2 update;
 - `docs/superpowers/plans/2026-07-18-public-preview-3-release-readiness.md` for
-  the current private readiness candidate.
+  the published Preview 3 source snapshot.
+
+The current public tag is `v0.5.0-preview.3`. Later updates need a new
+prerelease version and a reviewed public-mirror pull request. Do not move or
+rebuild an existing tag.
 
 ## 1. Human Approval Gates
 
