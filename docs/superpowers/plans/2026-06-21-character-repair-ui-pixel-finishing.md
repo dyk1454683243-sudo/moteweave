@@ -1,7 +1,7 @@
 # Character Repair UI And Pixel Finishing
 
 **Date:** 2026-06-21  
-**Status:** First browser repair and preview batch implemented; finishing polish continuing
+**Status:** Pixel Finishing v1 implemented; live repair quality evidence remains separate
 **Scope:** Character-pack quality closure after a mostly usable sprite sheet exists.
 
 ## Direction
@@ -29,7 +29,7 @@ This is not a standalone image editor, a full semantic auto-diagnosis system, or
 - Write dry-run artifacts: plan JSON, selected prompt, normalized sheet reference, target animation reference, optional motion-template reference, and source-sheet reference. `Implemented.`
 - Require `confirm_live_generation` and `maxProviderCalls` before live repair. `Implemented.`
 - Run one provider call for one action strip, apply it locally to the normalized sheet, reprocess the repaired sheet, and expose repaired strip, repaired sheet, Row GIF previews, quality report, and exports. `Implemented for the one-action workflow; still user-selected and quota-confirmed.`
-- Add Pixel Finishing as an opt-in character-pack output option using existing local image primitives. `Partially implemented; metric/report polish remains next.`
+- Add Pixel Finishing as an opt-in character-pack output option using existing local image primitives. `Implemented in 1452387 with deterministic mutation and report evidence.`
 
 ## 2026-06-22 Progress Update
 
@@ -39,11 +39,29 @@ This is not a standalone image editor, a full semantic auto-diagnosis system, or
 - Local fixed-region uploads now use staged `256 x 256` crop/matte cleanup before processing, bringing the local upload path closer to the AI generation path for background removal.
 - Local upload mode now hides generation-only prompt fields; the upload path expects fixed-format source images and should not imply provider prompt behavior.
 - The current repair workflow intentionally remains one selected action at a time. Multi-select repair, masked whole-sheet edit, and automatic semantic selection are future options only after the single-action loop is stable.
-- A separate language surface is now planned as UI polish: Chinese/English labels through a local dictionary and a top-right switcher, without changing provider prompts or export metadata in the first pass.
+- The first Chinese/English language surface is implemented through
+  `ae37d64`, `f4de1b6`, and `3c3463f`: Character Pack labels and runtime
+  messages use a local dictionary, the top-right switcher persists local
+  preference, and provider prompts and export metadata remain unchanged. The
+  2026-07-31 status reconciliation did not rerun live browser QA.
+
+## 2026-07-31 Pixel Finishing Status Reconciliation
+
+- Implementation commit `1452387` added the opt-in
+  `pixel_finishing_v1` character-pack path.
+- The report records before/after unique-color and palette-drift metrics,
+  palette changed-pixel ratio, alpha cleanup, halo/residue, small-component
+  cleanup, outline ratio, grid notes, and nearest-neighbor scale/export notes.
+- Current unit and process-sheet integration tests assert the deterministic
+  finishing report and finished-sheet preview/output path.
+- Default non-finishing and report-only paths remain non-mutating.
+
+This closes the deterministic Pixel Finishing implementation/reporting portion
+only. It does not establish live Provider repair quality, semantic action
+correctness, or the separately gated live-repair success threshold.
 
 ## Remaining Work
 
-- Finish Pixel Finishing reporting for unique color count, palette change ratio, halo/residue, outline ratio, grid/scale notes, and before/after evidence.
 - Keep comparing local upload and AI generation preprocessing so both paths use the same cleanup stages whenever the input contract allows it.
 - Add optional preview controls only if user review still needs them after the fixed-zoom gallery and transparent workspace preview.
 - Do not add automatic facing/action judgment until there is a reliable, testable semantic signal; user confirmation remains the safety boundary.
@@ -55,6 +73,10 @@ This is not a standalone image editor, a full semantic auto-diagnosis system, or
 - Live mock-provider repair produces fetchable repaired strip, validation report, normalized sheet, Row GIFs, and ZIP export.
 - Pixel Finishing records unique color count, palette change ratio, alpha cleanup, halo/residue, small-component cleanup, outline ratio, grid notes, and nearest-neighbor scale notes.
 - Existing upload and AI generation paths remain active and still render real pipeline outputs.
+
+The Pixel Finishing acceptance item above is met on current `main`. The live
+repair items remain subject to their explicit provider configuration, user
+confirmation, and separate quality-evidence boundary.
 
 ## Boundaries
 

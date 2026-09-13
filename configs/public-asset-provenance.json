@@ -2,11 +2,11 @@
   "schema_version": 1,
   "assets": [
     {
-      "path": "templates/fixed_region_motion_template_v1.png",
+      "path": "templates/motion_template_ocad_primary.png",
       "kind": "structural_template",
       "source_rights": "repository_owned",
-      "generator": "scripts/create-fixed-region-motion-assets.mjs",
-      "sha256": "338c3b8ae7587d9ed00debbb128222cb5cba850bc76f815bd1f47a2efdb45ce2",
+      "generator": "scripts/verify-authoritative-generation-structure.mjs",
+      "sha256": "27bb29c74ed671ec922ea3e080391b02ee35a0ff7bf8d685b8897d2925990d70",
       "release_status": "approved"
     },
     {
@@ -38,7 +38,7 @@
       "kind": "website_social_image",
       "source_rights": "repository_owned",
       "generator": "scripts/create-website-og.mjs",
-      "sha256": "a94ef13205e4b87056b13588e5e8036bc76cf62f8af5306eb49b61b115ee0b25",
+      "sha256": "dfabcbb81525f498d63d675c87b2cda9c9716d32b59071e840e8974b33d8c190",
       "release_status": "approved"
     }
   ]

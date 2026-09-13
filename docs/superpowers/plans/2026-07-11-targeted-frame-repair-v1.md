@@ -1,6 +1,7 @@
 # Targeted Frame Repair v1 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** Execute this plan task-by-task under `AGENTS.md`.
+> Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add an honest, one-frame, rectangle-mask-constrained AI repair flow inside the existing Character Finishing Workbench, with one-call accounting, exact decoded-pixel integrity, real validation, and specialized immutable acceptance.
 
@@ -15,7 +16,8 @@
 - Normative design: `docs/superpowers/specs/2026-07-11-targeted-frame-repair-v1-design.md`.
 - Approved design commit: `1bb606e`.
 - Execution starts from `main` after `1bb606e`; accepted Workbench ancestors `36eefaf`, `58176ce`, `89cf7b2`, `17d23f3`, and `ae5b69b` are all ancestors.
-- Local visual evidence remains unstaged under `.superpowers/brainstorm/4735-1783751584/content/`.
+- Historical local visual exploration was design-only and is no longer
+  retained or required as an execution input.
 - The roadmap item is Candidate #33, explicitly selected for this Editor Workspace block.
 - Existing `/`, Action Repair, Character Reprocess, provider adapters, validator, exporters, job-status enum, and project format remain available and behavior-compatible.
 - No new dependency, provider family, freehand tool, multiple-candidate mode, automatic retry, project migration, or external asset is authorized.
@@ -90,8 +92,10 @@ The Context must bind a sealed artifact manifest but cannot include its own hash
 
 ## Execution Safety
 
-- At execution time, create a clean isolated worktree/branch with `superpowers:using-git-worktrees`; suggested branch: `codex/targeted-frame-repair-v1`.
-- Do not stage, edit, move, scan, or delete the unrelated `.superpowers/` directory or duplicate `* 2.js` / `* 2.md` files present on the source checkout.
+- At execution time, create a clean isolated worktree/branch with standard Git
+  worktree commands under `AGENTS.md`; suggested branch:
+  `codex/targeted-frame-repair-v1`.
+- Preserve unrelated untracked user files present on the source checkout.
 - Only the primary agent or designated test owner runs tests, smoke, servers, or browser verification. Never overlap them.
 - Use only `npm run test:focused -- ...`, `npm test`, and `npm run smoke:local`; never raw `node --test` or an unguarded browser/server command.
 - Treat Tasks 1–2, 3–5, 6–10, and 11–13 as four verification sections. Run the full guarded suite at the end of Tasks 2, 5, 10, and 13.
@@ -2349,7 +2353,8 @@ git add docs/runbooks/targeted-frame-repair-v1.md docs/runbooks/README.md docs/r
 git commit -m "docs: close targeted frame repair v1"
 ```
 
-Do not stage local screenshots, `.superpowers/`, generated artifacts, workspace runtime data, or duplicate `* 2.*` files.
+Do not stage local screenshots, generated artifacts, workspace runtime data,
+or unrelated untracked user files.
 
 ## Post-MVP Live Quality Gate — Do Not Run Automatically
 

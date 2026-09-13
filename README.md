@@ -1,9 +1,15 @@
 # MoteWeave
 
-MoteWeave turns uploaded or optionally AI-generated game art into inspectable,
-previewable, and exportable character, motion, scene, and tile assets.
+Local-first pixel-art character and sprite workflow. This public source
+preview is published from the private engineering line to
+https://github.com/dyk1454683243-sudo/moteweave.
 
-Current preview version: `0.5.0-preview.3`.
+This project turns AI-generated or uploaded top-down sprite sheets into a standard character pack for browser preview and game-engine import.
+
+Current package version: `0.5.0`. Changes after this version are recorded under
+`Unreleased` in `CHANGELOG.md`. The release scope, evidence, and publication
+boundary are recorded in `docs/releases/v0.5.0.md`. The public site is
+https://moteweave.pages.dev/.
 
 ## Contributing
 
@@ -37,15 +43,17 @@ Implemented:
 - Source layout selector: `topdown_rpg_v0` 8x8 uniform input or `fixed_region_motion_v0` one-image fixed-region motion input. Historical `ocad_motion_v0` metadata remains readable as a legacy alias.
 - Fixed-region source action semantics are preserved in reports and overlays while normalized runtime actions stay compatible with `topdown_rpg_v0`.
 - Upload-first sheet processing with background cleanup, grid correction, normalization, validation, debug overlays, row GIF previews, and ZIP export.
-- Character UI processing controls bind the implemented background, cleanup,
-  stabilization, and fixed `96/64/48/32/16` output-size options without
-  disconnected scale controls.
-- A current, unblocked Motion Apply result can be explicitly reprocessed into
-  Character, Godot, RPG Maker, and OCAD packages. This local step may re-encode
-  pixels and does not call a Provider.
 - Multi-resolution normalized sheet outputs: 96, 64, 48, 32, and 16 px frame sizes.
 - Editor metadata export: `editor_metadata.json` records frame tags, frame rectangles, attachment points, visible bounds, and source provenance.
 - Browser playable preview using `normalized_sheet.png` plus `animations.json`.
+- Figma-backed Studio rail for Character, Action, Sequence, Tiles, Scene,
+  Project, QA, and Settings. Root and legacy paths use fixed server redirects;
+  the former parallel browser shell is retired.
+- Editor Workspace v0 with local project persistence, scene authoring,
+  animation timeline, asset library, interaction/playtest support, scene flow,
+  export review, and consumer evidence handoff.
+- Guarded Motion Source upload, analysis, preview, build, cancel/resume, and
+  reviewed set-apply flows with exact source and Job binding.
 - Optional OpenRouter/Gemini text-to-image generation with two modes:
   `production_sheet_v0` routes selected candidates through the sheet pipeline,
   while `quality_character_v0` writes single-character image artifacts without
@@ -55,6 +63,11 @@ Implemented:
 - Fixed-region generation writes `source_quality_report.json` and uses
   source-level occupancy, halo, edge-pressure, layout-alignment, and action
   motion checks during production-sheet candidate selection.
+- Generated fixed-region candidates are background-cleaned and fitted into the
+  canonical template-safe bounds before production-sheet processing. The
+  current prompt contract is `character_prompt_contract_v1_16`, including the
+  character-only climb rule that excludes ladders, rope, walls, platforms, and
+  other support scenery.
 - Phase 1 Godot NPC compatibility: generated ZIPs include `AI资源库/一图全动作/<character_id>/npc.json`, `sprite.png`, and `thumb.png`.
 - RPGMaker compatibility: `rpgmaker_pack.zip` includes 144x192 sprite sheets and `NPC.json` for the plugin's RPGMaker scanner.
 - OCAD compatibility: `ocad_pack.zip` includes 252x252 fixed-region sheets and `npc.json` for the plugin's OCAD scanner.
@@ -68,36 +81,25 @@ Not implemented yet:
 - Godot `.tres` export.
 - Broad scene/tile quality benchmark claims; the current live scene evidence is a one-case release smoke, not a production readiness guarantee.
 - Full parallax asset generation.
-- Full WFC, multi-level LDtk worlds, auto-layer rules, and map editor workflows.
-- Full production persistence, auth, billing, or public deployment hardening.
+- Full WFC, multi-level LDtk worlds, expanded auto-layer rules, region-scoped
+  generation, and saved external-editor round trips.
+- Hosted production persistence, auth, billing, or public deployment hardening.
+
+The fixed-region calibration path has passed one single-call `1K` acceptance.
+That result verifies one reviewed run; it is not a sampled provider-quality or
+general production-readiness claim.
 
 ## Quick Start
 
-Prerequisites:
-
-- Node.js 22 or 24; Node.js 24 LTS is recommended.
-- Git.
-- Optional FFmpeg for Motion Source video input.
-- Optional rembg/U2Net for external matting.
-
 ```bash
-git clone https://github.com/dyk1454683243-sudo/moteweave.git
-cd moteweave
-npm ci
+npm install
+npm test
 npm start
 ```
 
-Open the local URL printed by `npm start`, then use the Character Pack workflow.
-The server binds to the local machine; this Preview is not a hosted upload
-service.
-
-Provider-backed generation is optional and may spend API credits. The default
-upload, processing, preview, export, tests, and local smoke paths do not require
-a Provider key.
-
-FFmpeg and rembg are user-installed optional tools and are not bundled. External
-media-tool execution currently fails closed on Windows; the source Preview does
-not claim that path as supported.
+Open the local URL printed by `npm start`, then use the Studio rail. Root and
+invalid legacy inputs fall back to Character Studio; known legacy tabs use the
+fixed Studio destination table in `docs/roadmap/studio-migration-status.md`.
 
 ### Resource-guarded verification
 
@@ -108,15 +110,6 @@ Use the focused profile while developing:
 ```bash
 npm run test:focused -- test/path/to/file.test.js
 npm run guard:focused -- node path/to/script.mjs
-```
-
-Run the complete contributor verification only when the affected focused tests
-are already green:
-
-```bash
-npm test
-npm run smoke:local
-npm run first-user:local
 ```
 
 The focused profile allows 1024 MiB of V8 old space and 1536 MiB of process-tree RSS for 60 seconds. `npm test` and `npm run smoke:local` use the full profile with 2048 MiB of V8 old space and 4096 MiB of process-tree RSS. Do not bypass the guard or run overlapping test suites. A legitimate need for a higher ceiling must be reviewed before changing these values.
@@ -158,8 +151,9 @@ src/project-pack/
   Character + scene pack composition, manifest validation, and combined ZIP
   export.
 
-src/app.js
-  Browser UI orchestration. Keep image-processing logic out of this file.
+src/ui/studio/
+  The maintained browser application, route shell, and capability-bound Studio
+  controllers. Root and legacy URLs redirect here through fixed server routes.
 
 server.js
   Local HTTP API, job queue wiring, generated artifact writing, and static serving.
@@ -248,4 +242,4 @@ Read these first:
 5. `docs/protocols/rpgmaker-v0.md` or `docs/protocols/ocad-v0.md` when touching compatibility exporters
 6. The specific module and test file for the change
 
-Keep new behavior behind focused modules. Do not keep expanding `src/app.js` or mix exporter-specific assumptions into the core normalization pipeline.
+Keep new behavior behind focused Studio modules. Do not mix exporter-specific assumptions into the core normalization pipeline.

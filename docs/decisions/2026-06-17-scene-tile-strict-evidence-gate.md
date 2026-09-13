@@ -166,11 +166,11 @@ generated outside the unified adapter and placed under the local Gemini scratch
 directory:
 
 ```text
-<home>/.gemini/antigravity/brain/3fcf5fac-f4c2-46a2-9016-be474549b35c/dual_grid_mossy_forest_1781633376132.png
-<home>/.gemini/antigravity/brain/3fcf5fac-f4c2-46a2-9016-be474549b35c/dual_grid_dry_rocky_1781633385302.png
-<home>/.gemini/antigravity/brain/3fcf5fac-f4c2-46a2-9016-be474549b35c/dual_grid_snowy_ruins_1781633393172.png
-<home>/.gemini/antigravity/brain/3fcf5fac-f4c2-46a2-9016-be474549b35c/dual_grid_wet_cave_1781633402758.png
-<home>/.gemini/antigravity/brain/3fcf5fac-f4c2-46a2-9016-be474549b35c/dual_grid_village_dirt_1781633415192.png
+$HOME/.gemini/antigravity/brain/3fcf5fac-f4c2-46a2-9016-be474549b35c/dual_grid_mossy_forest_1781633376132.png
+$HOME/.gemini/antigravity/brain/3fcf5fac-f4c2-46a2-9016-be474549b35c/dual_grid_dry_rocky_1781633385302.png
+$HOME/.gemini/antigravity/brain/3fcf5fac-f4c2-46a2-9016-be474549b35c/dual_grid_snowy_ruins_1781633393172.png
+$HOME/.gemini/antigravity/brain/3fcf5fac-f4c2-46a2-9016-be474549b35c/dual_grid_wet_cave_1781633402758.png
+$HOME/.gemini/antigravity/brain/3fcf5fac-f4c2-46a2-9016-be474549b35c/dual_grid_village_dirt_1781633415192.png
 ```
 
 They were 1024x1024 JPEG-encoded images with `.png` names, so they were resized

@@ -6,15 +6,6 @@ Run:
 npm run benchmark:character-pack
 ```
 
-The default run uses only the tracked deterministic `sample_hero` fixture.
-Additional local inputs are explicit and repeatable:
-
-```bash
-npm run benchmark:character-pack -- \
-  --input <input-file> \
-  --input <second-input-file>
-```
-
 Protocol:
 
 ```text
@@ -36,8 +27,6 @@ generated/benchmarks/<run_id>/benchmark_report.json
 With Godot probe enabled:
 
 ```bash
-GODOT_BIN=<godot-bin> \
-NPC_PLUGIN_ZIP=<npc-plugin-zip> \
 npm run benchmark:character-pack -- --godot
 ```
 
@@ -49,6 +38,4 @@ items[].godot_probe.rpgmaker_v0
 items[].godot_probe.ocad_v0
 ```
 
-Each probe status is `pass`, `fail`, or `skipped`. A probe is skipped when
-`GODOT_BIN` or `NPC_PLUGIN_ZIP` is not configured, the configured file is not
-available, or the requested export is not present.
+Each probe status is `pass`, `fail`, or `skipped`. `skipped` is acceptable only when Godot or `$HOME/Downloads/NPC插件青春rmversion.zip` is not available.

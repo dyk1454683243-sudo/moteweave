@@ -1,12 +1,17 @@
 # Editor Frame Repair Quality Gate v1 Protocol
 
-**Status:** Implemented protocol; deterministic closeout evidence is recorded separately
+**Status:** Retired on 2026-08-08; historical evidence protocol only
 
 **Scope:** Provider-budgeted, eight-case quality evidence around the existing
 single-frame Repair workflow in Editor Workspace
 
 **Live-quality status:** Unverified until a separately authorized live session
 publishes a complete report
+
+> The eight-case single-frame Quality Gate routes and runtime have been
+> removed. This document preserves historical evidence semantics only and does
+> not describe an available product capability. It must not be used to route or
+> fall back from the exclusive three-atlas action-repair workflow.
 
 This protocol defines an append-only quality-gate layer around the existing
 Editor Frame Repair v1 contract. It does not add a provider dispatcher, batch

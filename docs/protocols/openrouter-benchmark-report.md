@@ -19,7 +19,7 @@ generated/openrouter-benchmarks/<run_id>/items/<case_id>_v<variant>/
   "source_run_id": null,
   "preset": "fixed_region_motion_v0",
   "provider_preset_id": null,
-  "template_file": "fixed_region_motion_template_v1.png",
+  "template_file": "motion_template_ocad_primary.png",
   "image_config": { "image_size": "1K", "aspect_ratio": "1:1" },
   "variants_per_case": 1,
   "summary": {},

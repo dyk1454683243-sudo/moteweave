@@ -3,9 +3,20 @@ import { once } from 'node:events'
 import http from 'node:http'
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
+
+import {
+  FIXED_REGION_ACTION_REPAIR_ACCEPTANCE_FILE,
+  FIXED_REGION_ACTION_REPAIR_JOB_TYPE,
+  FIXED_REGION_ACTION_REPAIR_REFERENCE_FILES,
+  FIXED_REGION_ACTION_REPAIR_REQUIRED_ACCEPTANCE_FILES,
+  buildFixedRegionActionRepairAcceptanceManifest,
+  buildFixedRegionActionRepairReviewContract,
+  fixedRegionActionRepairArtifactKey,
+  sha256ActionRepairBytes,
+} from '../../src/character-pack/fixedRegionActionRepairReview.js'
 
 import {
   createAssetRef,
@@ -128,6 +139,130 @@ function makeProjectWithAssetLayer() {
     },
   }))
   return project
+}
+
+function makeFixedRegionActionRepairReviewContract() {
+  return buildFixedRegionActionRepairReviewContract({
+    reviewId: 'review_action_001',
+    identity: {
+      project_id: 'project_demo',
+      asset_id: 'asset_hero',
+      parent_revision_id: 'rev_001',
+      source_job_id: 'job_hero',
+    },
+    plan: {
+      source_layout: 'fixed_region_motion_v0',
+      actions: ['idledown'],
+      region_keys: ['idledown'],
+      equipment_policy: 'none',
+      instruction: 'Remove the weapon and correct the complete pose.',
+      preflight: {
+        source_region_mask: {
+          width: 252,
+          height: 252,
+          regions: [{ key: 'idledown', x: 0, y: 0, w: 36, h: 36 }],
+        },
+      },
+      provider: {
+        id: 'gemini-default',
+        provider: 'gemini',
+        model: 'gemini-image-model',
+        image_config: { aspect_ratio: '1:1', image_size: '1K' },
+      },
+      atlas: { width: 1024, height: 1024, columns: 6, rows: 2 },
+      reference_policy: {
+        source_target_regions_holed: false,
+        full_source_sheet_sent: false,
+        full_normalized_sheet_sent: false,
+        provider_candidate_feedback: false,
+      },
+    },
+    sourceSheetBuffer: Buffer.from('parent source'),
+    normalizedSheetBuffer: Buffer.from('parent normalized sheet'),
+    motionTemplateBuffer: Buffer.from('motion template'),
+    referenceBundle: {
+      reference_images: FIXED_REGION_ACTION_REPAIR_REFERENCE_FILES.map((reference, index) => ({
+        ...reference,
+        buffer: Buffer.from(`reference ${index}`),
+      })),
+      evidence: { version: 'fixed_region_action_repair_atlas_v1', target_holes_zero_rgba: true },
+    },
+  })
+}
+
+async function writeFixedRegionActionRepairCandidate(root, jobId = 'job_action_candidate') {
+  const generatedDir = path.join(root, 'generated')
+  const jobDir = path.join(generatedDir, jobId)
+  await mkdir(jobDir, { recursive: true })
+  const review = makeFixedRegionActionRepairReviewContract()
+  const contentByName = new Map(
+    FIXED_REGION_ACTION_REPAIR_REQUIRED_ACCEPTANCE_FILES.map((fileName) => [
+      fileName,
+      Buffer.from(`sealed ${fileName}`),
+    ]),
+  )
+  contentByName.set('animations.json', Buffer.from(JSON.stringify({
+    profile: 'topdown_rpg_v0',
+    frame_size: { w: 96, h: 96 },
+    anchor: { x: 48, y: 88 },
+    animations: { walk_down: { frames: [0], fps: 8, loop: true, mode: 'loop' } },
+  })))
+  contentByName.set('metadata.json', Buffer.from(JSON.stringify({
+    id: 'accepted_action_repair',
+    name: 'Accepted Action Repair',
+    profile: 'topdown_rpg_v0',
+    source: { type: 'provider_source_region_repair' },
+    generation: { provider: 'gemini', model: 'gemini-image-model' },
+  })))
+  contentByName.set('editor_metadata.json', Buffer.from(JSON.stringify({ version: '0.1', frames: {} })))
+  contentByName.set('debug_report.json', Buffer.from(JSON.stringify({ validation: { status: 'pass' } })))
+  contentByName.set('fixed_region_action_repair_review.json', Buffer.from(JSON.stringify(review, null, 2)))
+  contentByName.set('extracted_frames/idledown.png', Buffer.from('sealed extracted frame'))
+  const artifactEntries = [...contentByName].map(([fileName, content]) => ({ file_name: fileName, content }))
+  const acceptance = buildFixedRegionActionRepairAcceptanceManifest({
+    jobId,
+    reviewContract: review,
+    result: {
+      status: 'source_repaired',
+      summary: {
+        provider_calls_used: 1,
+        quality_status: 'pass',
+        atlas_extraction_status: 'extraction_pass',
+      },
+      scope_validation: { status: 'scope_pass', outside_selected_changed_pixels: 0 },
+    },
+    artifactEntries,
+  })
+  for (const [fileName, content] of contentByName) {
+    await mkdir(path.dirname(path.join(jobDir, fileName)), { recursive: true })
+    await writeFile(path.join(jobDir, fileName), content)
+  }
+  const acceptanceBuffer = Buffer.from(JSON.stringify(acceptance, null, 2))
+  await writeFile(path.join(jobDir, FIXED_REGION_ACTION_REPAIR_ACCEPTANCE_FILE), acceptanceBuffer)
+  return {
+    generatedDir,
+    review,
+    acceptance,
+    job: {
+      id: jobId,
+      type: 'fixed_region_source_provider_repair',
+      status: 'done',
+      project_id: 'project_demo',
+      asset_id: 'asset_hero',
+      parent_revision_id: 'rev_001',
+      source_job_id: 'job_hero',
+      action_repair_review_id: review.review_id,
+      action_repair_plan_hash: review.plan_hash,
+      action_repair_reference_manifest_sha256: review.references.manifest_sha256,
+      action_repair_manifest_sha256: sha256ActionRepairBytes(acceptanceBuffer),
+      provider_call_budget: { used_provider_calls: 1 },
+      repair_status: 'source_repaired',
+      source_scope_status: 'scope_pass',
+      outside_selected_changed_pixels: 0,
+      accepted: false,
+      requires_user_confirmation: true,
+    },
+  }
 }
 
 function makeStaticArtifactProject({
@@ -518,18 +653,22 @@ test('editor project API exports project pack artifacts from the editor namespac
   assert.equal(stale.json.error, 'revision_conflict')
 })
 
-test('general import rejects reprocess jobs from the injected store before context or copy', async (t) => {
+test('general import rejects persistent specialized markers and still imports ordinary jobs', async (t) => {
   const root = await tempRoot()
   const generated = path.join(root, 'generated')
-  const specializedDir = path.join(generated, 'job_specialized')
-  const tamperedDir = path.join(generated, 'job_tampered_context')
+  const retiredContextDir = path.join(generated, 'job_retired_context')
+  const fixedContextDir = path.join(generated, 'job_fixed_context')
   const legacyDir = path.join(generated, 'job_legacy')
-  for (const directory of [specializedDir, tamperedDir, legacyDir]) {
+  for (const directory of [retiredContextDir, fixedContextDir, legacyDir]) {
     await mkdir(directory, { recursive: true })
   }
   await writeFile(
-    path.join(tamperedDir, 'editor_reprocess_context.json'),
-    JSON.stringify({ job_type: 'legacy_character_pack' }),
+    path.join(retiredContextDir, 'editor_reprocess_context.json'),
+    JSON.stringify({ job_type: 'editor_character_reprocess' }),
+  )
+  await writeFile(
+    path.join(fixedContextDir, 'fixed_region_action_repair_review.json'),
+    JSON.stringify({ job_type: FIXED_REGION_ACTION_REPAIR_JOB_TYPE }),
   )
   await writeFile(path.join(legacyDir, 'normalized_sheet.png'), 'sheet')
   await writeFile(path.join(legacyDir, 'animations.json'), JSON.stringify({
@@ -548,16 +687,9 @@ test('general import rejects reprocess jobs from the injected store before conte
   await writeFile(path.join(legacyDir, 'editor_metadata.json'), JSON.stringify({ version: '0.1', frames: {} }))
   await writeFile(path.join(legacyDir, 'debug_report.json'), JSON.stringify({ validation: { status: 'pass' } }))
 
-  const reprocessService = Object.freeze({
-    enqueue() {},
-    getJob(id) {
-      if (['job_specialized', 'job_tampered_context'].includes(id)) {
-        return { id, type: 'editor_character_reprocess' }
-      }
-      return id === 'job_legacy' ? { id, type: 'character_pack' } : null
-    },
+  const { server, baseUrl } = await startEditorApiServer(root, {
+    specializedGeneratedDir: generated,
   })
-  const { server, baseUrl } = await startEditorApiServer(root, { reprocessService })
   t.after(() => server.close())
   const created = await fetchJson(baseUrl, '/api/editor/projects', {
     method: 'POST',
@@ -566,7 +698,7 @@ test('general import rejects reprocess jobs from the injected store before conte
   })
   assert.equal(created.status, 201)
 
-  for (const jobId of ['job_specialized', 'job_tampered_context']) {
+  for (const jobId of ['job_retired_context', 'job_fixed_context']) {
     const response = await fetchJson(baseUrl, '/api/editor/projects/project_demo/import-job', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -593,6 +725,212 @@ test('general import rejects reprocess jobs from the injected store before conte
   })
   assert.equal(legacy.status, 200)
   assert.equal(legacy.json.revision.source_job_id, 'job_legacy')
+})
+
+test('reviewed candidate import rejects a stale active asset revision before copying artifacts', async (t) => {
+  const root = await tempRoot()
+  const { server, baseUrl } = await startEditorApiServer(root)
+  t.after(() => server.close())
+  const created = await fetchJson(baseUrl, '/api/editor/projects', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ id: 'project_demo', name: 'Demo Project', now: timestamp }),
+  })
+  const withAsset = {
+    ...created.json.project,
+    assets: { asset_hero: makeCharacterAsset() },
+  }
+  const saved = await fetchJson(baseUrl, '/api/editor/projects/project_demo', {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ project: withAsset, expectedRevision: 1 }),
+  })
+  assert.equal(saved.status, 200)
+
+  const response = await fetchJson(baseUrl, '/api/editor/projects/project_demo/import-job', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      expectedRevision: 2,
+      expectedAssetRevisionId: 'rev_stale',
+      kind: 'character_pack',
+      jobId: 'job_candidate',
+      assetId: 'asset_hero',
+    }),
+  })
+  assert.equal(response.status, 409)
+  assert.equal(response.json.error, 'asset_revision_conflict')
+})
+
+test('general import rejects a persistent fixed-region marker when generated roots differ', async (t) => {
+  const root = await tempRoot()
+  const editorGeneratedDir = path.join(root, 'editor-generated')
+  const specializedGeneratedDir = path.join(root, 'generated')
+  const jobDir = path.join(specializedGeneratedDir, 'job_fixed_after_restart')
+  await mkdir(jobDir, { recursive: true })
+  await writeFile(path.join(jobDir, 'fixed_region_action_repair_review.json'), '{tampered marker')
+  const { server, baseUrl } = await startEditorApiServer(root, {
+    generatedDir: editorGeneratedDir,
+    specializedGeneratedDir,
+  })
+  t.after(() => server.close())
+  const created = await fetchJson(baseUrl, '/api/editor/projects', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ id: 'project_demo', name: 'Demo Project', now: timestamp }),
+  })
+  assert.equal(created.status, 201)
+
+  const response = await fetchJson(baseUrl, '/api/editor/projects/project_demo/import-job', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      expectedRevision: 1,
+      kind: 'character_pack',
+      jobId: 'job_fixed_after_restart',
+      assetId: 'asset_forbidden',
+    }),
+  })
+  assert.equal(response.status, 400)
+  assert.equal(response.json.error, 'specialized_accept_required')
+})
+
+test('fixed-region action repair uses sealed specialized Accept and is idempotent without another provider call', async (t) => {
+  const root = await tempRoot()
+  const candidate = await writeFixedRegionActionRepairCandidate(root)
+  const jobs = new Map([[candidate.job.id, candidate.job]])
+  const { server, baseUrl } = await startEditorApiServer(root, {
+    specializedGeneratedDir: candidate.generatedDir,
+    getGeneratedJob: (jobId) => jobs.get(jobId) ?? null,
+    updateGeneratedJob: (jobId, patch) => {
+      const next = { ...jobs.get(jobId), ...patch }
+      jobs.set(jobId, next)
+      return next
+    },
+  })
+  t.after(() => server.close())
+
+  const created = await fetchJson(baseUrl, '/api/editor/projects', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ id: 'project_demo', name: 'Demo Project', now: timestamp }),
+  })
+  const projectWithAsset = {
+    ...created.json.project,
+    assets: { asset_hero: makeCharacterAsset() },
+  }
+  const parentSaved = await fetchJson(baseUrl, '/api/editor/projects/project_demo', {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ project: projectWithAsset, expectedRevision: 1 }),
+  })
+  assert.equal(parentSaved.status, 200)
+  assert.equal(parentSaved.json.project.revision, 2)
+
+  const generic = await fetchJson(baseUrl, '/api/editor/projects/project_demo/import-job', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      expectedRevision: 2,
+      expectedAssetRevisionId: 'rev_001',
+      kind: 'character_pack',
+      jobId: candidate.job.id,
+      assetId: 'asset_hero',
+    }),
+  })
+  assert.equal(generic.status, 400)
+  assert.equal(generic.json.error, 'specialized_accept_required')
+
+  const acceptBody = {
+    expectedRevision: 2,
+    expectedAssetRevisionId: 'rev_001',
+    expectedPlanHash: candidate.review.plan_hash,
+  }
+  const accepted = await fetchJson(
+    baseUrl,
+    `/api/editor/projects/project_demo/assets/asset_hero/action-repair/${candidate.job.id}/accept`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(acceptBody),
+    },
+  )
+  assert.equal(accepted.status, 200)
+  assert.equal(accepted.json.revision.id, 'rev_002')
+  assert.equal(accepted.json.revision.parent_revision_id, 'rev_001')
+  assert.equal(accepted.json.revision.source_job_id, candidate.job.id)
+  assert.equal(accepted.json.revision.processing_recipe_ref, null)
+  const extractedKey = fixedRegionActionRepairArtifactKey('extracted_frames/idledown.png')
+  const extractedArtifact = accepted.json.revision.artifacts[extractedKey]
+  assert.match(extractedArtifact, /\/sealed_[a-f0-9]{24}\.png$/)
+  assert.deepEqual(await readFile(path.join(root, extractedArtifact)), Buffer.from('sealed extracted frame'))
+  assert.equal(jobs.get(candidate.job.id).accepted, true)
+  assert.equal(jobs.get(candidate.job.id).requires_user_confirmation, false)
+
+  const replay = await fetchJson(
+    baseUrl,
+    `/api/editor/projects/project_demo/assets/asset_hero/action-repair/${candidate.job.id}/accept`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(acceptBody),
+    },
+  )
+  assert.equal(replay.status, 200)
+  assert.equal(replay.json.saved, 'already_accepted')
+  assert.equal(replay.json.revision.id, 'rev_002')
+  assert.equal(replay.json.project.revision, 3)
+})
+
+test('fixed-region specialized Accept rejects a sealed artifact changed after generation', async (t) => {
+  const root = await tempRoot()
+  const candidate = await writeFixedRegionActionRepairCandidate(root, 'job_action_tampered')
+  await writeFile(
+    path.join(candidate.generatedDir, candidate.job.id, 'source_scope_report.json'),
+    'tampered after sealing',
+  )
+  const jobs = new Map([[candidate.job.id, candidate.job]])
+  const { server, baseUrl } = await startEditorApiServer(root, {
+    specializedGeneratedDir: candidate.generatedDir,
+    getGeneratedJob: (jobId) => jobs.get(jobId) ?? null,
+    updateGeneratedJob: (jobId, patch) => {
+      const next = { ...jobs.get(jobId), ...patch }
+      jobs.set(jobId, next)
+      return next
+    },
+  })
+  t.after(() => server.close())
+  const created = await fetchJson(baseUrl, '/api/editor/projects', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ id: 'project_demo', name: 'Demo Project', now: timestamp }),
+  })
+  const saved = await fetchJson(baseUrl, '/api/editor/projects/project_demo', {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      project: { ...created.json.project, assets: { asset_hero: makeCharacterAsset() } },
+      expectedRevision: 1,
+    }),
+  })
+  assert.equal(saved.status, 200)
+
+  const response = await fetchJson(
+    baseUrl,
+    `/api/editor/projects/project_demo/assets/asset_hero/action-repair/${candidate.job.id}/accept`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        expectedRevision: 2,
+        expectedAssetRevisionId: 'rev_001',
+        expectedPlanHash: candidate.review.plan_hash,
+      }),
+    },
+  )
+  assert.equal(response.status, 422)
+  assert.equal(response.json.error, 'artifact_integrity_failed')
+  assert.equal(jobs.get(candidate.job.id).accepted, false)
 })
 
 test('server delegates /api/editor namespace to editor API handler', async (t) => {

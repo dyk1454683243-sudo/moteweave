@@ -5,9 +5,57 @@ import sharp from 'sharp'
 
 import { buildOpenRouterCharacterPrompt, generateCharacterSource, getGeminiProviderState } from '../../src/character-pack/providers/geminiProvider.js'
 import {
+  buildGeminiGenerateContentUrl,
+  supportsGeminiImageSize,
+} from '../../src/character-pack/providers/providerConfig.js'
+import {
   FIXED_REGION_MOTION_LAYOUT_ID,
   LEGACY_OCAD_MOTION_LAYOUT_ID,
 } from '../../src/character-pack/sourceLayouts.js'
+
+test('Gemini full generateContent endpoints stay bound to the declared Preset model', () => {
+  const matching = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?alt=json'
+  assert.equal(buildGeminiGenerateContentUrl({
+    baseUrl: matching,
+    model: 'gemini-3.1-flash-image-preview',
+  }), matching)
+  assert.equal(buildGeminiGenerateContentUrl({
+    baseUrl: matching,
+    model: 'models/gemini-3.1-flash-image-preview',
+  }), matching)
+  assert.equal(supportsGeminiImageSize('models/gemini-3.1-flash-image-preview'), true)
+  const matchingWithTrailingSlash = matching.replace(':generateContent?', ':generateContent/?')
+  assert.equal(buildGeminiGenerateContentUrl({
+    baseUrl: matchingWithTrailingSlash,
+    model: 'gemini-3.1-flash-image-preview',
+  }), matchingWithTrailingSlash)
+  assert.throws(
+    () => buildGeminiGenerateContentUrl({
+      baseUrl: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent',
+      model: 'gemini-3.1-flash-image-preview',
+    }),
+    /endpoint model does not match the provider Preset model/,
+  )
+  assert.throws(
+    () => buildGeminiGenerateContentUrl({
+      baseUrl: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent/',
+      model: 'gemini-3.1-flash-image-preview',
+    }),
+    /endpoint model does not match the provider Preset model/,
+  )
+  assert.throws(
+    () => buildGeminiGenerateContentUrl({
+      baseUrl: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent/extra',
+      model: 'gemini-3.1-flash-image-preview',
+    }),
+    /endpoint model path is invalid/,
+  )
+  const compatibleProxy = 'https://compatible.example.test/v1/image:generateContent'
+  assert.equal(buildGeminiGenerateContentUrl({
+    baseUrl: compatibleProxy,
+    model: 'proxy/image-model',
+  }), compatibleProxy)
+})
 
 test('getGeminiProviderState reports OpenRouter availability and implementation state', () => {
   const missing = getGeminiProviderState({})
@@ -47,6 +95,10 @@ test('getGeminiProviderState supports simple user-selected Gemini defaults witho
   assert.equal(state.presets[0].provider, 'gemini')
   assert.equal(state.presets[0].model, 'gemini-custom-image')
   assert.deepEqual(state.presets[0].image_config, { aspect_ratio: '2:1', image_size: '1K' })
+  assert.equal(state.presets[0].route_kind, 'google_native')
+  assert.equal(state.presets[0].supports_system_instruction, true)
+  assert.equal(state.presets[0].supports_role_interleaving, true)
+  assert.equal(state.presets[0].supports_image_size, false)
   assert.equal('apiKey' in state.presets[0], false)
 })
 
@@ -108,6 +160,23 @@ test('getGeminiProviderState exposes configured provider presets without secrets
   assert.equal('apiKey' in state.presets[0], false)
 })
 
+test('an unknown explicit provider preset fails instead of falling back', async () => {
+  let calls = 0
+  await assert.rejects(
+    generateCharacterSource({
+      description: 'strict preset',
+      providerPresetId: 'does-not-exist',
+      env: { OPENROUTER_API_KEY: 'key' },
+      fetchImpl: async () => {
+        calls += 1
+        throw new Error('must not call')
+      },
+    }),
+    /Unknown character provider preset/,
+  )
+  assert.equal(calls, 0)
+})
+
 test('generateCharacterSource parses an OpenRouter image data URL response', async () => {
   let request
   const png = Buffer.from('fake-png')
@@ -144,7 +213,7 @@ test('generateCharacterSource parses an OpenRouter image data URL response', asy
   assert.deepEqual(result.buffer, png)
   assert.equal(result.provider, 'openrouter')
   assert.equal(result.model, 'custom/model')
-  assert.equal(result.promptContract.contract_version, 'character_prompt_contract_v1_15')
+  assert.equal(result.promptContract.contract_version, 'character_prompt_contract_v1_17')
   assert.equal(result.promptContract.preset, FIXED_REGION_MOTION_LAYOUT_ID)
   assert.equal(result.promptContract.layout_id, FIXED_REGION_MOTION_LAYOUT_ID)
 })
@@ -489,8 +558,11 @@ test('generateCharacterSource supports the official Gemini image API provider', 
   assert.equal(request.init.headers['x-goog-api-key'], 'native-key')
   const body = JSON.parse(request.init.body)
   assert.equal(body.contents[0].role, 'user')
+  assert.equal('systemInstruction' in body, false)
   assert.match(body.contents[0].parts[0].text, /red armored knight/)
+  assert.match(body.contents[0].parts[0].text, /approved strict pose and layout template/i)
   assert.equal(body.contents[0].parts[1].inline_data.mime_type, 'image/png')
+  assert.doesNotMatch(body.contents[0].parts[0].text, /^STRUCTURE/m)
   const sentTemplate = Buffer.from(body.contents[0].parts[1].inline_data.data, 'base64')
   const sentTemplateMetadata = await sharp(sentTemplate).metadata()
   assert.equal(sentTemplateMetadata.width, 256)
@@ -503,10 +575,128 @@ test('generateCharacterSource supports the official Gemini image API provider', 
     },
   })
   assert.deepEqual(result.buffer, png)
+  assert.equal(result.mimeType, 'image/png')
   assert.equal(result.provider, 'gemini')
   assert.equal(result.providerPresetId, 'gemini-native')
   assert.equal(result.model, 'gemini-3.1-flash-image-preview')
   assert.equal(result.templateName, 'template.png')
+})
+
+test('Gemini responses without a declared MIME preserve null provenance', async () => {
+  const png = Buffer.from('native-gemini-no-declared-mime')
+  const result = await generateCharacterSource({
+    description: 'green cloaked scout',
+    providerPresetId: 'gemini-native-no-mime',
+    env: {
+      GEMINI_NATIVE_KEY: 'native-key',
+      CHARACTER_PROVIDER_PRESETS: JSON.stringify([{
+        id: 'gemini-native-no-mime',
+        provider: 'gemini',
+        apiKeyEnv: 'GEMINI_NATIVE_KEY',
+        model: 'gemini-3.1-flash-image-preview',
+      }]),
+    },
+    fetchImpl: async () => ({
+      ok: true,
+      async json() {
+        return {
+          candidates: [{ content: { parts: [{ inlineData: { data: png.toString('base64') } }] } }],
+        }
+      },
+    }),
+  })
+  assert.deepEqual(result.buffer, png)
+  assert.equal(result.mimeType, null)
+})
+
+test('reviewed full-sheet generation sends the sealed system instruction and interleaved references exactly once', async () => {
+  let request
+  const output = Buffer.from('reviewed-output')
+  const fetchImpl = async (url, init) => {
+    request = { url, init }
+    return {
+      ok: true,
+      async json() {
+        return {
+          candidates: [{ content: { parts: [{ inlineData: { mimeType: 'image/png', data: output.toString('base64') } }] } }],
+        }
+      },
+    }
+  }
+  const env = {
+    GEMINI_KEY: 'native-key',
+    CHARACTER_PROVIDER_PRESETS: JSON.stringify([{
+      id: 'gemini-native',
+      provider: 'gemini',
+      apiKeyEnv: 'GEMINI_KEY',
+      model: 'gemini-3.1-flash-image-preview',
+      image_size: '2K',
+      aspect_ratio: '1:1',
+    }]),
+  }
+  const providerBudget = { max: 1, used: 0 }
+  const reviewedRequest = {
+    provider_preset_id: 'gemini-native',
+    model: 'gemini-3.1-flash-image-preview',
+    prompt_contract: {
+      contract_version: 'character_prompt_contract_v1_18',
+      layout_id: 'topdown_rpg_v0',
+      layout_kind: 'uniform_grid',
+    },
+    prompt_sections: {
+      system_instruction: 'SEALED SYSTEM',
+      content_parts: [
+        { type: 'text', role: 'task', text: 'SEALED TASK' },
+        { type: 'text', role: 'structure', text: 'SEALED STRUCTURE' },
+        { type: 'image', role: 'structure' },
+        { type: 'text', role: 'identity', text: 'SEALED IDENTITY' },
+        { type: 'image', role: 'identity' },
+        { type: 'text', role: 'palette', text: 'SEALED PALETTE' },
+        { type: 'image', role: 'palette' },
+        { type: 'text', role: 'output_contract', text: 'SEALED OUTPUT' },
+      ],
+    },
+    review_binding: {
+      reviewed_run_id: 'reviewed_1',
+      plan_hash: 'a'.repeat(64),
+      reference_manifest_sha256: 'b'.repeat(64),
+    },
+  }
+  const result = await generateCharacterSource({
+    description: 'must not rebuild',
+    preset: 'topdown_rpg_v0',
+    providerPresetId: 'gemini-native',
+    imageConfig: { image_size: '2K', aspect_ratio: '1:1' },
+    generationOptions: { candidateCount: 1 },
+    templateImage: { name: 'structure_reference.png', mimeType: 'image/png', buffer: Buffer.from('structure') },
+    referenceImage: { name: 'identity_reference.png', mimeType: 'image/png', buffer: Buffer.from('identity') },
+    paletteImage: { name: 'palette_reference.png', mimeType: 'image/png', buffer: Buffer.from('palette') },
+    reviewedRequest,
+    generationProfileId: 'full_sheet_topdown_v1',
+    providerBudget,
+    env,
+    fetchImpl,
+  })
+
+  const body = JSON.parse(request.init.body)
+  assert.equal(body.systemInstruction.parts[0].text, 'SEALED SYSTEM')
+  assert.deepEqual(body.contents[0].parts.map((part) => part.text ?? Buffer.from(part.inline_data.data, 'base64').toString()), [
+    'SEALED TASK',
+    'SEALED STRUCTURE',
+    'structure',
+    'SEALED IDENTITY',
+    'identity',
+    'SEALED PALETTE',
+    'palette',
+    'SEALED OUTPUT',
+  ])
+  assert.equal(providerBudget.used, 1)
+  assert.equal(result.generationProfileId, 'full_sheet_topdown_v1')
+  assert.deepEqual(result.generationReview, reviewedRequest.review_binding)
+  assert.equal(result.providerAttempts.length, 1)
+  assert.deepEqual(result.providerAttempts[0].provider_call_budget_before, { used_provider_calls: 0, max_provider_calls: 1 })
+  assert.deepEqual(result.providerAttempts[0].provider_call_budget_after, { used_provider_calls: 1, max_provider_calls: 1 })
+  assert.equal('apiKey' in result.providerAttempts[0], false)
 })
 
 test('generateCharacterSource uses simple Gemini env config and generic local API key', async () => {
@@ -662,9 +852,9 @@ test('generateCharacterSource sends palette images as style-only references', as
 
   const body = JSON.parse(request.init.body)
   assert.equal(body.messages[0].content[0].type, 'text')
-  assert.match(body.messages[0].content[0].text, /DO NOT copy character content/i)
   assert.match(body.messages[0].content[0].text, /palette\/style reference only/i)
-  assert.match(body.messages[0].content[0].text, /Match only its color palette, ramp relationships, saturation range, and outline weight/i)
+  assert.match(body.messages[0].content[0].text, /color palette, ramp relationships, saturation range, and outline weight/i)
+  assert.match(body.messages[0].content[0].text, /DO NOT copy character content, objects, UI, labels, layout/i)
   const sentTemplate = Buffer.from(body.messages[0].content[1].image_url.url.split(',', 2)[1], 'base64')
   const sentTemplateMetadata = await sharp(sentTemplate).metadata()
   assert.equal(sentTemplateMetadata.width, 2048)
@@ -710,7 +900,7 @@ test('generateCharacterSource prepares fixed-region templates as 256px reference
     description: 'hooded merchant',
     preset: FIXED_REGION_MOTION_LAYOUT_ID,
     env: { OPENROUTER_API_KEY: 'key', OPENROUTER_IMAGE_SIZE: '1K' },
-    templateImage: { buffer: template, mimeType: 'image/png', name: 'fixed_region_motion_template_v1.png' },
+    templateImage: { buffer: template, mimeType: 'image/png', name: 'motion_template_ocad_primary.png' },
     fetchImpl,
   })
 
@@ -721,7 +911,7 @@ test('generateCharacterSource prepares fixed-region templates as 256px reference
 
   assert.equal(metadata.width, 256)
   assert.equal(metadata.height, 256)
-  assert.equal(result.templateName, 'fixed_region_motion_template_v1.png')
+  assert.equal(result.templateName, 'motion_template_ocad_primary.png')
 })
 
 test('generateCharacterSource upscales 8x8 templates to the requested generation size before API submission', async () => {
@@ -782,7 +972,8 @@ test('buildOpenRouterCharacterPrompt supports the fixed-region motion layout', (
   assert.match(prompt, /fixed-region motion source layout/i)
   assert.match(prompt, /first attached template image as the structural template/i)
   assert.match(prompt, /body orientation, facing direction, silhouette rhythm/i)
-  assert.match(prompt, /sprite sheet layout, pixel art style/i)
+  assert.match(prompt, /sprite sheet layout/i)
+  assert.match(prompt, /pixel art style, and output rules/i)
   assert.match(prompt, /Do not target a literal tiny pixel canvas/i)
   assert.match(prompt, /local post-processing/i)
   assert.match(prompt, /Default to empty hands/i)

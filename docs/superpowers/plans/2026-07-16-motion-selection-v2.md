@@ -15,7 +15,7 @@ preserving v1 and Manual behavior.
 - Do not call a Provider.
 - Do not scan `output/`, `generated/`, unrelated artifacts, or exclusive
   worktrees.
-- Do not modify or stage unrelated `.superpowers/` or `* 2.*` files.
+- Preserve unrelated untracked user files.
 - D does not redesign the Motion Source UI; E owns that work.
 
 ## Task 1: Freeze Contract And V1 Compatibility

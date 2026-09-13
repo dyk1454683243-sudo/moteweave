@@ -17,6 +17,11 @@ import {
   resolveSourceLayout,
 } from './sourceLayouts.js'
 import { buildCharacterPackZip } from './zipExport.js'
+import {
+  evaluateNormalizedSubjectCount,
+  evaluateSourceSubjectCount,
+  mergeSubjectCountStageReports,
+} from './subjectCountGate.js'
 
 const BACKGROUND_STATUS_RANK = Object.freeze({ pass: 3, warning: 2, fail: 1, error: 0 })
 
@@ -215,6 +220,25 @@ export async function processSheetBuffer(buffer, options = {}) {
     })
     : processingStage.validationStage
   const validationWithBackground = validationStage.validation
+  const subjectCountEnabled = options.subjectCountGate === true || options.subject_count_gate === true
+  const sourceSubjectCount = subjectCountEnabled
+    ? evaluateSourceSubjectCount(source.transparent, sourceLayout.id, { stage: 'calibrated_source' })
+    : null
+  const sourceSubjectCountReport = subjectCountEnabled
+    ? mergeSubjectCountStageReports([
+        options.subjectCountPreCalibrationReport ?? options.subject_count_pre_calibration_report ?? null,
+        sourceSubjectCount.report,
+      ], { sourceLayoutId: sourceLayout.id })
+    : null
+  const normalizedSubjectCount = subjectCountEnabled
+    ? evaluateNormalizedSubjectCount(frames, profile, sourceLayout.id)
+    : null
+  const overallSubjectCountReport = subjectCountEnabled
+    ? mergeSubjectCountStageReports([
+        sourceSubjectCountReport,
+        normalizedSubjectCount.report,
+      ], { sourceLayoutId: sourceLayout.id })
+    : null
   const id = buildPackageId(options.name ?? 'character', options.createdAt ?? new Date())
   const sourceLayoutSummary = {
     id: sourceLayout.id,
@@ -286,7 +310,31 @@ export async function processSheetBuffer(buffer, options = {}) {
     pixelStyleReport,
     inspectionPreview: inspectionPreviewArtifacts.report,
   })
+  if (subjectCountEnabled) {
+    debugReport.generation_profile = options.generationProfile ?? options.generation_profile ?? null
+    debugReport.subject_count = {
+      required: true,
+      status: overallSubjectCountReport.status,
+      source: sourceSubjectCountReport,
+      normalized: normalizedSubjectCount.report,
+      suggested_region_keys: overallSubjectCountReport.suggested_region_keys,
+      needs_review_region_keys: overallSubjectCountReport.needs_review_region_keys,
+      advisory_region_keys: overallSubjectCountReport.advisory_region_keys,
+    }
+  }
   const normalizedSheetPng = await encodeRgbaPng(normalizedSheet)
+  const sourceSubjectCountOverlayPng = sourceSubjectCount?.overlay
+    ? await encodeRgbaPng(sourceSubjectCount.overlay)
+    : null
+  const normalizedSubjectCountOverlayPng = normalizedSubjectCount?.overlay
+    ? await encodeRgbaPng(normalizedSubjectCount.overlay)
+    : null
+  const sourceSubjectCountReportJson = sourceSubjectCountReport
+    ? Buffer.from(JSON.stringify(sourceSubjectCountReport, null, 2), 'utf8')
+    : null
+  const normalizedSubjectCountReportJson = normalizedSubjectCount?.report
+    ? Buffer.from(JSON.stringify(normalizedSubjectCount.report, null, 2), 'utf8')
+    : null
   const multiResolution = await buildMultiResolutionArtifacts({
     normalizedSheet,
     normalizedSheetPng,
@@ -319,7 +367,11 @@ export async function processSheetBuffer(buffer, options = {}) {
     'source.png': source.sourcePng,
     'source_layout_overlay.png': sourceLayoutOverlayPng,
     ...(sourceQualityReportJson ? { 'source_quality_report.json': sourceQualityReportJson } : {}),
+    ...(sourceSubjectCountReportJson ? { 'source_subject_count_report.json': sourceSubjectCountReportJson } : {}),
+    ...(sourceSubjectCountOverlayPng ? { 'source_subject_count_overlay.png': sourceSubjectCountOverlayPng } : {}),
     'normalized_sheet.png': normalizedSheetPng,
+    ...(normalizedSubjectCountReportJson ? { 'normalized_subject_count_report.json': normalizedSubjectCountReportJson } : {}),
+    ...(normalizedSubjectCountOverlayPng ? { 'normalized_subject_count_overlay.png': normalizedSubjectCountOverlayPng } : {}),
     'multi_resolution.json': multiResolution.manifest,
     ...Object.fromEntries(multiResolution.manifest.sheets.map((sheet) => [sheet.file, multiResolution.sheets[sheet.frame_size]])),
     'debug_overlay.png': debugOverlayPng,
@@ -352,7 +404,11 @@ export async function processSheetBuffer(buffer, options = {}) {
       editorMetadataJson,
       sourceLayoutOverlayPng,
       sourceQualityReportJson,
+      sourceSubjectCountReportJson,
+      sourceSubjectCountOverlayPng,
       normalizedSheetPng,
+      normalizedSubjectCountReportJson,
+      normalizedSubjectCountOverlayPng,
       multiResolutionManifest: multiResolution.manifest,
       multiResolutionSheets: multiResolution.sheets,
       debugOverlayPng,

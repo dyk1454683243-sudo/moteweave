@@ -30,7 +30,7 @@ Run this check *before* generating anything. It is a hard gate, not a reminder.
 - Use your `generate_image` tool.
 - Pass the appropriate descriptive text prompt.
 - If a template was selected, supply its absolute path to the `ImagePaths` argument of the `generate_image` tool.
-  - **Template-Specific Restrictions**: If the user selects the `fixed_region_motion_template_v1.png` template, you MUST explicitly instruct the image generator not to generate any weapons, props, or skills (e.g., "DO NOT GENERATE ANY WEAPONS OR PROPS. Empty hands only"). This ensures the generated character strictly matches the unarmed silhouettes of this specific template.
+  - **Template-Specific Restrictions**: If the user selects the `motion_template_ocad_primary.png` template, you MUST explicitly instruct the image generator not to generate any weapons, props, or skills (e.g., "DO NOT GENERATE ANY WEAPONS OR PROPS. Empty hands only"). This ensures the generated character strictly matches the unarmed silhouettes of this specific template.
 
 ### 3. Manual Review (MANDATORY)
 - Do NOT commit the image directly to the codebase.
@@ -47,13 +47,14 @@ Run this check *before* generating anything. It is a hard gate, not a reminder.
     --id <stable_id_for_the_image> \
     --kind <single_character|topdown_sheet|ocad_sheet|bad_case> \
     --profile <processing_profile> \
-    --source-rights generated_by_ai_from_template \
+    --source-rights generated_by_ai \
     --expected-check <check_name> \
     --notes "<description of image and background type>"
   ```
-- `--source-rights generated_by_ai_from_template` records *how* the pixels were produced; it is **not** a copyright clearance. It is only valid for original or public-domain subjects that passed the Step 0 gate. Never use it to launder a named-IP image into the committed set.
+- `--source-rights generated_by_ai` records *how* the pixels were produced; it is **not** a copyright clearance. It is only valid for original or public-domain subjects that passed the Step 0 gate. Never use it to launder a named-IP image into the committed set.
+- **Never** use `cp` to manually copy the file or manually edit `manifest.json`. The CLI handles metadata extraction and SHA-256 calculation automatically.
 
 ## Common Mistakes
 - **Skipping manual review**: Do not immediately commit the generated image. You must pause for user approval.
 - **Manually editing manifest.json**: Always use the `local-images-add` CLI to avoid skipping the `sha256` and physical dimension generation steps.
-- **Using IP/Copyrighted characters**: Enforce the Step 0 IP & Rights Gate. Named commercial characters are blocked from the committed set by default; only a user-authorized, gitignored, delete-after-testing local exception is allowed. Do not treat `generated_by_ai_from_template` as a copyright waiver.
+- **Using IP/Copyrighted characters**: Enforce the Step 0 IP & Rights Gate. Named commercial characters are blocked from the committed set by default; only a user-authorized, gitignored, delete-after-testing local exception is allowed. Do not treat `generated_by_ai` as a copyright waiver.

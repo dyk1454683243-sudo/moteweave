@@ -1,6 +1,7 @@
 # Character Finishing Workbench v1 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** Execute this plan task-by-task under `AGENTS.md`.
+> Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add a provider-free, non-destructive Character Finishing Workbench to `/editor` that builds one real local Character Pack preview and accepts that exact job as an immutable child revision.
 
@@ -15,8 +16,11 @@
 - Approved design: `docs/superpowers/specs/2026-07-10-character-finishing-workbench-v1-design.md` at commit `b17080e481dc6c9409612906e9a8d45043d4f360`.
 - Design ancestors: `36eefaf` Visual Repair Workspace, `58176ce` Editor shell module split, and `89cf7b2` Editor Canvas Playtest MVP.
 - Before implementation, read `AGENTS.md`, `docs/guardrails/ui-implementation-guardrails.md`, `docs/guardrails/editor-workspace-guardrails.md`, the approved design, and this entire plan.
-- Use `superpowers:using-git-worktrees` before Task 1. Create `codex/character-finishing-workbench-v1` from the plan-bearing `main`; verify that `b17080e` is an ancestor. Do not implement directly on `main`.
-- The existing untracked `.superpowers/` directory and `* 2.js` / `* 2.md` files are unrelated user files. Never stage, edit, move, or delete them.
+- Before Task 1, use standard Git worktree commands under `AGENTS.md` to
+  create `codex/character-finishing-workbench-v1` from the plan-bearing
+  `main`; verify that `b17080e` is an ancestor. Do not implement directly on
+  `main`.
+- Preserve unrelated untracked user files.
 - Do not scan `output/`, `generated/`, or unrelated artifact directories. Tests may create isolated temporary generated/workspace roots.
 - Do not modify protected Character Pack processing files, validators, failure taxonomy, providers, exporters, profiles, or the job-status enum. In particular, do not edit `src/character-pack/processSheet.js` or any module it calls. This plan may import and exercise those modules as existing dependencies.
 - Do not copy code, UI, wording, or assets from an external product. No new attribution is expected because this is an original implementation using only repository-owned behavior and existing dependencies. If execution adds any outside dependency or algorithm, stop and update `ATTRIBUTIONS.md` only after explicit scope approval.
@@ -7228,7 +7232,9 @@ git diff --name-only b17080e...HEAD -- src/character-pack
 git diff --check
 ```
 
-Expected: only planned Editor/UI/docs/tests/server files changed; the `src/character-pack` command prints nothing. Unrelated untracked `.superpowers/` and duplicate `* 2.*` files remain untouched and unstaged.
+Expected: only planned Editor/UI/docs/tests/server files changed; the
+`src/character-pack` command prints nothing. Unrelated untracked user files
+remain untouched and unstaged.
 
 - [ ] **Step 2: Run unfinished-marker, naming, and external-copy audits.**
 
@@ -7277,7 +7283,10 @@ If a verified defect required code changes, return to its owning task, add a reg
 
 - [ ] **Step 8: Request code review and finish the branch.**
 
-Use `superpowers:requesting-code-review`, address only evidence-backed findings, rerun the affected focused tests plus `npm test` and `npm run smoke:local`, then use `superpowers:finishing-a-development-branch`. Do not merge or push unless the user explicitly asks.
+Request an evidence-backed code review, address only evidence-backed findings,
+rerun the affected focused tests plus `npm test` and `npm run smoke:local`,
+then finish the development branch with standard Git commands under
+`AGENTS.md`. Do not merge or push unless the user explicitly asks.
 
 ## Completion Checklist
 

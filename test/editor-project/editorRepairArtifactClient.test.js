@@ -6,8 +6,6 @@ import { createRepairArtifactClient } from '../../src/ui/editor/artifactClient.j
 const managedJsonUrl = '/api/editor/artifact?path=workspace%2Fprojects%2Fproject_demo%2Fassets%2Fasset_hero%2Frev_003%2Fanimations.json'
 const generatedJsonUrl = '/generated/job_preview/animations.json'
 const generatedImageUrl = '/generated/job_preview/normalized_sheet.png'
-const qualityGateSessionId = 'frqg_20260713_primary'
-const qualityGateJsonUrl = `/generated/frame-repair-quality-gates/${qualityGateSessionId}/session_plan.json`
 
 function fakeResponse({ status = 200, json = {}, blob = { bytes: 'png' } } = {}) {
   return {
@@ -118,37 +116,6 @@ test('artifact client accepts only exact recorded managed and explicit generated
     url: generatedJsonUrl,
     allowedGeneratedUrls,
   }))
-})
-
-test('quality-gate artifacts require the exact session identity, fixed filename, and current allowlist', async () => {
-  let fetchCalls = 0
-  const client = createRepairArtifactClient({
-    fetchImpl: async () => {
-      fetchCalls += 1
-      return fakeResponse({ json: { protocol: 'frame_repair_quality_gate_plan_v1' } })
-    },
-  })
-  const allowedGeneratedUrls = new Set([qualityGateJsonUrl])
-  assert.deepEqual(await client.loadJson({
-    identity: `quality-gate:${qualityGateSessionId}`,
-    url: qualityGateJsonUrl,
-    allowedGeneratedUrls,
-  }), { protocol: 'frame_repair_quality_gate_plan_v1' })
-  for (const url of [
-    qualityGateJsonUrl.replace(qualityGateSessionId, 'frqg_20260713_another'),
-    `${qualityGateJsonUrl}?download=1`,
-    qualityGateJsonUrl.replace('session_plan.json', 'nested/session_plan.json'),
-    qualityGateJsonUrl.replace('session_plan.json', 'private.json'),
-    qualityGateJsonUrl.replace('session_plan.json', 'case_case_a_review.json'),
-    qualityGateJsonUrl.replace('frame-repair-quality-gates', 'frame-repair-quality-gates%2Fescape'),
-  ]) {
-    assertUnsafe(() => client.loadJson({
-      identity: `quality-gate:${qualityGateSessionId}`,
-      url,
-      allowedGeneratedUrls,
-    }))
-  }
-  assert.equal(fetchCalls, 1)
 })
 
 test('JSON and image loads deduplicate by identity and controlled URL', async () => {

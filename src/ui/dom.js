@@ -1,4 +1,33 @@
+import { t } from './i18n.js'
+
 export const $ = (selector, root = document) => root.querySelector(selector)
+
+function clearI18nVariables(element) {
+  for (const attribute of [...(element.attributes ?? [])]) {
+    if (attribute.name.startsWith('data-i18n-var-')) element.removeAttribute(attribute.name)
+  }
+}
+
+export function setPlainText(target, message) {
+  const element = typeof target === 'string' ? $(target) : target
+  if (!element) return
+  element.removeAttribute?.('data-i18n')
+  clearI18nVariables(element)
+  element.textContent = String(message ?? '')
+}
+
+export function setLocalizedText(target, key, replacements = {}) {
+  const element = typeof target === 'string' ? $(target) : target
+  if (!element) return
+  element.dataset.i18n = key
+  clearI18nVariables(element)
+  for (const [name, value] of Object.entries(replacements)) {
+    const safeName = String(name).replace(/[^a-zA-Z0-9_-]/g, '')
+    if (!safeName) continue
+    element.setAttribute(`data-i18n-var-${safeName}`, String(value ?? ''))
+  }
+  element.textContent = t(key, replacements)
+}
 
 export function showToast(message) {
   const toast = $('#toast')
@@ -39,7 +68,7 @@ export function loadImage(file) {
     image.onload = () => resolve({ image, url })
     image.onerror = () => {
       URL.revokeObjectURL(url)
-      reject(new Error(`无法读取图片：${file.name}`))
+      reject(new Error(t('shared.error.imageRead', { name: file.name })))
     }
     image.src = url
   })
@@ -55,13 +84,16 @@ export async function fileToBase64(file) {
 
 export async function fetchJson(url) {
   const response = await fetch(url)
-  if (!response.ok) throw new Error(`无法读取结果：${response.status}`)
+  if (!response.ok) throw new Error(t('shared.error.resultRead', { status: response.status }))
   return response.json()
 }
 
 export function canvasToBlob(canvas) {
   return new Promise((resolve, reject) => {
-    canvas.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('无法导出 PNG'))), 'image/png')
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error(t('shared.error.pngExport')))),
+      'image/png',
+    )
   })
 }
 

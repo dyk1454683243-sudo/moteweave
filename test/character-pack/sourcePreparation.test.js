@@ -1,7 +1,12 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { removeBackground } from '../../src/character-pack/sourcePreparation.js'
+import { encodeRgbaPng, loadRgba } from '../../src/character-pack/imageCodec.js'
+import {
+  prepareSourceForProcessing,
+  removeBackground,
+  shouldPreferExistingAlpha,
+} from '../../src/character-pack/sourcePreparation.js'
 
 function rgba(width, height, pixels) {
   return { width, height, data: Uint8ClampedArray.from(pixels.flat(2)) }
@@ -10,6 +15,97 @@ function rgba(width, height, pixels) {
 function offset(width, x, y) {
   return (y * width + x) * 4
 }
+
+test('reference-board alpha preference requires the configured non-opaque coverage', () => {
+  const image = rgba(10, 10, Array.from({ length: 10 }, () => (
+    Array.from({ length: 10 }, () => [0, 0, 0, 255])
+  )))
+  image.data[3] = 128
+  assert.equal(shouldPreferExistingAlpha(image, { minCoverage: 0.02 }), false)
+
+  image.data[7] = 0
+  assert.equal(shouldPreferExistingAlpha(image, { minCoverage: 0.02 }), true)
+})
+
+test('ordinary fixed-region upload preserves geometry-first background processing', async () => {
+  const source = rgba(4, 4, Array.from({ length: 4 }, () => (
+    Array.from({ length: 4 }, () => [255, 255, 255, 255])
+  )))
+  const prepared = await prepareSourceForProcessing(
+    await encodeRgbaPng(source),
+    {
+      id: 'fixed_region_upload_test_v0',
+      kind: 'fixed_regions',
+      sheet: { w: 2, h: 2 },
+    },
+    {
+      backgroundMode: 'flood',
+      backgroundTolerance: 0,
+    },
+  )
+
+  assert.deepEqual(prepared.sourcePreprocess.report, {
+    applied: true,
+    method: 'fixed_region_resize',
+    input_size: { w: 4, h: 4 },
+    output_size: { w: 2, h: 2 },
+    source_layout: 'fixed_region_upload_test_v0',
+  })
+  assert.equal(prepared.background.processed_before_geometry, false)
+  assert.equal(prepared.background.alpha_provenance, 'staging')
+
+  const stagedSource = await loadRgba(prepared.sourcePng)
+  assert.deepEqual({ width: stagedSource.width, height: stagedSource.height }, { width: 2, height: 2 })
+  assert.deepEqual(
+    Array.from({ length: 4 }, (_, index) => stagedSource.data[index * 4 + 3]),
+    [255, 255, 255, 255],
+  )
+  assert.deepEqual(
+    { width: prepared.transparent.width, height: prepared.transparent.height },
+    { width: 2, height: 2 },
+  )
+  assert.deepEqual(
+    Array.from({ length: 4 }, (_, index) => prepared.transparent.data[index * 4 + 3]),
+    [0, 0, 0, 0],
+  )
+})
+
+test('removeBackground preserves an approved calibrated alpha provenance', async () => {
+  const image = rgba(1, 1, [[[20, 30, 40, 128]]])
+  const result = await removeBackground(image, {
+    backgroundMode: 'alpha',
+    inputAlphaProvenance: 'calibrated',
+  })
+
+  assert.equal(result.input_alpha.provenance, 'calibrated')
+  assert.equal(result.alpha_provenance, 'calibrated')
+})
+
+test('fixed-region staging alpha remains attributed to staging after geometry', async () => {
+  const source = rgba(4, 4, Array.from({ length: 4 }, () => (
+    Array.from({ length: 4 }, () => [255, 255, 255, 255])
+  )))
+  const prepared = await prepareSourceForProcessing(
+    await encodeRgbaPng(source),
+    {
+      id: 'fixed_region_staging_provenance_v0',
+      kind: 'fixed_regions',
+      sheet: { w: 252, h: 252 },
+    },
+    {
+      backgroundMode: 'auto',
+      fixedRegionSourceStaging: 'fixed_region_256_crop',
+    },
+  )
+
+  assert.equal(prepared.sourceStaging.report.applied, true)
+  assert.equal(prepared.background.input_alpha.provenance, 'staging')
+  assert.equal(prepared.background.alpha_provenance, 'staging')
+  assert.deepEqual(
+    { width: prepared.transparent.width, height: prepared.transparent.height },
+    { width: 252, height: 252 },
+  )
+})
 
 test('removeBackground flood path clears opaque white matte fringe without deleting enclosed whites', async () => {
   const pixels = Array.from({ length: 7 }, () => Array.from({ length: 7 }, () => [255, 255, 255, 255]))

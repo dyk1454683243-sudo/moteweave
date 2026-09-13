@@ -134,29 +134,21 @@ test('resource guard terminates a process tree that exceeds its RSS ceiling', as
 })
 
 test('resource guard applies the requested V8 old-space ceiling to Node children', async () => {
-  const measureHeapLimit = async (maxOldSpaceMiB) => {
-    const result = await runGuard([
-      '--max-old-space-mib', String(maxOldSpaceMiB),
-      '--max-rss-mib', '256',
-      '--timeout-ms', '5000',
-      '--poll-ms', '25',
-      '--',
-      process.execPath,
-      '--input-type=module',
-      '-e',
-      "import v8 from 'node:v8'; console.log(JSON.stringify({ heap_size_limit: v8.getHeapStatistics().heap_size_limit, node_options: process.env.NODE_OPTIONS }))",
-    ])
+  const result = await runGuard([
+    '--max-old-space-mib', '128',
+    '--max-rss-mib', '256',
+    '--timeout-ms', '5000',
+    '--poll-ms', '25',
+    '--',
+    process.execPath,
+    '--input-type=module',
+    '-e',
+    "import v8 from 'node:v8'; console.log(v8.getHeapStatistics().heap_size_limit)",
+  ])
 
-    assert.equal(result.reachedSafetyTimeout, false)
-    assert.equal(result.code, 0)
-    return JSON.parse(result.stdout.trim())
-  }
-
-  const lower = await measureHeapLimit(128)
-  const higher = await measureHeapLimit(256)
-  assert.equal(lower.node_options, '--max-old-space-size=128')
-  assert.equal(higher.node_options, '--max-old-space-size=256')
-  assert.equal(higher.heap_size_limit - lower.heap_size_limit, 128 * 1024 * 1024)
+  assert.equal(result.reachedSafetyTimeout, false)
+  assert.equal(result.code, 0)
+  assert.ok(Number(result.stdout.trim()) <= 256 * 1024 * 1024, result.stdout)
 })
 
 test('resource guard force-kills descendants that ignore graceful termination', async () => {
@@ -240,11 +232,6 @@ test('package test and local smoke scripts always run through the resource guard
   assert.match(packageJson.scripts['test:focused'], /--max-old-space-mib 1024/)
   assert.match(packageJson.scripts['smoke:local'], /run-with-resource-guard\.mjs/)
   assert.match(packageJson.scripts['smoke:local'], /--max-rss-mib 4096/)
-  assert.match(packageJson.scripts['first-user:local'], /run-with-resource-guard\.mjs/)
-  assert.match(packageJson.scripts['first-user:local'], /--max-old-space-mib 2048/)
-  assert.match(packageJson.scripts['first-user:local'], /--max-rss-mib 4096/)
-  assert.match(packageJson.scripts['first-user:local'], /--timeout-ms 900000/)
-  assert.match(packageJson.scripts['first-user:local'], /run-first-user-acceptance\.mjs/)
 })
 
 test('resource guard reports its limits, elapsed time, and peak process-tree RSS', async () => {

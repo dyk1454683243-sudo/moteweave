@@ -1,6 +1,13 @@
 import { pixelOffset } from './imageMath.js'
 import { detectAlphaBBox } from './normalizer.js'
 import { describeOcadRegionKey, isFixedRegionMotionLayout } from './sourceLayouts.js'
+import {
+  equipmentMaskBits,
+  equipmentMaskEvidence,
+  equipmentPolicyContract,
+  evaluateEquipmentQualityGate,
+  normalizeEquipmentPolicy,
+} from './equipmentPolicy.js'
 
 const EXPECTED_MOTION_ACTIONS = new Set([
   'walkdown',
@@ -282,4 +289,96 @@ export function evaluateFixedRegionSourceQuality(image, sourceLayout, options = 
     action_motion: actionMotion,
     regions,
   }
+}
+
+function assertMatchingSheet(candidate, reference, label) {
+  if (reference == null) return
+  if (!reference?.data || reference.width !== candidate.width || reference.height !== candidate.height) {
+    throw new TypeError(`${label} must match the candidate source sheet dimensions`)
+  }
+}
+
+function mergeLocalMask(target, localEvidence, rect, sheetWidth) {
+  const local = equipmentMaskBits(localEvidence)
+  for (let y = 0; y < rect.h; y += 1) {
+    for (let x = 0; x < rect.w; x += 1) {
+      if (local[y * rect.w + x]) target[(rect.y + y) * sheetWidth + rect.x + x] = 1
+    }
+  }
+}
+
+export function evaluateActionRepairEquipmentQuality(image, sourceLayout, options = {}) {
+  if (!image?.data || !sourceLayout?.sheet || !sourceLayout?.regions) return null
+  assertMatchingSheet(image, options.referenceImage, 'equipment reference image')
+  assertMatchingSheet(image, options.templateImage, 'equipment template image')
+  const policy = normalizeEquipmentPolicy(options.equipmentPolicy)
+  const requireRemovalEvidence = options.requireRemovalEvidence === true
+  const requestedRegionKeys = options.regionKeys == null
+    ? Object.keys(sourceLayout.regions)
+    : [...new Set(options.regionKeys)]
+  if (!requestedRegionKeys.length || requestedRegionKeys.some((key) => !Object.hasOwn(sourceLayout.regions, key))) {
+    throw new TypeError('equipment quality gate region keys are invalid')
+  }
+
+  const rejected = new Uint8Array(image.width * image.height)
+  const blockingErrors = []
+  const warnings = []
+  const regions = requestedRegionKeys.map((key) => {
+    const sourceRegion = sourceLayout.regions[key]
+    const rect = scaledRegion(sourceRegion, image, sourceLayout)
+    const candidate = copyRegion(image, rect)
+    const before = options.referenceImage ? copyRegion(options.referenceImage, rect) : null
+    const template = options.templateImage ? copyRegion(options.templateImage, rect) : null
+    const gate = evaluateEquipmentQualityGate({
+      candidate,
+      before,
+      template,
+      equipmentPolicy: policy,
+      requireRemovalEvidence,
+      preferTemplateEnvelope: options.preferTemplateEnvelope === true,
+    })
+    mergeLocalMask(rejected, gate.rejected_mask, rect, image.width)
+    for (const error of gate.blocking_errors) blockingErrors.push(`${error}:${key}`)
+    for (const warning of gate.warnings) warnings.push(`${warning}:${key}`)
+    return {
+      region_key: key,
+      rect,
+      status: gate.status,
+      blocking_errors: gate.blocking_errors,
+      warnings: gate.warnings,
+      rejected_pixel_count: gate.rejected_pixel_count,
+      rejected_mask: gate.rejected_mask,
+      detections: gate.detections.map((detection) => ({
+        ...detection,
+        sheet_bbox: {
+          x: rect.x + detection.bbox.x,
+          y: rect.y + detection.bbox.y,
+          w: detection.bbox.w,
+          h: detection.bbox.h,
+          right: rect.x + detection.bbox.right,
+          bottom: rect.y + detection.bbox.bottom,
+        },
+      })),
+    }
+  })
+  const rejectedMask = equipmentMaskEvidence(rejected, image.width, image.height)
+  return {
+    mode: 'action_repair_equipment_quality_gate_v1',
+    policy,
+    provider_free: true,
+    status: blockingErrors.length > 0 ? 'blocked' : 'pass',
+    blocking_errors: [...new Set(blockingErrors)],
+    warnings: [...new Set(warnings)],
+    selected_region_keys: requestedRegionKeys,
+    rejected_pixel_count: rejectedMask.active_pixel_count,
+    rejected_mask: rejectedMask,
+    body_contract: equipmentPolicyContract(policy),
+    removal_evidence_required: requireRemovalEvidence,
+    regions,
+  }
+}
+
+export function evaluateFixedRegionEquipmentQuality(image, sourceLayout, options = {}) {
+  if (!isFixedRegionMotionLayout(sourceLayout)) return null
+  return evaluateActionRepairEquipmentQuality(image, sourceLayout, options)
 }

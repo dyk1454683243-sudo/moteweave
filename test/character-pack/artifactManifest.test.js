@@ -2,6 +2,10 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import { buildCharacterPackArtifactManifest } from '../../src/character-pack/artifactManifest.js'
+import {
+  BACKGROUND_MATTE_V2_ARTIFACT_FILES,
+  BACKGROUND_MATTE_V2_AUXILIARY_ARTIFACT_FILES,
+} from '../../src/character-pack/backgroundMatteV2.js'
 
 test('buildCharacterPackArtifactManifest exposes optional source and generation artifacts', () => {
   const manifest = buildCharacterPackArtifactManifest('job_123', {
@@ -27,6 +31,13 @@ test('buildCharacterPackArtifactManifest exposes optional source and generation 
     editorMetadataJson: { sheet: 'normalized_sheet.png' },
     debugReport: { validation: { status: 'pass', blocking_errors: [] } },
     files: {
+      rawProviderOutputBuffer: Buffer.from('raw provider png'),
+      rawProviderOutputFileName: 'raw_provider_output.png',
+      backgroundRemovedProviderOutputBuffer: Buffer.from('transparent provider png'),
+      backgroundRemovedProviderOutputFileName: 'background_removed_provider_output.png',
+      backgroundMatteV2ArtifactBuffers: Object.fromEntries(
+        BACKGROUND_MATTE_V2_AUXILIARY_ARTIFACT_FILES.map((file) => [file, Buffer.from(file)]),
+      ),
       sourcePng: Buffer.from('source'),
       sourceLayoutOverlayPng: Buffer.from('source overlay'),
       sourceQualityReportJson: Buffer.from('source quality'),
@@ -52,6 +63,9 @@ test('buildCharacterPackArtifactManifest exposes optional source and generation 
   assert.deepEqual(
     manifest.files.map((file) => file.name),
     [
+      'raw_provider_output.png',
+      'background_removed_provider_output.png',
+      ...BACKGROUND_MATTE_V2_AUXILIARY_ARTIFACT_FILES,
       'source.png',
       'source_layout_overlay.png',
       'source_quality_report.json',
@@ -76,6 +90,19 @@ test('buildCharacterPackArtifactManifest exposes optional source and generation 
       'ocad_pack.zip',
       'character_pack.zip',
     ]
+  )
+  assert.equal(manifest.urls.raw_provider_output_url, '/generated/job_123/raw_provider_output.png')
+  assert.equal(
+    manifest.urls.background_removed_provider_output_url,
+    '/generated/job_123/background_removed_provider_output.png',
+  )
+  assert.equal(
+    manifest.urls.background_review_url,
+    `/generated/job_123/${BACKGROUND_MATTE_V2_ARTIFACT_FILES.REVIEW}`,
+  )
+  assert.equal(
+    manifest.urls.background_foreground_reconstruction_url,
+    `/generated/job_123/${BACKGROUND_MATTE_V2_ARTIFACT_FILES.FOREGROUND_RECONSTRUCTION}`,
   )
   assert.equal(manifest.urls.source_url, '/generated/job_123/source.png')
   assert.equal(manifest.urls.source_layout_overlay_url, '/generated/job_123/source_layout_overlay.png')
@@ -146,6 +173,7 @@ test('buildCharacterPackArtifactManifest publishes release artifacts when the li
       debugOverlayPng: Buffer.from('debug'),
       onionSkinOverlayPng: Buffer.from('onion'),
       rowGifBuffers: {},
+      manualAcceptanceJson: Buffer.from('{"decision":"accepted"}'),
       godotNpcZipBuffer: Buffer.from('godot'),
       rpgmakerZipBuffer: Buffer.from('rpgmaker'),
       ocadZipBuffer: Buffer.from('ocad'),
@@ -155,9 +183,11 @@ test('buildCharacterPackArtifactManifest publishes release artifacts when the li
 
   assert.equal(manifest.artifactDisposition, 'release')
   assert.equal(manifest.files.some((file) => file.name === 'generation_release_gate.json'), true)
+  assert.equal(manifest.files.some((file) => file.name === 'manual_acceptance.json'), true)
   assert.equal(manifest.files.some((file) => file.name === 'character_pack.zip'), true)
   assert.equal(manifest.files.some((file) => file.name === 'godot_npc_pack.zip'), true)
   assert.equal(manifest.urls.generation_release_gate_url, '/generated/job_release/generation_release_gate.json')
+  assert.equal(manifest.urls.manual_acceptance_url, '/generated/job_release/manual_acceptance.json')
   assert.equal(manifest.urls.zip_url, '/generated/job_release/character_pack.zip')
   assert.equal(manifest.urls.godot_npc_zip_url, '/generated/job_release/godot_npc_pack.zip')
 })
@@ -219,6 +249,65 @@ test('buildCharacterPackArtifactManifest keeps diagnostics but omits release pac
   assert.equal('ocad_zip_url' in manifest.urls, false)
 })
 
+test('buildCharacterPackArtifactManifest keeps review evidence but omits release packages before human acceptance', () => {
+  const manifest = buildCharacterPackArtifactManifest('job_review', {
+    animationsJson: { animations: {} },
+    metadataJson: { id: 'pack' },
+    editorMetadataJson: { sheet: 'normalized_sheet.png' },
+    debugReport: { validation: { status: 'warning', warnings: ['frame_17_baseline_drift'], blocking_errors: [] } },
+    generationReleaseGate: {
+      schema_version: 1,
+      mode: 'generation_release_gate_v1',
+      generation_mode: 'production_sheet_v0',
+      policy: 'strict_live_generation_v1',
+      status: 'needs_review',
+      release_ready: false,
+      manual_review_required: true,
+      human_decision_status: 'pending',
+      blocking_errors: [],
+      automated_review_findings: ['validation.status_not_pass'],
+      warnings: ['validation:frame_17_baseline_drift'],
+      evidence: {},
+    },
+    releaseReady: false,
+    manualReviewRequired: true,
+    artifactDisposition: 'review_required',
+    files: {
+      rawProviderOutputBuffer: Buffer.from('raw provider png'),
+      rawProviderOutputFileName: 'raw_provider_output.png',
+      sourcePng: Buffer.from('source'),
+      sourceSubjectCountReportJson: { status: 'blocked' },
+      sourceSubjectCountOverlayPng: Buffer.from('source overlay'),
+      normalizedSheetPng: Buffer.from('sheet'),
+      normalizedSubjectCountReportJson: { status: 'blocked' },
+      normalizedSubjectCountOverlayPng: Buffer.from('normalized overlay'),
+      debugOverlayPng: Buffer.from('debug'),
+      onionSkinOverlayPng: Buffer.from('onion'),
+      promptTxt: Buffer.from('prompt'),
+      generationJson: { provider: 'mock' },
+      rowGifBuffers: {},
+      godotNpcZipBuffer: Buffer.from('godot'),
+      zipBuffer: Buffer.from('zip'),
+    },
+  })
+
+  const names = manifest.files.map((file) => file.name)
+  assert.equal(manifest.artifactDisposition, 'review_required')
+  assert.equal(names.includes('raw_provider_output.png'), true)
+  assert.equal(manifest.urls.raw_provider_output_url, '/generated/job_review/raw_provider_output.png')
+  assert.equal(names.includes('source.png'), true)
+  assert.equal(names.includes('normalized_sheet.png'), true)
+  assert.equal(names.includes('source_subject_count_report.json'), true)
+  assert.equal(names.includes('source_subject_count_overlay.png'), true)
+  assert.equal(names.includes('normalized_subject_count_report.json'), true)
+  assert.equal(names.includes('normalized_subject_count_overlay.png'), true)
+  assert.equal(names.includes('generation_release_gate.json'), true)
+  assert.equal(names.includes('character_pack.zip'), false)
+  assert.equal(names.includes('godot_npc_pack.zip'), false)
+  assert.equal('zip_url' in manifest.urls, false)
+  assert.equal('metadata_url' in manifest.urls, false)
+})
+
 test('buildCharacterPackArtifactManifest keeps semantic GIF filenames mapped to runtime actions', () => {
   const manifest = buildCharacterPackArtifactManifest('job_456', {
     animationsJson: {
@@ -266,4 +355,34 @@ test('buildCharacterPackArtifactManifest keeps semantic GIF filenames mapped to 
       url: '/generated/job_456/talk.gif',
     },
   ])
+})
+
+test('buildCharacterPackArtifactManifest rejects a partial Background Matte V2 evidence set', () => {
+  assert.throws(
+    () => buildCharacterPackArtifactManifest('job_partial_matte', {
+      files: {
+        backgroundRemovedProviderOutputBuffer: Buffer.from('matte'),
+        backgroundRemovedProviderOutputFileName: BACKGROUND_MATTE_V2_ARTIFACT_FILES.OUTPUT,
+        backgroundMatteV2ArtifactBuffers: {
+          [BACKGROUND_MATTE_V2_ARTIFACT_FILES.REVIEW]: Buffer.from('review'),
+        },
+      },
+    }),
+    /artifact set is incomplete/,
+  )
+  assert.throws(
+    () => buildCharacterPackArtifactManifest('job_extra_matte', {
+      files: {
+        backgroundRemovedProviderOutputBuffer: Buffer.from('matte'),
+        backgroundRemovedProviderOutputFileName: BACKGROUND_MATTE_V2_ARTIFACT_FILES.OUTPUT,
+        backgroundMatteV2ArtifactBuffers: {
+          ...Object.fromEntries(
+            BACKGROUND_MATTE_V2_AUXILIARY_ARTIFACT_FILES.map((file) => [file, Buffer.from(file)]),
+          ),
+          'unexpected.png': Buffer.from('unexpected'),
+        },
+      },
+    }),
+    /artifact set is incomplete/,
+  )
 })

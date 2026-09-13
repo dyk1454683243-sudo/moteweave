@@ -7,40 +7,80 @@ import path from 'node:path'
 import { Readable } from 'node:stream'
 import { fileURLToPath } from 'node:url'
 
+import { routeApi } from './src/server/routes/index.js'
+import { legacyStudioRedirectLocation } from './src/server/legacyStudioRedirect.js'
+import { acceptFullSheetGeneration } from './src/server/fullSheetGenerationAcceptance.js'
+import { buildCharacterPackArtifactManifest } from './src/character-pack/artifactManifest.js'
 import { writeCharacterPackArtifacts } from './src/character-pack/artifactWriter.js'
-import { ACTION_REPAIR_MODE, repairModeForAnimation } from './src/character-pack/actionRepairMode.js'
 import { buildBenchmarkGallery } from './src/character-pack/benchmark/benchmarkGallery.js'
-import { buildCharacterQualityClosureRepairManifestForDebugReport } from './src/character-pack/benchmark/qualityClosureRepairManifest.js'
 import {
-  buildQualityClosureProviderRepairLoopPlan,
-  buildQualityClosureProviderRepairReferenceImages,
-  runQualityClosureProviderRepairLoop,
-  serializeQualityClosureProviderRepairLoopPlan,
-  serializeQualityClosureProviderRepairLoopResult,
-} from './src/character-pack/benchmark/qualityClosureProviderRepairLoop.js'
-import { serializeQualityClosureProviderRepairApplyResult } from './src/character-pack/benchmark/qualityClosureRepairApply.js'
+  actionRepairRegionKeyForFrameIndex,
+  isActionRepairSourceLayoutId,
+  normalizeActionRepairActions,
+  resolveActionRepairLayout,
+} from './src/character-pack/actionRepairLayouts.js'
 import { DEFAULT_GENERATION_PRESET } from './src/character-pack/generationDefaults.js'
+import {
+  BACKGROUND_RECIPE_IDS,
+  resolveBackgroundMode,
+} from './src/character-pack/backgroundProcessingContract.js'
+import {
+  assertFullSheetGenerationProfileRequest,
+  resolveFullSheetGenerationProfile,
+} from './src/character-pack/generationProfiles.js'
+import {
+  GENERATION_PROMPT_FILE,
+  GENERATION_REFERENCE_MANIFEST_FILE,
+  GENERATION_REQUEST_MANIFEST_FILE,
+  GENERATION_REVIEW_FILE,
+  assertFullSheetGenerationReferenceManifest,
+  assertFullSheetGenerationRequestManifest,
+  assertFullSheetGenerationReview,
+  buildFullSheetGenerationReview,
+  hashGenerationReviewValue,
+  sha256GenerationBytes,
+} from './src/character-pack/generationReview.js'
+import {
+  buildIdentityReferenceBoard,
+  buildPaletteReferenceBoard,
+  buildStructureReferenceBoard,
+} from './src/character-pack/generationReferenceBoards.js'
 import { encodeRgbaPng, loadRgba } from './src/character-pack/imageCodec.js'
 import { getGeminiProviderState } from './src/character-pack/providers/geminiProvider.js'
+import {
+  buildGeminiGenerateContentUrl,
+  resolveProviderPreset,
+} from './src/character-pack/providers/providerConfig.js'
 import { createJob, getJob, JOB_STATUS, updateJob } from './src/character-pack/jobStore.js'
 import { createJobQueue } from './src/character-pack/jobQueue.js'
-import {
-  OCAD_SOURCE_ACTION_REPAIR_TARGETS,
-  isOcadSourceAction,
-} from './src/character-pack/ocadSourceActions.js'
 import { processSheetBuffer } from './src/character-pack/processSheet.js'
 import { normalizePixelGridRefinementOptions } from './src/character-pack/pixelGridRefinement.js'
 import { applyPixelStyleCorrection } from './src/character-pack/stylePipeline.js'
 import {
   buildFixedRegionSourceRepairPlan,
-  buildFixedRegionSourceRepairReferenceImages,
+  buildFixedRegionSourceRepairReferenceBundle,
   finalizeFixedRegionSourceRepairPlan,
   runFixedRegionSourceRepairLoop,
   serializeFixedRegionSourceRepairLoopResult,
   serializeFixedRegionSourceRepairPlan,
 } from './src/character-pack/sourceRegionRepair.js'
-import { FIXED_REGION_MOTION_LAYOUT_ID } from './src/character-pack/sourceLayoutIds.js'
-import { loadTemplateImage } from './src/character-pack/templateStore.js'
+import {
+  FIXED_REGION_ACTION_REPAIR_REFERENCE_FILES,
+  FIXED_REGION_ACTION_REPAIR_REVIEW_FILE,
+  assertFixedRegionActionRepairReviewContract,
+  buildFixedRegionActionRepairAcceptanceManifest,
+  buildFixedRegionActionRepairReviewContract,
+  fixedRegionActionRepairArtifactKey,
+  hashActionRepairValue,
+  sha256ActionRepairBytes,
+} from './src/character-pack/fixedRegionActionRepairReview.js'
+import {
+  TOPDOWN_RPG_SOURCE_LAYOUT_ID,
+} from './src/character-pack/sourceLayoutIds.js'
+import {
+  loadAuthoritativeGenerationStructureImage,
+  loadTemplateImage,
+} from './src/character-pack/templateStore.js'
 import { writeTextToImageArtifacts } from './src/character-pack/textToImageArtifacts.js'
 import {
   normalizeGenerationOptions,
@@ -96,25 +136,8 @@ import {
   createEditorArtifactAccessRegistry,
   handleEditorProjectApi,
 } from './src/editor-project/apiHandler.js'
-import {
-  createCharacterReprocessCoordinator,
-  resolveImplementationRevision,
-} from './src/editor-project/characterReprocessCoordinator.js'
-import {
-  createCharacterReprocessService,
-  writeCharacterReprocessEvidence,
-} from './src/editor-project/characterReprocessService.js'
-import { writeFrameRepairArtifacts } from './src/editor-project/frameRepairArtifacts.js'
-import {
-  compositeFrameRepairCandidate,
-  normalizeFrameRepairCandidate,
-} from './src/editor-project/frameRepairComposite.js'
-import { createFrameRepairCoordinator } from './src/editor-project/frameRepairCoordinator.js'
-import { createFrameRepairQualityGateCoordinator } from './src/editor-project/frameRepairQualityGateCoordinator.js'
-import { createFrameRepairOperationLedger } from './src/editor-project/frameRepairOperationLedger.js'
-import { requestFrameRepairCandidate } from './src/editor-project/frameRepairProvider.js'
-import { createFrameRepairService } from './src/editor-project/frameRepairService.js'
-import { packageNormalizedCharacterSheet } from './src/editor-project/normalizedCharacterSheetPackage.js'
+import { resolveManagedRevisionArtifactFile } from './src/editor-project/paths.js'
+import { loadEditorProject } from './src/editor-project/projectStore.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -148,8 +171,6 @@ const editorWorkspaceDir = process.env.EDITOR_WORKSPACE_ROOT
 const editorGeneratedDir = process.env.EDITOR_GENERATED_DIR
   ? path.resolve(process.env.EDITOR_GENERATED_DIR)
   : generatedDir
-const packageVersion = JSON.parse(readFileSync(path.join(__dirname, 'package.json'), 'utf8')).version
-const implementationRevision = resolveImplementationRevision({ env: process.env, packageVersion })
 const editorArtifactAccessRegistry = createEditorArtifactAccessRegistry()
 let runtimeProviderEnv = {}
 const jobQueue = createJobQueue({ concurrency: process.env.CHARACTER_JOB_CONCURRENCY || 2 })
@@ -163,61 +184,6 @@ const motionSourceReleaseRetryTimers = new Map()
 const motionSourceReleaseRetryAttempts = new Map()
 const MOTION_SOURCE_PENDING_RELEASE_OPERATION_LIMIT = 1024
 const MOTION_SOURCE_RELEASE_RETRY_DELAYS_MS = Object.freeze([250, 1000, 4000])
-const characterReprocessService = createCharacterReprocessService({
-  generatedDir,
-  jobQueue,
-  createJob,
-  getJob,
-  updateJob,
-  processSheet: processSheetBuffer,
-  writeCharacterArtifacts: ({ job, result }) => writeCharacterPackArtifacts({
-    jobId: job.id,
-    outputDir: generatedDir,
-    result,
-    allowExistingJobDir: true,
-  }),
-  writeEvidence: (input) => writeCharacterReprocessEvidence({ generatedDir, ...input }),
-})
-const characterReprocessCoordinator = createCharacterReprocessCoordinator({
-  projectRoot: __dirname,
-  workspaceRoot: editorWorkspaceDir,
-  generatedDir,
-  implementationRevision,
-  reprocessService: characterReprocessService,
-})
-const frameRepairOperationLedger = createFrameRepairOperationLedger({
-  workspaceRoot: editorWorkspaceDir,
-})
-const frameRepairService = createFrameRepairService({
-  generatedDir,
-  jobQueue,
-  createJob,
-  getJob,
-  updateJob,
-  ledger: frameRepairOperationLedger,
-  generateCandidate: requestFrameRepairCandidate,
-  normalizeCandidate: normalizeFrameRepairCandidate,
-  compositeCandidate: compositeFrameRepairCandidate,
-  packageSheet: packageNormalizedCharacterSheet,
-  writeArtifacts: writeFrameRepairArtifacts,
-})
-const frameRepairCoordinator = createFrameRepairCoordinator({
-  projectRoot: __dirname,
-  workspaceRoot: editorWorkspaceDir,
-  generatedDir,
-  implementationRevision,
-  getProviderEnv: () => ({ ...process.env, ...runtimeProviderEnv }),
-  frameRepairService,
-})
-const frameRepairQualityGateCoordinator = createFrameRepairQualityGateCoordinator({
-  projectRoot: __dirname,
-  workspaceRoot: editorWorkspaceDir,
-  generatedDir,
-  implementationRevision,
-  frameRepairCoordinator,
-  frameRepairService,
-})
-
 const CONTENT_TYPES = {
   '.css': 'text/css; charset=utf-8',
   '.gif': 'image/gif',
@@ -263,10 +229,33 @@ function publicTwoPointFiveDMaterialSourceProviderConfig(providerPresetId = '') 
     active_preset_id: state.active_preset_id,
     selected_preset_id: selected?.id ?? null,
     provider: selected?.provider ?? state.provider,
+    route_kind: selected?.route_kind ?? null,
     model: selected?.model ?? state.model,
     selected_available: Boolean(selected?.available),
     image_config: selected?.image_config ?? null,
   }
+}
+
+function twoPointFiveDMaterialSourceProviderBinding(value = {}) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('expectedProviderConfig must be an object')
+  }
+  const binding = {
+    selected_available: value.selected_available === true,
+    selected_preset_id: String(value.selected_preset_id ?? ''),
+    provider: String(value.provider ?? ''),
+    route_kind: String(value.route_kind ?? ''),
+    model: String(value.model ?? ''),
+  }
+  if (['selected_preset_id', 'provider', 'route_kind', 'model'].some((field) => !binding[field])) {
+    throw new Error('expectedProviderConfig must seal preset, provider, route, and model')
+  }
+  return binding
+}
+
+function twoPointFiveDMaterialSourceProviderBindingMatches(left, right) {
+  return ['selected_available', 'selected_preset_id', 'provider', 'route_kind', 'model']
+    .every((field) => left[field] === right[field])
 }
 
 function runtimeString(body = {}, ...keys) {
@@ -316,6 +305,40 @@ async function readBody(req) {
   const chunks = []
   for await (const chunk of req) chunks.push(chunk)
   return Buffer.concat(chunks)
+}
+
+function boundedBodyError(code, message, httpStatus) {
+  return Object.assign(new Error(message), {
+    code,
+    http_status: httpStatus,
+  })
+}
+
+async function readBodyBounded(req, maxBytes) {
+  const contentLength = req.headers['content-length']
+  if (contentLength != null) {
+    const declared = Number(contentLength)
+    if (!Number.isSafeInteger(declared) || declared < 0) {
+      throw boundedBodyError(
+        'invalid_acceptance_request',
+        'Content-Length must be a non-negative integer',
+        400,
+      )
+    }
+    if (declared > maxBytes) {
+      throw boundedBodyError('acceptance_request_too_large', 'manual acceptance request is too large', 413)
+    }
+  }
+  const chunks = []
+  let totalBytes = 0
+  for await (const chunk of req) {
+    totalBytes += chunk.byteLength
+    if (totalBytes > maxBytes) {
+      throw boundedBodyError('acceptance_request_too_large', 'manual acceptance request is too large', 413)
+    }
+    chunks.push(chunk)
+  }
+  return Buffer.concat(chunks, totalBytes)
 }
 
 const MOTION_SOURCE_LEGACY_JSON_LIMIT = 16 * 1024 * 1024
@@ -485,8 +508,13 @@ function sendMotionError(res, error, fallbackCode = 'motion_source_request_faile
   })
 }
 
-async function writeJobArtifacts(job, result) {
-  const written = await writeCharacterPackArtifacts({ jobId: job.id, outputDir: generatedDir, result })
+async function writeJobArtifacts(job, result, artifactWriteOptions = {}) {
+  const written = await writeCharacterPackArtifacts({
+    jobId: job.id,
+    outputDir: generatedDir,
+    result,
+    ...artifactWriteOptions,
+  })
   const releaseGate = result.generationReleaseGate ?? null
   updateJob(job.id, {
     status: written.status,
@@ -498,6 +526,9 @@ async function writeJobArtifacts(job, result) {
       release_ready: written.artifact_disposition === 'release' && result.releaseReady === true,
       artifact_disposition: written.artifact_disposition ?? 'diagnostic_only',
       failure_status: written.failure_status ?? null,
+      manual_review_required: written.manual_review_required === true,
+      review_status: written.review_status ?? null,
+      human_decision_status: written.human_decision_status ?? null,
     } : {}),
   })
 }
@@ -607,6 +638,15 @@ function repairActionsFromBody(body = {}) {
   return [...new Set(actions.map((action) => String(action ?? '').trim()).filter(Boolean))]
 }
 
+function repairRegionKeysFromBody(body = {}) {
+  const options = body.options ?? {}
+  const raw = body.regionKeys ?? body.region_keys ??
+    options.regionKeys ?? options.region_keys ?? null
+  if (raw == null) return null
+  const regionKeys = Array.isArray(raw) ? raw : [raw]
+  return [...new Set(regionKeys.map((key) => String(key ?? '').trim()).filter(Boolean))]
+}
+
 function repairProviderPresetIdFromBody(body = {}) {
   return String(
     body.providerPresetId ??
@@ -629,38 +669,152 @@ function repairImageConfigFromBody(body = {}) {
   }
 }
 
-function repairMotionTemplateFromBody(body = {}) {
+function repairEquipmentPolicyFromBody(body = {}) {
   const options = body.options ?? {}
-  const disabled = body.disableMotionTemplate || body.disable_motion_template || options.disableMotionTemplate || options.disable_motion_template
-  if (disabled) return { enabled: false }
+  return body.equipmentPolicy ?? body.equipment_policy ??
+    options.equipmentPolicy ?? options.equipment_policy ?? 'none'
+}
+
+function repairInstructionFromBody(body = {}) {
+  const options = body.options ?? {}
+  return body.instruction ?? body.repairInstruction ?? body.repair_instruction ??
+    options.instruction ?? options.repairInstruction ?? options.repair_instruction ??
+    'Correct the selected action slots while preserving the character identity.'
+}
+
+function fixedRegionActionRepairIdentityFromBody(body = {}, sourceJobId = '') {
+  const identity = {
+    project_id: String(body.projectId ?? body.project_id ?? '').trim(),
+    asset_id: String(body.assetId ?? body.asset_id ?? '').trim(),
+    parent_revision_id: String(body.parentRevisionId ?? body.parent_revision_id ?? '').trim(),
+    source_job_id: String(sourceJobId ?? '').trim(),
+  }
+  for (const [key, value] of Object.entries(identity)) {
+    if (!/^[A-Za-z0-9._-]{1,120}$/.test(value) || value.includes('..')) {
+      throw new Error(`action repair ${key} is required and must be a safe id`)
+    }
+  }
+  return identity
+}
+
+function fixedRegionActionRepairReviewBindingFromBody(body = {}) {
+  const reviewId = String(body.reviewedRunId ?? body.reviewed_run_id ?? '').trim()
+  const expectedPlanHash = String(body.expectedPlanHash ?? body.expected_plan_hash ?? '').trim()
+  const expectedReferenceManifestSha256 = String(
+    body.expectedReferenceManifestSha256 ?? body.expected_reference_manifest_sha256 ?? '',
+  ).trim()
+  if (!/^[A-Za-z0-9._-]{1,120}$/.test(reviewId) || reviewId.includes('..')) {
+    throw new Error('reviewedRunId is required for action repair live generation')
+  }
+  if (!/^[a-f0-9]{64}$/.test(expectedPlanHash)) {
+    throw new Error('expectedPlanHash is required for action repair live generation')
+  }
+  if (!/^[a-f0-9]{64}$/.test(expectedReferenceManifestSha256)) {
+    throw new Error('expectedReferenceManifestSha256 is required for action repair live generation')
+  }
+  return { reviewId, expectedPlanHash, expectedReferenceManifestSha256 }
+}
+
+function repairNormalizedFrameMappings(debugReport = {}, sourceLayoutId = debugReport.source_layout?.id) {
+  return (Array.isArray(debugReport.frames) ? debugReport.frames : [])
+    .map((frame) => ({
+      frame_index: frame?.index,
+      region_key: frame?.source_frame?.region_key ?? actionRepairRegionKeyForFrameIndex(sourceLayoutId, frame?.index),
+    }))
+    .filter((item) => Number.isInteger(item.frame_index) && typeof item.region_key === 'string')
+}
+
+function repairMotionTemplateForSourceLayout(sourceLayoutId) {
+  const layout = resolveActionRepairLayout(sourceLayoutId)
   return {
     enabled: true,
-    preset: FIXED_REGION_MOTION_LAYOUT_ID,
-    layout: FIXED_REGION_MOTION_LAYOUT_ID,
+    preset: layout.template_preset,
+    layout: layout.id,
   }
 }
 
-function providerTaskMatchesAnimation(task = {}, animation = '') {
-  if (!animation) return false
-  return task.provider_required && (
-    task.source_action === animation ||
-    task.requested_action === animation ||
-    task.target?.source_action === animation ||
-    task.target?.requested_action === animation ||
-    task.target?.animation === animation ||
-    (Array.isArray(task.target?.animations) && task.target.animations.includes(animation))
-  )
+function isActionRepairDebugReport(debugReport = {}) {
+  return isActionRepairSourceLayoutId(debugReport.source_layout?.id)
 }
 
-function isFixedRegionDebugReport(debugReport = {}) {
-  return debugReport.source_layout?.id === FIXED_REGION_MOTION_LAYOUT_ID
+function requiredManagedRepairIdentity(body = {}, camelKey, snakeKey, label) {
+  const value = String(body[camelKey] ?? body[snakeKey] ?? '').trim()
+  if (!value) throw new Error(`${label} is required when the source job is not active`)
+  return value
+}
+
+async function assertManagedRevisionRepairIdentity(body = {}, sourceJobId) {
+  const projectId = requiredManagedRepairIdentity(body, 'projectId', 'project_id', 'projectId')
+  const assetId = requiredManagedRepairIdentity(body, 'assetId', 'asset_id', 'assetId')
+  const parentRevisionId = requiredManagedRepairIdentity(
+    body,
+    'parentRevisionId',
+    'parent_revision_id',
+    'parentRevisionId',
+  )
+  const { project } = await loadEditorProject({
+    projectId,
+    projectRoot: __dirname,
+    workspaceRoot: editorWorkspaceDir,
+  })
+  const asset = project.id === projectId ? project.assets?.[assetId] : null
+  const revision = asset?.revisions?.[parentRevisionId]
+  if (
+    asset?.id !== assetId ||
+    asset.kind !== 'character_pack' ||
+    asset.active_revision_id !== parentRevisionId ||
+    revision?.id !== parentRevisionId ||
+    revision.source_job_id !== sourceJobId
+  ) {
+    throw new Error('managed character repair identity does not match the active parent revision')
+  }
+  return { projectId, assetId, parentRevisionId, revision }
+}
+
+async function managedRevisionRepairSourceContext(body = {}, sourceJobId, verifiedIdentity = null) {
+  const {
+    projectId,
+    assetId,
+    revision,
+  } = verifiedIdentity ?? await assertManagedRevisionRepairIdentity(body, sourceJobId)
+  const artifactOptions = {
+    projectId,
+    assetId,
+    revision,
+    projectRoot: __dirname,
+    workspaceRoot: editorWorkspaceDir,
+  }
+  const [debugReportPath, normalizedSheetPath, sourceSheetPath] = await Promise.all([
+    resolveManagedRevisionArtifactFile({ ...artifactOptions, artifactKey: 'debug_report' }),
+    resolveManagedRevisionArtifactFile({ ...artifactOptions, artifactKey: 'sheet' }),
+    resolveManagedRevisionArtifactFile({ ...artifactOptions, artifactKey: 'source' }),
+  ])
+  const debugReport = JSON.parse(await readFile(debugReportPath, 'utf8'))
+  if (!isActionRepairDebugReport(debugReport)) {
+    throw new Error('managed revision repair recovery requires a supported action-repair source layout')
+  }
+  return {
+    sourceJobId,
+    sourceJob: {
+      id: sourceJobId,
+      type: 'editor_managed_character_revision',
+      status: 'done',
+      description: '',
+    },
+    sourceDir: path.dirname(debugReportPath),
+    debugReport,
+    debugReportPath,
+    normalizedSheetPath,
+    sourceSheetPath,
+  }
 }
 
 async function repairSourceContextFromBody(body = {}) {
   const sourceJobId = String(body.jobId ?? body.job_id ?? body.sourceJobId ?? body.source_job_id ?? '').trim()
   if (!sourceJobId) throw new Error('jobId is required')
+  const verifiedIdentity = await assertManagedRevisionRepairIdentity(body, sourceJobId)
   const sourceJob = getJob(sourceJobId)
-  if (!sourceJob) throw new Error(`unknown character job: ${sourceJobId}`)
+  if (!sourceJob) return managedRevisionRepairSourceContext(body, sourceJobId, verifiedIdentity)
   const sourceDir = safeGeneratedJobDir(sourceJobId)
   const debugReportPath = path.join(sourceDir, 'debug_report.json')
   const normalizedSheetPath = path.join(sourceDir, 'normalized_sheet.png')
@@ -680,81 +834,13 @@ async function repairSourceContextFromBody(body = {}) {
   }
 }
 
-function shouldUseFixedRegionSourceRepair(debugReport = {}, actions = []) {
-  return isFixedRegionDebugReport(debugReport) && actions.length > 0 && actions.every((action) => isOcadSourceAction(action))
-}
-
-function resolveRepairSelection(rawAction = '', debugReport = {}) {
-  const requestedAction = String(rawAction || '').trim()
-  if (!requestedAction) return { requested_action: '', animation: '', source_action: null, derived_targets: [] }
-  if (isFixedRegionDebugReport(debugReport) && isOcadSourceAction(requestedAction)) {
-    const target = OCAD_SOURCE_ACTION_REPAIR_TARGETS[requestedAction]
-    if (!target) {
-      throw new Error(`source action ${requestedAction} is preview-only in the current 8x8 export repair path`)
-    }
-    return {
-      requested_action: requestedAction,
-      source_action: requestedAction,
-      source_layout: FIXED_REGION_MOTION_LAYOUT_ID,
-      animation: target.animation,
-      derived_targets: target.derived ?? [],
-    }
+function assertActionRepairSource(debugReport = {}, actions = []) {
+  const sourceLayoutId = debugReport.source_layout?.id
+  if (!isActionRepairDebugReport(debugReport)) {
+    throw new Error('character action repair requires topdown_rpg_v0 or fixed_region_motion_v0 source evidence')
   }
-  return {
-    requested_action: requestedAction,
-    source_action: null,
-    source_layout: null,
-    animation: requestedAction,
-    derived_targets: [],
-  }
-}
-
-function publicSelectedRepairAction(plan = {}) {
-  return plan.selected?.source_action ?? plan.selected?.requested_action ?? plan.selected?.animation ?? null
-}
-
-function addSelectedAnimationRepairTask(debugReport = {}, selection = {}) {
-  const closure = debugReport.quality_closure ?? {}
-  const existing = Array.isArray(closure.repair_tasks) ? closure.repair_tasks : []
-  const animation = selection.animation
-  const requestedAction = selection.requested_action ?? animation
-  const repairMode = repairModeForAnimation(animation)
-  if (!animation || existing.some((task) => (
-    providerTaskMatchesAnimation(task, requestedAction) ||
-    providerTaskMatchesAnimation(task, animation) ||
-    (task.provider_required && (
-      task.animation === animation ||
-      task.animations?.includes(animation) ||
-      (selection.source_action && task.source_action === selection.source_action) ||
-      task.requested_action === requestedAction
-    ))
-  ))) {
-    return debugReport
-  }
-  return {
-    ...debugReport,
-    quality_closure: {
-      ...closure,
-      mode: closure.mode ?? 'character_frame_quality_closure_v1',
-      repair_tasks: [
-        ...existing,
-        {
-          id: `user_selected_${requestedAction}_repair`,
-          action: 'single_animation_repair',
-          provider_required: true,
-          animation,
-          requested_action: requestedAction,
-          source_action: selection.source_action ?? null,
-          source_layout: selection.source_layout ?? null,
-          derived_targets: selection.derived_targets ?? [],
-          repair_mode: repairMode,
-          rationale: repairMode === ACTION_REPAIR_MODE.STATIC_POSE
-            ? 'User selected this static source pose for one-cell provider repair and local replacement.'
-            : 'User selected this source action for one-action provider repair.',
-        },
-      ],
-    },
-  }
+  normalizeActionRepairActions(sourceLayoutId, actions)
+  return sourceLayoutId
 }
 
 async function motionTemplateForRepairPlan(plan) {
@@ -769,70 +855,11 @@ async function motionTemplateForRepairPlan(plan) {
   }
 }
 
-async function sourceSheetBufferForRepairPlan(plan) {
-  const sourceSheet = plan.preflight?.source_sheet
-  return sourceSheet && existsSync(sourceSheet) ? readFile(sourceSheet) : null
-}
-
-async function writeRepairReferenceFiles(plan, referenceImages = []) {
-  const fileByName = new Map([
-    ['motion_template_reference.png', plan.files.motion_template_reference],
-    ['normalized_sheet_reference.png', plan.files.normalized_sheet_reference],
-    ['target_animation_reference.png', plan.files.target_animation_reference],
-    ['source_sheet_reference.png', plan.files.source_sheet_reference],
-  ])
-  for (const image of referenceImages) {
-    const file = fileByName.get(image.name)
-    if (file) await writeFile(file, image.buffer)
-  }
-}
-
-async function writeRepairPlanArtifacts(plan, referenceImages = []) {
-  await mkdir(plan.output_dir, { recursive: true })
-  await writeFile(plan.files.plan, JSON.stringify(serializeQualityClosureProviderRepairLoopPlan(plan), null, 2))
-  if (plan.selected) await writeFile(plan.files.prompt, plan.selected.prompt)
-  await writeRepairReferenceFiles(plan, referenceImages)
-}
-
-async function writeRepairLoopArtifacts(plan, result) {
-  await writeRepairPlanArtifacts(plan, result.reference_images ?? [])
-  if (result.generation) {
-    await writeFile(plan.files.raw_provider_output, result.generation.raw_provider_png)
-    await writeFile(plan.files.repaired_strip, result.generation.repaired_strip_png)
-  }
-  if (result.apply_result) {
-    await mkdir(plan.files.item_output_dir, { recursive: true })
-    await writeFile(plan.files.repaired_normalized_sheet, result.apply_result.repaired_normalized_sheet_png)
-    for (const [fileName, buffer] of Object.entries(result.apply_result.row_gif_buffers ?? {})) {
-      await writeFile(path.join(plan.files.item_output_dir, fileName), buffer)
-    }
-    await writeFile(plan.files.validation_report, JSON.stringify(serializeQualityClosureProviderRepairApplyResult(result.apply_result), null, 2))
-    await writeFile(plan.files.markdown_report, result.apply_result.markdown)
-  }
-  await writeFile(plan.files.summary, JSON.stringify(serializeQualityClosureProviderRepairLoopResult(result), null, 2))
-}
-
-function repairArtifactUrls(plan, result = null) {
-  return {
-    repair_plan_url: generatedUrlForFile(plan.files.plan),
-    repair_prompt_url: generatedUrlForFile(plan.files.prompt),
-    repair_motion_template_reference_url: plan.motion_template?.enabled ? generatedUrlForFile(plan.files.motion_template_reference) : null,
-    repair_normalized_sheet_reference_url: generatedUrlForFile(plan.files.normalized_sheet_reference),
-    repair_target_animation_reference_url: generatedUrlForFile(plan.files.target_animation_reference),
-    repair_summary_url: result ? generatedUrlForFile(plan.files.summary) : null,
-    raw_provider_repair_output_url: result?.generation ? generatedUrlForFile(plan.files.raw_provider_output) : null,
-    repaired_animation_strip_url: result?.generation ? generatedUrlForFile(plan.files.repaired_strip) : null,
-    repaired_normalized_sheet_url: result?.apply_result ? generatedUrlForFile(plan.files.repaired_normalized_sheet) : null,
-    repair_validation_report_url: result?.apply_result ? generatedUrlForFile(plan.files.validation_report) : null,
-    repair_markdown_report_url: result?.apply_result ? generatedUrlForFile(plan.files.markdown_report) : null,
-  }
-}
-
 async function writeFixedRegionSourceRepairReferenceFiles(plan, referenceImages = []) {
   const fileByName = new Map([
-    ['motion_template_reference.png', plan.files.motion_template_reference],
-    ['source_sheet_reference.png', plan.files.source_sheet_reference],
-    ['normalized_sheet_reference.png', plan.files.normalized_sheet_reference],
+    ['identity_anchor_atlas.png', plan.files.identity_anchor_atlas],
+    ['pose_guide_atlas.png', plan.files.pose_guide_atlas],
+    ['empty_output_atlas.png', plan.files.empty_output_atlas],
   ])
   for (const image of referenceImages) {
     const file = fileByName.get(image.name)
@@ -840,18 +867,61 @@ async function writeFixedRegionSourceRepairReferenceFiles(plan, referenceImages 
   }
 }
 
-async function writeFixedRegionSourceRepairPlanArtifacts(plan, referenceImages = []) {
+async function writeFixedRegionSourceRepairPlanArtifacts(plan, referenceImages = [], reviewContract = null) {
   await mkdir(plan.output_dir, { recursive: true })
   await writeFile(plan.files.plan, JSON.stringify(serializeFixedRegionSourceRepairPlan(plan), null, 2))
   await writeFile(plan.files.prompt, plan.selected.prompt)
   await writeFixedRegionSourceRepairReferenceFiles(plan, referenceImages)
+  if (reviewContract) {
+    await writeFile(plan.files.review_contract, JSON.stringify(reviewContract, null, 2))
+  }
+}
+
+async function writeFixedRegionSourceRepairProviderCandidateArtifacts(plan, { generation, referenceImages = [] } = {}) {
+  if (!generation?.raw_provider_png) throw new Error('action-repair provider candidate is required')
+  await writeFixedRegionSourceRepairPlanArtifacts(plan, referenceImages)
+  await writeFile(plan.files.raw_provider_output, generation.raw_provider_png)
 }
 
 async function writeFixedRegionSourceRepairLoopArtifacts(plan, result) {
-  await writeFixedRegionSourceRepairPlanArtifacts(plan, result.reference_images ?? [])
   if (result.generation) {
-    await writeFile(plan.files.raw_provider_output, result.generation.raw_provider_png)
-    await writeFile(plan.files.normalized_provider_sheet, result.generation.normalized_provider_source_sheet_png)
+    await writeFixedRegionSourceRepairProviderCandidateArtifacts(plan, {
+      generation: result.generation,
+      referenceImages: result.reference_images ?? [],
+    })
+    if (result.generation.normalized_provider_source_sheet_png) {
+      await writeFile(plan.files.normalized_provider_sheet, result.generation.normalized_provider_source_sheet_png)
+    }
+    if (result.generation.background_removed_provider_atlas_png) {
+      await writeFile(plan.files.background_removed_provider_atlas, result.generation.background_removed_provider_atlas_png)
+    }
+    if (result.generation.atlas_extraction_report) {
+      await writeFile(plan.files.atlas_extraction_report, JSON.stringify(result.generation.atlas_extraction_report, null, 2))
+    }
+    const extractedFrames = Object.entries(result.generation.extracted_frames ?? {})
+    if (extractedFrames.length) {
+      await mkdir(plan.files.extracted_frames_dir, { recursive: true })
+      for (const [regionKey, buffer] of extractedFrames) {
+        await writeFile(path.join(plan.files.extracted_frames_dir, `${regionKey}.png`), buffer)
+      }
+    }
+  } else await writeFixedRegionSourceRepairPlanArtifacts(plan, result.reference_images ?? [])
+  if (result.review_candidate) {
+    await writeFile(plan.files.review_candidate_source_sheet, result.review_candidate.source_sheet_png)
+  }
+  if (result.candidate_validation) {
+    await writeFile(plan.files.candidate_validation_report, JSON.stringify(result.candidate_validation, null, 2))
+  }
+  if (result.scope_validation) {
+    await writeFile(plan.files.source_scope_report, JSON.stringify(result.scope_validation, null, 2))
+  }
+  if (result.quality_gate) {
+    await writeFile(plan.files.equipment_quality_report, JSON.stringify(result.quality_gate.report, null, 2))
+    await writeFile(plan.files.equipment_quality_overlay, result.quality_gate.overlay_png)
+    if (result.quality_gate.separated) {
+      await writeFile(plan.files.equipment_body_candidate, result.quality_gate.separated.body_candidate_png)
+      await writeFile(plan.files.equipment_layer, result.quality_gate.separated.equipment_layer_png)
+    }
   }
   if (result.apply_result) await writeFile(plan.files.repaired_source_sheet, result.apply_result.repaired_source_sheet_png)
   await writeFile(plan.files.summary, JSON.stringify(serializeFixedRegionSourceRepairLoopResult(result), null, 2))
@@ -860,149 +930,282 @@ async function writeFixedRegionSourceRepairLoopArtifacts(plan, result) {
 function fixedRegionSourceRepairArtifactUrls(plan, result = null) {
   return {
     repair_plan_url: generatedUrlForFile(plan.files.plan),
+    action_repair_review_contract_url: generatedUrlForFile(plan.files.review_contract),
+    action_repair_acceptance_manifest_url: result?.acceptance_manifest
+      ? generatedUrlForFile(plan.files.acceptance_manifest)
+      : null,
     repair_prompt_url: generatedUrlForFile(plan.files.prompt),
-    repair_motion_template_reference_url: plan.motion_template?.enabled ? generatedUrlForFile(plan.files.motion_template_reference) : null,
-    repair_source_sheet_reference_url: generatedUrlForFile(plan.files.source_sheet_reference),
-    repair_normalized_sheet_reference_url: generatedUrlForFile(plan.files.normalized_sheet_reference),
+    repair_identity_anchor_atlas_url: generatedUrlForFile(plan.files.identity_anchor_atlas),
+    repair_pose_guide_atlas_url: generatedUrlForFile(plan.files.pose_guide_atlas),
+    repair_empty_output_atlas_url: generatedUrlForFile(plan.files.empty_output_atlas),
+    repair_motion_template_reference_url: null,
+    repair_source_sheet_reference_url: null,
+    repair_normalized_sheet_reference_url: null,
     repair_summary_url: result ? generatedUrlForFile(plan.files.summary) : null,
     raw_provider_repair_output_url: result?.generation ? generatedUrlForFile(plan.files.raw_provider_output) : null,
-    normalized_provider_source_sheet_url: result?.generation ? generatedUrlForFile(plan.files.normalized_provider_sheet) : null,
+    normalized_provider_source_sheet_url: result?.generation?.normalized_provider_source_sheet_png
+      ? generatedUrlForFile(plan.files.normalized_provider_sheet)
+      : null,
+    background_removed_provider_atlas_url: result?.generation?.background_removed_provider_atlas_png
+      ? generatedUrlForFile(plan.files.background_removed_provider_atlas)
+      : null,
+    atlas_extraction_report_url: result?.generation?.atlas_extraction_report
+      ? generatedUrlForFile(plan.files.atlas_extraction_report)
+      : null,
     repaired_source_sheet_url: result?.apply_result ? generatedUrlForFile(plan.files.repaired_source_sheet) : null,
+    review_candidate_source_sheet_url: result?.review_candidate
+      ? generatedUrlForFile(plan.files.review_candidate_source_sheet)
+      : null,
+    candidate_validation_report_url: result?.candidate_validation
+      ? generatedUrlForFile(plan.files.candidate_validation_report)
+      : null,
+    source_scope_report_url: result?.scope_validation
+      ? generatedUrlForFile(plan.files.source_scope_report)
+      : null,
+    equipment_quality_report_url: result?.quality_gate ? generatedUrlForFile(plan.files.equipment_quality_report) : null,
+    equipment_quality_overlay_url: result?.quality_gate ? generatedUrlForFile(plan.files.equipment_quality_overlay) : null,
+    equipment_body_candidate_url: result?.quality_gate?.separated
+      ? generatedUrlForFile(plan.files.equipment_body_candidate)
+      : null,
+    equipment_layer_url: result?.quality_gate?.separated
+      ? generatedUrlForFile(plan.files.equipment_layer)
+      : null,
+  }
+}
+
+async function buildFixedRegionActionRepairReview({ body, reviewId, fixedContext }) {
+  const { plan } = fixedContext
+  const identity = fixedRegionActionRepairIdentityFromBody(body, fixedContext.sourceJobId)
+  const [sourceSheetBuffer, normalizedSheetBuffer, motionTemplate] = await Promise.all([
+    readFile(plan.preflight.source_sheet),
+    readFile(plan.preflight.normalized_sheet),
+    motionTemplateForRepairPlan(plan),
+  ])
+  if (!motionTemplate?.buffer) throw new Error('action repair motion template is unavailable')
+  const referenceBundle = await buildFixedRegionSourceRepairReferenceBundle({
+    sourceSheetBuffer,
+    normalizedSheetBuffer,
+    motionTemplateBuffer: motionTemplate.buffer,
+    normalizedFrameMappings: repairNormalizedFrameMappings(fixedContext.debugReport),
+    actions: plan.actions,
+    regionKeys: plan.region_keys,
+    sourceLayoutId: plan.source_layout,
+  })
+  const reviewContract = buildFixedRegionActionRepairReviewContract({
+    reviewId,
+    identity,
+    plan,
+    sourceSheetBuffer,
+    normalizedSheetBuffer,
+    motionTemplateBuffer: motionTemplate.buffer,
+    referenceBundle,
+  })
+  return {
+    identity,
+    sourceSheetBuffer,
+    normalizedSheetBuffer,
+    motionTemplateBuffer: motionTemplate.buffer,
+    referenceBundle,
+    reviewContract,
+  }
+}
+
+async function readReviewedFixedRegionActionRepairReferences(reviewDir, reviewContract) {
+  const referenceImages = []
+  for (let index = 0; index < FIXED_REGION_ACTION_REPAIR_REFERENCE_FILES.length; index += 1) {
+    const expected = FIXED_REGION_ACTION_REPAIR_REFERENCE_FILES[index]
+    const recorded = reviewContract.references.items[index]
+    const buffer = await readFile(path.join(reviewDir, expected.name))
+    if (buffer.byteLength !== recorded.byte_length || sha256ActionRepairBytes(buffer) !== recorded.sha256) {
+      throw new Error('reviewed action repair reference changed after planning')
+    }
+    referenceImages.push({ ...expected, mimeType: 'image/png', buffer })
+  }
+  return referenceImages
+}
+
+async function verifyFixedRegionActionRepairReview({ body, fixedContext }) {
+  const binding = fixedRegionActionRepairReviewBindingFromBody(body)
+  const reviewDir = safeGeneratedJobDir(binding.reviewId)
+  const storedReview = assertFixedRegionActionRepairReviewContract(
+    JSON.parse(await readFile(path.join(reviewDir, FIXED_REGION_ACTION_REPAIR_REVIEW_FILE), 'utf8')),
+  )
+  if (storedReview.review_id !== binding.reviewId || storedReview.plan_hash !== binding.expectedPlanHash ||
+      storedReview.references.manifest_sha256 !== binding.expectedReferenceManifestSha256) {
+    throw new Error('action repair review binding is stale')
+  }
+  const current = await buildFixedRegionActionRepairReview({
+    body,
+    reviewId: binding.reviewId,
+    fixedContext,
+  })
+  if (current.reviewContract.plan_hash !== storedReview.plan_hash ||
+      current.reviewContract.references.manifest_sha256 !== storedReview.references.manifest_sha256 ||
+      hashActionRepairValue(current.reviewContract) !== hashActionRepairValue(storedReview)) {
+    throw new Error('action repair inputs changed after planning')
+  }
+  const referenceImages = await readReviewedFixedRegionActionRepairReferences(reviewDir, storedReview)
+  for (let index = 0; index < referenceImages.length; index += 1) {
+    if (sha256ActionRepairBytes(referenceImages[index].buffer) !==
+        current.reviewContract.references.items[index].sha256) {
+      throw new Error('action repair reviewed references no longer match current authority')
+    }
+  }
+  return {
+    ...current,
+    reviewContract: storedReview,
+    referenceBundle: {
+      reference_images: referenceImages,
+      evidence: storedReview.atlas_evidence,
+    },
+  }
+}
+
+function fixedRegionActionRepairEvidenceFileNames(plan) {
+  const names = [
+    plan.files.plan,
+    plan.files.review_contract,
+    plan.files.summary,
+    plan.files.prompt,
+    plan.files.identity_anchor_atlas,
+    plan.files.pose_guide_atlas,
+    plan.files.empty_output_atlas,
+    plan.files.raw_provider_output,
+    plan.files.background_removed_provider_atlas,
+    plan.files.atlas_extraction_report,
+    plan.files.normalized_provider_sheet,
+    plan.files.repaired_source_sheet,
+    plan.files.review_candidate_source_sheet,
+    plan.files.candidate_validation_report,
+    plan.files.source_scope_report,
+    plan.files.equipment_quality_report,
+    plan.files.equipment_quality_overlay,
+    plan.files.equipment_body_candidate,
+    plan.files.equipment_layer,
+    ...plan.region_keys.map((key) => path.join(plan.files.extracted_frames_dir, `${key}.png`)),
+  ]
+  return names.map((filePath) => path.relative(plan.output_dir, filePath).split(path.sep).join('/'))
+}
+
+async function writeFixedRegionActionRepairAcceptanceManifest({ jobId, plan, reviewContract, result, processed }) {
+  const packManifest = buildCharacterPackArtifactManifest(jobId, processed)
+  const names = [...new Set([
+    ...packManifest.files.map((entry) => entry.name),
+    ...fixedRegionActionRepairEvidenceFileNames(plan),
+  ])]
+  const artifactEntries = []
+  for (const fileName of names) {
+    const filePath = path.join(plan.output_dir, fileName)
+    if (!existsSync(filePath)) continue
+    artifactEntries.push({
+      key: fixedRegionActionRepairArtifactKey(fileName),
+      file_name: fileName,
+      content: await readFile(filePath),
+    })
+  }
+  const manifest = buildFixedRegionActionRepairAcceptanceManifest({
+    jobId,
+    reviewContract,
+    result,
+    artifactEntries,
+  })
+  const manifestBuffer = Buffer.from(JSON.stringify(manifest, null, 2), 'utf8')
+  await writeFile(plan.files.acceptance_manifest, manifestBuffer, { flag: 'wx' })
+  return {
+    manifest,
+    sha256: sha256ActionRepairBytes(manifestBuffer),
   }
 }
 
 async function buildFixedRegionSourceRepairPlanFromBody(body = {}, { outputDir }) {
   const context = await repairSourceContextFromBody(body)
   const actions = repairActionsFromBody(body)
-  if (!shouldUseFixedRegionSourceRepair(context.debugReport, actions)) {
-    throw new Error('fixed-region source repair requires fixed-region source actions')
-  }
-  const plan = finalizeFixedRegionSourceRepairPlan(buildFixedRegionSourceRepairPlan({
+  const regionKeys = repairRegionKeysFromBody(body)
+  const sourceLayoutId = assertActionRepairSource(context.debugReport, actions)
+  const repairSourceSheetPath = sourceLayoutId === TOPDOWN_RPG_SOURCE_LAYOUT_ID
+    ? context.normalizedSheetPath
+    : context.sourceSheetPath
+  const basePlan = finalizeFixedRegionSourceRepairPlan(buildFixedRegionSourceRepairPlan({
     sourceJobId: context.sourceJobId,
+    sourceLayoutId,
     actions,
+    regionKeys,
     outputDir,
     providerPresetId: repairProviderPresetIdFromBody(body),
     imageConfig: repairImageConfigFromBody(body),
     backgroundMode: body.backgroundMode ?? body.background_mode ?? body.options?.backgroundMode ?? 'auto',
-    motionTemplate: repairMotionTemplateFromBody(body),
-    sourceSheetPath: context.sourceSheetPath,
+    motionTemplate: repairMotionTemplateForSourceLayout(sourceLayoutId),
+    sourceSheetPath: repairSourceSheetPath,
     normalizedSheetPath: context.normalizedSheetPath,
+    equipmentPolicy: repairEquipmentPolicyFromBody(body),
+    instruction: repairInstructionFromBody(body),
   }))
-  return { ...context, plan }
-}
-
-async function buildCharacterActionRepairPlanFromBody(body = {}, { outputDir }) {
-  const sourceJobId = String(body.jobId ?? body.job_id ?? body.sourceJobId ?? body.source_job_id ?? '').trim()
-  if (!sourceJobId) throw new Error('jobId is required')
-  const sourceJob = getJob(sourceJobId)
-  if (!sourceJob) throw new Error(`unknown character job: ${sourceJobId}`)
-  const sourceDir = safeGeneratedJobDir(sourceJobId)
-  const debugReportPath = path.join(sourceDir, 'debug_report.json')
-  const normalizedSheetPath = path.join(sourceDir, 'normalized_sheet.png')
-  if (!existsSync(debugReportPath) || !existsSync(normalizedSheetPath)) {
-    throw new Error('source job is missing character pack artifacts; process or generate a character sheet first')
-  }
-  const requestedAction = repairActionFromBody(body)
-  const rawDebugReport = JSON.parse(await readFile(debugReportPath, 'utf8'))
-  const selection = resolveRepairSelection(requestedAction, rawDebugReport)
-  const debugReport = addSelectedAnimationRepairTask(rawDebugReport, selection)
-  const manifest = buildCharacterQualityClosureRepairManifestForDebugReport(debugReport, {
-    runId: sourceJobId,
-    itemId: sourceJobId,
-    artifactDir: sourceDir,
-    debugReportPath,
-    item: {
-      id: sourceJobId,
-      description: rawDebugReport.description ?? sourceJob.description ?? '',
+  const preset = resolveProviderPreset(currentProviderEnv(), basePlan.provider_preset_id || '')
+  const providerErrors = preset.available === true ? [] : ['selected provider preset is unavailable']
+  const plan = {
+    ...basePlan,
+    can_run: basePlan.can_run && providerErrors.length === 0,
+    preflight: {
+      ...basePlan.preflight,
+      can_run: basePlan.preflight.can_run && providerErrors.length === 0,
+      errors: [...basePlan.preflight.errors, ...providerErrors],
     },
-  })
-  const selectedTaskId =
-    body.taskId ??
-    body.task_id ??
-    manifest.tasks.find((task) => providerTaskMatchesAnimation(task, selection.requested_action))?.task_id ??
-    manifest.tasks.find((task) => providerTaskMatchesAnimation(task, selection.animation))?.task_id ??
-    null
-  const plan = buildQualityClosureProviderRepairLoopPlan({
-    manifest,
-    taskId: selectedTaskId,
-    outputDir,
-    providerPresetId: repairProviderPresetIdFromBody(body),
-    imageConfig: repairImageConfigFromBody(body),
-    backgroundMode: body.backgroundMode ?? body.background_mode ?? body.options?.backgroundMode ?? 'auto',
-    motionTemplate: repairMotionTemplateFromBody(body),
-  })
-  return { sourceJob, sourceDir, debugReport, manifest, plan }
+    provider: {
+      id: preset.id,
+      provider: preset.provider,
+      label: preset.label,
+      model: preset.model,
+      available: preset.available === true,
+      image_config: {
+        ...preset.imageConfig,
+        ...basePlan.image_config,
+      },
+    },
+  }
+  return { ...context, plan }
 }
 
 async function writeDryRunCharacterActionRepairPlan(body, res) {
   const runId = safeRunId(body.runId ?? body.run_id, `repair_plan_${Date.now().toString(36)}`)
-  const context = await repairSourceContextFromBody(body)
-  const actions = repairActionsFromBody(body)
-  if (shouldUseFixedRegionSourceRepair(context.debugReport, actions)) {
-    const { plan } = await buildFixedRegionSourceRepairPlanFromBody(body, { outputDir: safeGeneratedJobDir(runId) })
-    let referenceImages = []
-    if (plan.can_run) {
-      const motionTemplate = await motionTemplateForRepairPlan(plan)
-      referenceImages = await buildFixedRegionSourceRepairReferenceImages({
-        sourceSheetBuffer: await readFile(plan.preflight.source_sheet),
-        normalizedSheetBuffer: plan.preflight.normalized_sheet ? await readFile(plan.preflight.normalized_sheet) : null,
-        motionTemplateBuffer: motionTemplate?.buffer ?? null,
-      })
-    }
-    await writeFixedRegionSourceRepairPlanArtifacts(plan, referenceImages)
-    return sendJson(res, 200, {
-      mode: 'dry_run_plan',
-      repair_mode: 'fixed_region_source_patch',
-      status: plan.can_run ? 'done' : 'blocked',
-      run_id: plan.run_id,
-      can_run: plan.can_run,
-      preflight: plan.preflight,
-      estimated_provider_calls: plan.estimated_provider_calls,
-      selected_animation: plan.actions[0] ?? null,
-      selected_source_action: plan.actions[0] ?? null,
-      selected_source_actions: plan.actions,
-      selected_region_keys: plan.region_keys,
-      selected_frames: plan.region_keys,
-      source_action_layout: plan.source_layout,
-      provider_preset_id: plan.provider_preset_id,
-      image_config: plan.image_config,
-      actions: plan.actions,
-      ...fixedRegionSourceRepairArtifactUrls(plan),
-      claim_boundary: plan.claim_boundary,
-    })
-  }
-  const { plan } = await buildCharacterActionRepairPlanFromBody(body, { outputDir: safeGeneratedJobDir(runId) })
-  let referenceImages = []
+  const fixedContext = await buildFixedRegionSourceRepairPlanFromBody(body, { outputDir: safeGeneratedJobDir(runId) })
+  const { plan } = fixedContext
+  let review = null
   if (plan.can_run) {
-    const normalizedSheetBuffer = await readFile(plan.preflight.normalized_sheet)
-    const motionTemplate = await motionTemplateForRepairPlan(plan)
-    referenceImages = await buildQualityClosureProviderRepairReferenceImages({
-      task: plan.task,
-      normalizedSheetBuffer,
-      motionTemplateBuffer: motionTemplate?.buffer ?? null,
-      motionTemplateName: motionTemplate?.name ?? undefined,
-      motionTemplateLayout: motionTemplate?.layout ?? null,
-      sourceSheetBuffer: await sourceSheetBufferForRepairPlan(plan),
-    })
+    review = await buildFixedRegionActionRepairReview({ body, reviewId: runId, fixedContext })
   }
-  await writeRepairPlanArtifacts(plan, referenceImages)
+  await writeFixedRegionSourceRepairPlanArtifacts(
+    plan,
+    review?.referenceBundle.reference_images ?? [],
+    review?.reviewContract ?? null,
+  )
   return sendJson(res, 200, {
     mode: 'dry_run_plan',
+    repair_mode: 'action_repair_atlas',
     status: plan.can_run ? 'done' : 'blocked',
     run_id: plan.run_id,
+    review_id: review?.reviewContract.review_id ?? null,
+    plan_hash: review?.reviewContract.plan_hash ?? null,
+    reference_manifest_sha256: review?.reviewContract.references.manifest_sha256 ?? null,
+    identity: review?.reviewContract.identity ?? null,
     can_run: plan.can_run,
     preflight: plan.preflight,
     estimated_provider_calls: plan.estimated_provider_calls,
-    selected_task_id: plan.selected?.task_id ?? null,
-    selected_animation: publicSelectedRepairAction(plan),
-    selected_runtime_animation: plan.selected?.animation ?? null,
-    selected_source_action: plan.selected?.source_action ?? null,
-    selected_derived_frames: plan.selected?.derived_frames ?? [],
-    selected_frames: plan.selected?.frames ?? [],
-    source_action_layout: plan.selected?.source_layout ?? null,
+    selected_animation: plan.actions[0] ?? null,
+    selected_source_action: plan.actions[0] ?? null,
+    selected_source_actions: plan.actions,
+    selected_region_keys: plan.region_keys,
+    selected_frames: plan.region_keys,
+    source_action_layout: plan.source_layout,
     provider_preset_id: plan.provider_preset_id,
+    provider: plan.provider,
+    model: plan.provider.model,
     image_config: plan.image_config,
-    ...repairArtifactUrls(plan),
+    equipment_policy: plan.equipment_policy,
+    instruction: plan.instruction,
+    atlas: plan.atlas,
+    reference_policy: plan.reference_policy,
+    actions: plan.actions,
+    ...fixedRegionSourceRepairArtifactUrls(plan),
     claim_boundary: plan.claim_boundary,
   })
 }
@@ -1037,49 +1240,132 @@ async function handleRepairCharacterAction(req, res) {
     })
   }
   try {
-    const context = await repairSourceContextFromBody(body)
-    const actions = repairActionsFromBody(body)
-    if (shouldUseFixedRegionSourceRepair(context.debugReport, actions)) {
-      const job = createJob({ status: JOB_STATUS.QUEUED, type: 'fixed_region_source_provider_repair' })
-      let plan
-      let providerCallBudget
-      try {
-        ;({ plan } = await buildFixedRegionSourceRepairPlanFromBody(body, { outputDir: safeGeneratedJobDir(job.id) }))
-        if (!plan.can_run) throw new Error(`fixed-region source repair preflight failed: ${plan.preflight.errors.join('; ')}`)
-        providerCallBudget = providerCallBudgetFromBody(body, { plannedProviderCalls: plan.estimated_provider_calls })
-        updateJob(job.id, {
-          selected_animation: plan.actions[0] ?? null,
-          selected_source_action: plan.actions[0] ?? null,
-          selected_source_actions: plan.actions,
-          selected_region_keys: plan.region_keys,
-          selected_frames: plan.region_keys,
-          source_action_layout: plan.source_layout,
-          estimated_provider_calls: plan.estimated_provider_calls,
-          provider_preset_id: plan.provider_preset_id,
-          provider_call_budget: publicProviderCallBudget(providerCallBudget),
-          repair_mode: 'fixed_region_source_patch',
-          actions: plan.actions,
-          ...fixedRegionSourceRepairArtifactUrls(plan),
-        })
-        jobQueue.enqueue(
+    const reviewBinding = fixedRegionActionRepairReviewBindingFromBody(body)
+    const reviewedPlanContext = await buildFixedRegionSourceRepairPlanFromBody(body, {
+      outputDir: safeGeneratedJobDir(reviewBinding.reviewId),
+    })
+    if (!reviewedPlanContext.plan.can_run) {
+      throw new Error(`action repair preflight failed: ${reviewedPlanContext.plan.preflight.errors.join('; ')}`)
+    }
+    const reviewedProviderCallBudget = providerCallBudgetFromBody(body, {
+      plannedProviderCalls: reviewedPlanContext.plan.estimated_provider_calls,
+    })
+    if (reviewedProviderCallBudget.max_provider_calls !== 1) {
+      throw new Error('action repair maxProviderCalls must be exactly 1')
+    }
+    const reviewed = await verifyFixedRegionActionRepairReview({
+      body,
+      fixedContext: reviewedPlanContext,
+    })
+    const job = createJob({ status: JOB_STATUS.QUEUED, type: 'fixed_region_source_provider_repair' })
+    let plan
+    let fixedContext
+    let providerCallBudget
+    try {
+      fixedContext = await buildFixedRegionSourceRepairPlanFromBody(body, { outputDir: safeGeneratedJobDir(job.id) })
+      plan = fixedContext.plan
+      if (!plan.can_run) throw new Error(`action repair preflight failed: ${plan.preflight.errors.join('; ')}`)
+      providerCallBudget = reviewedProviderCallBudget
+      await writeFixedRegionSourceRepairPlanArtifacts(
+        plan,
+        reviewed.referenceBundle.reference_images,
+        reviewed.reviewContract,
+      )
+      updateJob(job.id, {
+        project_id: reviewed.reviewContract.identity.project_id,
+        asset_id: reviewed.reviewContract.identity.asset_id,
+        parent_revision_id: reviewed.reviewContract.identity.parent_revision_id,
+        source_job_id: reviewed.reviewContract.identity.source_job_id,
+        action_repair_review_id: reviewed.reviewContract.review_id,
+        action_repair_plan_hash: reviewed.reviewContract.plan_hash,
+        action_repair_reference_manifest_sha256: reviewed.reviewContract.references.manifest_sha256,
+        selected_animation: plan.actions[0] ?? null,
+        selected_source_action: plan.actions[0] ?? null,
+        selected_source_actions: plan.actions,
+        selected_region_keys: plan.region_keys,
+        selected_frames: plan.region_keys,
+        source_action_layout: plan.source_layout,
+        estimated_provider_calls: plan.estimated_provider_calls,
+        provider_preset_id: plan.provider_preset_id,
+        provider: plan.provider.provider,
+        model: plan.provider.model,
+        provider_call_budget: publicProviderCallBudget(providerCallBudget),
+        repair_mode: 'action_repair_atlas',
+        equipment_policy: plan.equipment_policy,
+        instruction: plan.instruction,
+        accepted: false,
+        requires_user_confirmation: true,
+        actions: plan.actions,
+        ...fixedRegionSourceRepairArtifactUrls(plan),
+      })
+      jobQueue.enqueue(
           async () => {
             loadLocalEnv()
             updateJob(job.id, { status: JOB_STATUS.GENERATING })
-            const motionTemplate = await motionTemplateForRepairPlan(plan)
             const result = await runFixedRegionSourceRepairLoop({
               plan,
-              sourceSheetBuffer: await readFile(plan.preflight.source_sheet),
-              normalizedSheetBuffer: plan.preflight.normalized_sheet ? await readFile(plan.preflight.normalized_sheet) : null,
-              motionTemplateBuffer: motionTemplate?.buffer ?? null,
+              sourceSheetBuffer: reviewed.sourceSheetBuffer,
+              normalizedSheetBuffer: reviewed.normalizedSheetBuffer,
+              motionTemplateBuffer: reviewed.motionTemplateBuffer,
+              normalizedFrameMappings: repairNormalizedFrameMappings(
+                fixedContext.debugReport,
+                plan.source_layout,
+              ),
               env: currentProviderEnv(),
+              referenceBundle: reviewed.referenceBundle,
+              onProviderDispatch: () => {
+                providerCallBudget.providerBudget.used = 1
+                updateJob(job.id, {
+                  provider_call_budget: publicProviderCallBudget(providerCallBudget),
+                })
+              },
+              onProviderCandidate: ({ generation, referenceImages }) => (
+                writeFixedRegionSourceRepairProviderCandidateArtifacts(plan, { generation, referenceImages })
+              ),
             })
-            providerCallBudget.providerBudget.used = result.summary?.generated_count ?? 0
+            providerCallBudget.providerBudget.used = result.summary?.provider_calls_used ?? 0
             await writeFixedRegionSourceRepairLoopArtifacts(plan, result)
+            if (result.status === 'quality_blocked') {
+              updateJob(job.id, {
+                status: JOB_STATUS.FAILED_POST_PROCESSING,
+                repair_status: result.status,
+                quality_status: 'blocked',
+                reason: result.error?.code ?? 'equipment_quality_blocked',
+                retry_hint: 'manual_review_no_retry',
+                provider_call_budget: publicProviderCallBudget(providerCallBudget),
+                equipment_policy: plan.equipment_policy,
+                accepted: false,
+                requires_user_confirmation: true,
+                source_scope_status: result.scope_validation?.status ?? null,
+                outside_selected_changed_pixels: result.scope_validation?.outside_selected_changed_pixels ?? null,
+                source_action_layout: plan.source_layout,
+                ...fixedRegionSourceRepairArtifactUrls(plan, result),
+              })
+              return
+            }
+            if (result.status === 'failed_post_processing') {
+              updateJob(job.id, {
+                status: JOB_STATUS.FAILED_POST_PROCESSING,
+                repair_status: result.status,
+                quality_status: result.summary?.quality_status ?? 'unknown',
+                reason: result.error?.code ?? 'local_post_processing_failed',
+                retry_hint: result.error?.retry_hint ?? 'manual_review_no_retry',
+                provider_call_budget: publicProviderCallBudget(providerCallBudget),
+                equipment_policy: plan.equipment_policy,
+                accepted: false,
+                requires_user_confirmation: true,
+                source_scope_status: result.scope_validation?.status ?? null,
+                outside_selected_changed_pixels: result.scope_validation?.outside_selected_changed_pixels ?? null,
+                source_action_layout: plan.source_layout,
+                ...fixedRegionSourceRepairArtifactUrls(plan, result),
+              })
+              return
+            }
             if (!result.generation || !result.apply_result) {
               updateJob(job.id, {
                 status: JOB_STATUS.FAILED_MODEL_ERROR,
                 repair_status: result.status,
-                reason: result.error?.message ?? 'provider repair did not return an applicable fixed-region source sheet',
+                reason: result.error?.message ?? 'provider repair did not return an applicable action-repair source sheet',
                 retry_hint: result.error?.retry_hint ?? 'manual_inspect',
                 provider_call_budget: publicProviderCallBudget(providerCallBudget),
                 source_action_layout: plan.source_layout,
@@ -1090,10 +1376,10 @@ async function handleRepairCharacterAction(req, res) {
             updateJob(job.id, { status: JOB_STATUS.POST_PROCESSING })
             const processed = await processSheetBuffer(result.apply_result.repaired_source_sheet_png, {
               name: body.name ?? 'repaired_character',
-              description: body.description ?? 'fixed-region source provider repair result',
+              description: body.description ?? 'three-atlas action repair result',
               sourceType: 'provider_source_region_repair',
               sourceFileName: 'repaired_source_sheet.png',
-              sourceLayout: FIXED_REGION_MOTION_LAYOUT_ID,
+              sourceLayout: plan.source_layout,
               backgroundMode: 'passthrough',
               autoCorrect: false,
               motionStabilize: false,
@@ -1106,10 +1392,25 @@ async function handleRepairCharacterAction(req, res) {
               result: processed,
               allowExistingJobDir: true,
             })
+            let acceptance = null
+            if (written.status === JOB_STATUS.DONE) {
+              acceptance = await writeFixedRegionActionRepairAcceptanceManifest({
+                jobId: job.id,
+                plan,
+                reviewContract: reviewed.reviewContract,
+                result,
+                processed,
+              })
+            }
+            const resultWithAcceptance = acceptance
+              ? { ...result, acceptance_manifest: acceptance.manifest }
+              : result
             updateJob(job.id, {
               status: written.status,
               repair_status: result.status,
               repair_summary: result.summary,
+              quality_status: result.summary?.quality_status ?? null,
+              atlas_extraction_status: result.summary?.atlas_extraction_status ?? null,
               provider: result.generation.provider,
               provider_preset_id: result.generation.provider_preset_id,
               model: result.generation.model,
@@ -1120,124 +1421,34 @@ async function handleRepairCharacterAction(req, res) {
               selected_region_keys: plan.region_keys,
               selected_frames: plan.region_keys,
               source_action_layout: plan.source_layout,
-              repair_mode: 'fixed_region_source_patch',
+              equipment_policy: plan.equipment_policy,
+              accepted: false,
+              requires_user_confirmation: true,
+              source_scope_status: result.scope_validation?.status ?? null,
+              outside_selected_changed_pixels: result.scope_validation?.outside_selected_changed_pixels ?? null,
+              repair_mode: 'action_repair_atlas',
+              action_repair_manifest_sha256: acceptance?.sha256 ?? null,
               actions: plan.actions,
               ...written.urls,
-              ...fixedRegionSourceRepairArtifactUrls(plan, result),
+              ...fixedRegionSourceRepairArtifactUrls(plan, resultWithAcceptance),
               reason: written.reason,
               retry_hint: written.retry_hint,
               claim_boundary: result.claim_boundary,
             })
           },
           (error) => {
-            updateJob(job.id, generationFailurePatch(error, providerCallBudget))
+            updateJob(job.id, generationFailurePatch(error, providerCallBudget, {
+              jobStatus: getJob(job.id)?.status ?? null,
+            }))
           }
-        )
-      } catch (error) {
-        updateJob(job.id, { status: JOB_STATUS.FAILED_POST_PROCESSING, reason: String(error.message || error), retry_hint: 'manual_inspect' })
-      }
-      return sendJson(res, 202, getJob(job.id))
+      )
+    } catch (error) {
+      updateJob(job.id, { status: JOB_STATUS.FAILED_POST_PROCESSING, reason: String(error.message || error), retry_hint: 'manual_inspect' })
     }
+    return sendJson(res, 202, getJob(job.id))
   } catch (error) {
     return sendJson(res, 400, { error: 'repair_plan_failed', reason: String(error.message || error) })
   }
-  const job = createJob({ status: JOB_STATUS.QUEUED, type: 'character_action_provider_repair' })
-  let plan
-  let providerCallBudget
-  try {
-    ;({ plan } = await buildCharacterActionRepairPlanFromBody(body, { outputDir: safeGeneratedJobDir(job.id) }))
-    if (!plan.can_run) throw new Error(`character action repair preflight failed: ${plan.preflight.errors.join('; ')}`)
-    providerCallBudget = providerCallBudgetFromBody(body, { plannedProviderCalls: plan.estimated_provider_calls })
-    updateJob(job.id, {
-      selected_task_id: plan.selected?.task_id ?? null,
-      selected_animation: publicSelectedRepairAction(plan),
-      selected_runtime_animation: plan.selected?.animation ?? null,
-      selected_source_action: plan.selected?.source_action ?? null,
-      selected_derived_frames: plan.selected?.derived_frames ?? [],
-      selected_frames: plan.selected?.frames ?? [],
-      source_action_layout: plan.selected?.source_layout ?? null,
-      estimated_provider_calls: plan.estimated_provider_calls,
-      provider_preset_id: plan.provider_preset_id,
-      provider_call_budget: publicProviderCallBudget(providerCallBudget),
-      ...repairArtifactUrls(plan),
-    })
-    jobQueue.enqueue(
-      async () => {
-        loadLocalEnv()
-        updateJob(job.id, { status: JOB_STATUS.GENERATING })
-        const normalizedSheetBuffer = await readFile(plan.preflight.normalized_sheet)
-        const motionTemplate = await motionTemplateForRepairPlan(plan)
-        const result = await runQualityClosureProviderRepairLoop({
-          plan,
-          normalizedSheetBuffer,
-          motionTemplateBuffer: motionTemplate?.buffer ?? null,
-          motionTemplateName: motionTemplate?.name ?? undefined,
-          motionTemplateLayout: motionTemplate?.layout ?? null,
-          sourceSheetBuffer: await sourceSheetBufferForRepairPlan(plan),
-          env: currentProviderEnv(),
-        })
-        providerCallBudget.providerBudget.used = result.summary?.generated_count ?? 0
-        await writeRepairLoopArtifacts(plan, result)
-        if (!result.generation || !result.apply_result) {
-          updateJob(job.id, {
-            status: JOB_STATUS.FAILED_MODEL_ERROR,
-            repair_status: result.status,
-            reason: result.error?.message ?? 'provider repair did not return an applicable strip',
-            retry_hint: result.error?.retry_hint ?? 'manual_inspect',
-            provider_call_budget: publicProviderCallBudget(providerCallBudget),
-            source_action_layout: plan.selected?.source_layout ?? null,
-            ...repairArtifactUrls(plan, result),
-          })
-          return
-        }
-        updateJob(job.id, { status: JOB_STATUS.POST_PROCESSING })
-        const processed = await processSheetBuffer(result.apply_result.repaired_normalized_sheet_png, {
-          name: body.name ?? 'repaired_character',
-          description: body.description ?? 'single-action provider repair result',
-          sourceType: 'provider_repair',
-          sourceFileName: 'repaired_normalized_sheet.png',
-          sourceLayout: 'topdown_rpg_v0',
-          backgroundMode: 'passthrough',
-          autoCorrect: false,
-          motionStabilize: false,
-          componentCleanup: false,
-          styleReport: true,
-        })
-        const written = await writeCharacterPackArtifacts({
-          jobId: job.id,
-          outputDir: generatedDir,
-          result: processed,
-          allowExistingJobDir: true,
-        })
-        updateJob(job.id, {
-          status: written.status,
-          repair_status: result.status,
-          repair_summary: result.summary,
-          provider: result.generation.provider,
-          provider_preset_id: result.generation.provider_preset_id,
-          model: result.generation.model,
-          provider_call_budget: publicProviderCallBudget(providerCallBudget),
-          selected_animation: publicSelectedRepairAction(plan),
-          selected_runtime_animation: plan.selected?.animation ?? null,
-          selected_source_action: plan.selected?.source_action ?? null,
-          selected_derived_frames: plan.selected?.derived_frames ?? [],
-          selected_frames: plan.selected?.frames ?? [],
-          source_action_layout: plan.selected?.source_layout ?? null,
-          ...written.urls,
-          ...repairArtifactUrls(plan, result),
-          reason: written.reason,
-          retry_hint: written.retry_hint,
-          claim_boundary: result.claim_boundary,
-        })
-      },
-      (error) => {
-        updateJob(job.id, generationFailurePatch(error, providerCallBudget))
-      }
-    )
-  } catch (error) {
-    updateJob(job.id, { status: JOB_STATUS.FAILED_POST_PROCESSING, reason: String(error.message || error), retry_hint: 'manual_inspect' })
-  }
-  return sendJson(res, 202, getJob(job.id))
 }
 
 async function handleProviderConfig(req, res) {
@@ -2090,6 +2301,336 @@ function imageConfigFromBody(body = {}, { mode, characterPreset } = {}) {
       characterPreset,
       imageConfig: { aspect_ratio: aspectInput },
     }),
+  }
+}
+
+function generationProfileIdFromBody(body = {}) {
+  return String(body.generationProfileId ?? body.generation_profile_id ?? '').trim()
+}
+
+function backgroundModeFromGenerationBody(body = {}) {
+  return body.options?.backgroundMode ?? body.backgroundMode ?? body.background_mode
+}
+
+function providerPresetIdFromGenerationBody(body = {}) {
+  return String(body.providerPresetId ?? body.provider_preset_id ?? body.provider_preset ?? '').trim()
+}
+
+function maxProviderCallsFromBody(body = {}) {
+  return body.maxProviderCalls ?? body.max_provider_calls ?? body.providerBudget?.max ??
+    body.provider_budget?.max ?? body.options?.maxProviderCalls ?? body.options?.max_provider_calls
+}
+
+function hasGenerationOptionOverrides(body = {}) {
+  const options = body.options ?? {}
+  return Boolean(
+    body.generationOptions || body.generation_options ||
+    body.candidateCount !== undefined || body.candidate_count !== undefined ||
+    body.seed !== undefined || body.temperature !== undefined || body.topP !== undefined ||
+    body.top_p !== undefined || body.topK !== undefined || body.top_k !== undefined ||
+    body.qualityTier !== undefined || body.quality_tier !== undefined ||
+    options.candidateCount !== undefined || options.candidate_count !== undefined ||
+    options.seed !== undefined || options.temperature !== undefined ||
+    options.topP !== undefined || options.top_p !== undefined ||
+    options.topK !== undefined || options.top_k !== undefined ||
+    options.qualityTier !== undefined
+  )
+}
+
+function generationImageConfigOverridesFromBody(body = {}) {
+  const input = body.imageConfig ?? body.image_config ?? {}
+  return {
+    ...input,
+    ...(body.imageSize !== undefined || body.image_size !== undefined
+      ? { image_size: body.imageSize ?? body.image_size }
+      : {}),
+    ...(body.aspectRatio !== undefined || body.aspect_ratio !== undefined
+      ? { aspect_ratio: body.aspectRatio ?? body.aspect_ratio }
+      : {}),
+  }
+}
+
+function hasPromptFieldOverrides(body = {}) {
+  const options = body.options ?? {}
+  return Boolean(
+    body.promptFields !== undefined || body.prompt_fields !== undefined ||
+    body.identity !== undefined || body.body !== undefined || body.outfit !== undefined ||
+    body.clothing !== undefined || body.colors !== undefined || body.palette !== undefined ||
+    body.equipment !== undefined || body.weapon !== undefined || body.style !== undefined ||
+    body.promptBackground !== undefined || body.prompt_background !== undefined ||
+    body.outputType !== undefined || body.output_type !== undefined ||
+    options.identity !== undefined || options.body !== undefined || options.outfit !== undefined ||
+    options.clothing !== undefined || options.colors !== undefined || options.palette !== undefined ||
+    options.equipment !== undefined || options.weapon !== undefined || options.style !== undefined ||
+    options.promptBackground !== undefined || options.outputType !== undefined
+  )
+}
+
+function assertGenerationReviewBinding(body = {}) {
+  const reviewId = String(body.reviewedRunId ?? body.reviewed_run_id ?? '').trim()
+  const expectedPlanHash = String(body.expectedPlanHash ?? body.expected_plan_hash ?? '').trim()
+  const expectedReferenceManifestSha256 = String(
+    body.expectedReferenceManifestSha256 ?? body.expected_reference_manifest_sha256 ?? '',
+  ).trim()
+  if (!/^[A-Za-z0-9._-]{1,120}$/.test(reviewId) || reviewId.includes('..')) {
+    throw new Error('reviewedRunId is required for full-sheet live generation')
+  }
+  if (!/^[a-f0-9]{64}$/.test(expectedPlanHash)) {
+    throw new Error('expectedPlanHash is required for full-sheet live generation')
+  }
+  if (!/^[a-f0-9]{64}$/.test(expectedReferenceManifestSha256)) {
+    throw new Error('expectedReferenceManifestSha256 is required for full-sheet live generation')
+  }
+  if (body.confirmLiveGeneration !== true && body.confirm_live_generation !== true) {
+    throw new Error('confirmLiveGeneration: true is required for full-sheet live generation')
+  }
+  if (Number(maxProviderCallsFromBody(body)) !== 1) {
+    throw new Error('maxProviderCalls: 1 is required for full-sheet live generation')
+  }
+  return { reviewId, expectedPlanHash, expectedReferenceManifestSha256 }
+}
+
+function generationReviewArtifactUrls(reviewDir, references) {
+  return {
+    generation_review_url: generatedUrlForFile(path.join(reviewDir, GENERATION_REVIEW_FILE)),
+    generation_request_manifest_url: generatedUrlForFile(path.join(reviewDir, GENERATION_REQUEST_MANIFEST_FILE)),
+    generation_reference_manifest_url: generatedUrlForFile(path.join(reviewDir, GENERATION_REFERENCE_MANIFEST_FILE)),
+    generation_prompt_url: generatedUrlForFile(path.join(reviewDir, GENERATION_PROMPT_FILE)),
+    reference_urls: references.map((image) => ({
+      name: image.name,
+      role: image.role,
+      url: generatedUrlForFile(path.join(reviewDir, image.name)),
+    })),
+  }
+}
+
+async function writeFullSheetGenerationReviewArtifacts(reviewDir, built) {
+  await mkdir(generatedDir, { recursive: true })
+  await mkdir(reviewDir)
+  await writeFile(path.join(reviewDir, GENERATION_REVIEW_FILE), JSON.stringify(built.review, null, 2), { flag: 'wx' })
+  await writeFile(path.join(reviewDir, GENERATION_REQUEST_MANIFEST_FILE), JSON.stringify(built.requestManifest, null, 2), { flag: 'wx' })
+  await writeFile(path.join(reviewDir, GENERATION_REFERENCE_MANIFEST_FILE), JSON.stringify(built.referenceManifest, null, 2), { flag: 'wx' })
+  await writeFile(path.join(reviewDir, GENERATION_PROMPT_FILE), built.promptText, { flag: 'wx' })
+  for (const image of built.references) {
+    await writeFile(path.join(reviewDir, image.name), image.buffer, { flag: 'wx' })
+  }
+}
+
+async function buildFullSheetGenerationReviewFromBody(body = {}, { reviewId } = {}) {
+  const profile = resolveFullSheetGenerationProfile(generationProfileIdFromBody(body), { required: true })
+  const generationOptions = generationOptionsFromBody(body)
+  const backgroundMode = backgroundModeFromGenerationBody(body)
+  const characterPreset = body.characterPreset ?? body.character_preset ?? body.options?.characterPreset
+  const modeInput = body.t2iMode ?? body.t2i_mode ?? body.mode
+  assertFullSheetGenerationProfileRequest(profile, {
+    preset: body.preset,
+    mode: modeInput,
+    imageConfig: generationImageConfigOverridesFromBody(body),
+    generationOptions,
+    maxProviderCalls: maxProviderCallsFromBody(body),
+    backgroundMode,
+  })
+  const providerPreset = resolveProviderPreset(currentProviderEnv(), providerPresetIdFromGenerationBody(body))
+  const templateImage = await loadAuthoritativeGenerationStructureImage(profile.source_layout, { rootDir: __dirname })
+  if (!templateImage) {
+    throw new Error(
+      `authoritative generation Structure is unavailable for ${profile.id}; placeholder or cross-layout substitution is forbidden`,
+    )
+  }
+  const identityInput = uploadedImageFromBody(body, 'reference', 'identity.png')
+  const paletteInput = uploadedImageFromBody(body, 'palette', 'palette.png')
+  const references = [
+    await buildStructureReferenceBoard(templateImage, { sourceLayoutId: profile.source_layout }),
+  ]
+  const identity = await buildIdentityReferenceBoard(identityInput)
+  if (identity) references.push(identity)
+  const palette = await buildPaletteReferenceBoard(paletteInput)
+  if (palette) references.push(palette)
+  return buildFullSheetGenerationReview({
+    reviewId,
+    profile,
+    providerPreset,
+    description: body.description ?? '',
+    promptFields: promptFieldsFromBody(body),
+    characterPreset,
+    backgroundMode,
+    generationOptions,
+    references,
+  })
+}
+
+async function handleGenerateCharacterReview(req, res) {
+  loadLocalEnv()
+  try {
+    const body = JSON.parse((await readBody(req)).toString('utf8'))
+    const reviewId = safeRunId(
+      body.runId ?? body.run_id,
+      `generation_review_${Date.now().toString(36)}_${randomUUID().slice(0, 8)}`,
+    )
+    const built = await buildFullSheetGenerationReviewFromBody(body, { reviewId })
+    const reviewDir = safeGeneratedJobDir(reviewId)
+    await writeFullSheetGenerationReviewArtifacts(reviewDir, built)
+    return sendJson(res, 200, {
+      mode: 'provider_free_generation_review',
+      status: 'done',
+      generation_profile_id: built.requestManifest.generation_profile.id,
+      review_id: reviewId,
+      reviewed_run_id: reviewId,
+      plan_hash: built.requestManifest.plan_hash,
+      reference_manifest_sha256: built.requestManifest.reference_manifest_sha256,
+      provider: built.requestManifest.provider,
+      model: built.requestManifest.provider.model,
+      image_config: built.requestManifest.image_config,
+      candidate_count: 1,
+      estimated_provider_calls: 1,
+      provider_calls_used: 0,
+      max_provider_calls: 1,
+      references: built.referenceManifest.items,
+      ...generationReviewArtifactUrls(reviewDir, built.references),
+    })
+  } catch (error) {
+    return sendJson(res, 400, {
+      error: 'generation_review_failed',
+      reason: String(error.message || error),
+      estimated_provider_calls: 0,
+      provider_calls_used: 0,
+    })
+  }
+}
+
+function assertOptionalReviewedOriginal(body, prefix, referenceItem) {
+  const image = uploadedImageFromBody(body, prefix, `${prefix}.png`)
+  if (!image) return
+  if (!referenceItem?.original_input || sha256GenerationBytes(image.buffer) !== referenceItem.original_input.sha256) {
+    throw new Error(`${prefix} image changed after generation Review`)
+  }
+}
+
+async function verifyFullSheetGenerationReview(body = {}, { providerEnv = currentProviderEnv() } = {}) {
+  const binding = assertGenerationReviewBinding(body)
+  const profileId = generationProfileIdFromBody(body)
+  const currentProfile = resolveFullSheetGenerationProfile(profileId, { required: true })
+  const reviewDir = safeGeneratedJobDir(binding.reviewId)
+  const [reviewValue, requestValue, referenceValue] = await Promise.all([
+    readFile(path.join(reviewDir, GENERATION_REVIEW_FILE), 'utf8'),
+    readFile(path.join(reviewDir, GENERATION_REQUEST_MANIFEST_FILE), 'utf8'),
+    readFile(path.join(reviewDir, GENERATION_REFERENCE_MANIFEST_FILE), 'utf8'),
+  ])
+  const review = assertFullSheetGenerationReview(JSON.parse(reviewValue))
+  const requestManifest = assertFullSheetGenerationRequestManifest(JSON.parse(requestValue))
+  const referenceManifest = assertFullSheetGenerationReferenceManifest(
+    JSON.parse(referenceValue),
+    requestManifest.reference_manifest_sha256,
+    currentProfile,
+  )
+  if (hashGenerationReviewValue(requestManifest.reference_order) !== hashGenerationReviewValue(
+    referenceManifest.items.map((item) => ({ name: item.name, role: item.role })),
+  )) {
+    throw new Error('generation reference order changed after Review')
+  }
+  if (review.review_id !== binding.reviewId || requestManifest.review_id !== binding.reviewId ||
+      review.plan_hash !== binding.expectedPlanHash || requestManifest.plan_hash !== binding.expectedPlanHash ||
+      review.reference_manifest_sha256 !== binding.expectedReferenceManifestSha256 ||
+      requestManifest.reference_manifest_sha256 !== binding.expectedReferenceManifestSha256) {
+    throw new Error('generation Review binding is stale')
+  }
+  if (profileId !== review.generation_profile_id || profileId !== requestManifest.generation_profile.id) {
+    throw new Error('generation Profile changed after Review')
+  }
+  if (hashGenerationReviewValue(currentProfile) !== hashGenerationReviewValue(requestManifest.generation_profile)) {
+    throw new Error('generation Profile definition changed after Review')
+  }
+  const authoritativeStructure = await loadAuthoritativeGenerationStructureImage(currentProfile.source_layout, {
+    rootDir: __dirname,
+  })
+  const reviewedStructure = referenceManifest.items.find((item) => item.role === 'structure')
+  if (!authoritativeStructure || reviewedStructure?.sha256 !== authoritativeStructure.expectedStructureSha256) {
+    throw new Error('reviewed generation Structure is not the current authoritative exact-outline reference')
+  }
+  assertFullSheetGenerationProfileRequest(currentProfile, {
+    preset: body.preset,
+    mode: body.t2iMode ?? body.t2i_mode ?? body.mode,
+    imageConfig: generationImageConfigOverridesFromBody(body),
+    generationOptions: generationOptionsFromBody(body),
+    maxProviderCalls: maxProviderCallsFromBody(body),
+    backgroundMode: backgroundModeFromGenerationBody(body),
+  })
+  const requestedPresetId = providerPresetIdFromGenerationBody(body)
+  if (requestedPresetId && requestedPresetId !== requestManifest.provider.preset_id) {
+    throw new Error('provider Preset changed after Review')
+  }
+  const providerPreset = resolveProviderPreset(providerEnv, requestManifest.provider.preset_id)
+  const currentProvider = {
+    preset_id: providerPreset.id,
+    provider: providerPreset.provider,
+    route_kind: providerPreset.routeKind,
+    model: providerPreset.model,
+    image_config: { ...providerPreset.imageConfig },
+    supports_system_instruction: providerPreset.supportsSystemInstruction === true,
+    supports_role_interleaving: providerPreset.supportsRoleInterleaving === true,
+    supports_image_size: providerPreset.supportsImageSize === true,
+    provider_endpoint_sha256: sha256GenerationBytes(Buffer.from(buildGeminiGenerateContentUrl(providerPreset), 'utf8')),
+  }
+  if (hashGenerationReviewValue(currentProvider) !== hashGenerationReviewValue(requestManifest.provider)) {
+    throw new Error('provider Preset or model changed after Review')
+  }
+  if (hasGenerationOptionOverrides(body) &&
+      hashGenerationReviewValue(generationOptionsFromBody(body)) !== hashGenerationReviewValue(requestManifest.generation_options)) {
+    throw new Error('generation options changed after Review')
+  }
+  if (body.description !== undefined && String(body.description) !== requestManifest.request_input.description) {
+    throw new Error('description changed after Review')
+  }
+  if (hasPromptFieldOverrides(body) &&
+      hashGenerationReviewValue(promptFieldsFromBody(body)) !== hashGenerationReviewValue(requestManifest.request_input.prompt_fields)) {
+    throw new Error('prompt fields changed after Review')
+  }
+  const suppliedCharacterPreset = body.characterPreset ?? body.character_preset ?? body.options?.characterPreset
+  if (suppliedCharacterPreset !== undefined && suppliedCharacterPreset !== requestManifest.request_input.character_preset) {
+    throw new Error('character Preset changed after Review')
+  }
+  const suppliedBackgroundMode = body.options?.backgroundMode ?? body.backgroundMode ?? body.background_mode
+  if (suppliedBackgroundMode !== undefined && suppliedBackgroundMode !== requestManifest.request_input.background_mode) {
+    throw new Error('background mode changed after Review')
+  }
+  assertOptionalReviewedOriginal(body, 'reference', referenceManifest.items.find((item) => item.role === 'identity'))
+  assertOptionalReviewedOriginal(body, 'palette', referenceManifest.items.find((item) => item.role === 'palette'))
+  const references = []
+  for (const item of referenceManifest.items) {
+    if (path.basename(item.name) !== item.name) throw new Error('generation reference file name is unsafe')
+    const buffer = await readFile(path.join(reviewDir, item.name))
+    if (buffer.byteLength !== item.byte_length || sha256GenerationBytes(buffer) !== item.sha256) {
+      throw new Error(`reviewed ${item.role} reference changed after Review`)
+    }
+    references.push({
+      name: item.name,
+      role: item.role,
+      mimeType: 'image/png',
+      buffer,
+    })
+  }
+  const promptBuffer = await readFile(path.join(reviewDir, GENERATION_PROMPT_FILE))
+  if (sha256GenerationBytes(promptBuffer) !== requestManifest.prompt_text_sha256) {
+    throw new Error('reviewed generation prompt changed after Review')
+  }
+  const byRole = Object.fromEntries(references.map((image) => [image.role, image]))
+  return {
+    profile: currentProfile,
+    providerPreset,
+    requestManifest,
+    referenceManifest,
+    references: byRole,
+    reviewedRequest: {
+      provider_preset_id: providerPreset.id,
+      model: providerPreset.model,
+      prompt_contract: requestManifest.prompt_contract,
+      prompt_sections: requestManifest.prompt_sections,
+      review_binding: {
+        reviewed_run_id: binding.reviewId,
+        plan_hash: binding.expectedPlanHash,
+        reference_manifest_sha256: binding.expectedReferenceManifestSha256,
+      },
+    },
   }
 }
 
@@ -2970,25 +3511,50 @@ async function handleGenerateCharacter(req, res) {
   const job = createJob({ status: JOB_STATUS.QUEUED })
   try {
     const body = JSON.parse((await readBody(req)).toString('utf8'))
+    const generationProfileId = generationProfileIdFromBody(body)
+    const generationProfile = generationProfileId
+      ? resolveFullSheetGenerationProfile(generationProfileId, { required: true })
+      : null
+    resolveBackgroundMode(backgroundModeFromGenerationBody(body) ?? 'auto', {
+      allowDeterministicV2:
+        generationProfile?.background_recipe_id ===
+        BACKGROUND_RECIPE_IDS.DETERMINISTIC_PIXEL_MATTE_V2,
+    })
+    const initialReviewedGeneration = generationProfileId
+      ? await verifyFullSheetGenerationReview(body)
+      : null
     let providerCallBudget = null
+    let prewrittenRawProviderOutputFileName = null
     jobQueue.enqueue(
       async () => {
         loadLocalEnv()
         updateJob(job.id, { status: JOB_STATUS.GENERATING })
-        const providerEnv = currentProviderEnv()
-        const preset = body.preset ?? DEFAULT_GENERATION_PRESET
-        const t2iMode = normalizeTextToImageMode(body.t2iMode ?? body.t2i_mode ?? body.mode)
-        const characterPreset = body.characterPreset ?? body.character_preset ?? body.options?.characterPreset
-        const promptFields = promptFieldsFromBody(body)
-        const backgroundMode = body.options?.backgroundMode ?? body.backgroundMode ?? body.background_mode ?? 'auto'
-        const imageConfig = imageConfigFromBody(body, { mode: t2iMode, characterPreset })
-        const generationOptions = generationOptionsFromBody(body)
+        const providerEnv = Object.freeze(currentProviderEnv())
+        const reviewedGeneration = initialReviewedGeneration
+          ? await verifyFullSheetGenerationReview(body, { providerEnv })
+          : null
+        const reviewedInput = reviewedGeneration?.requestManifest.request_input
+        const preset = reviewedGeneration?.profile.source_layout ?? body.preset ?? DEFAULT_GENERATION_PRESET
+        const t2iMode = reviewedGeneration?.profile.generation_mode ??
+          normalizeTextToImageMode(body.t2iMode ?? body.t2i_mode ?? body.mode)
+        const characterPreset = reviewedInput?.character_preset ??
+          body.characterPreset ?? body.character_preset ?? body.options?.characterPreset
+        const promptFields = reviewedInput?.prompt_fields ?? promptFieldsFromBody(body)
+        const backgroundMode = reviewedInput?.background_mode ??
+          body.options?.backgroundMode ?? body.backgroundMode ?? body.background_mode ?? 'auto'
+        const imageConfig = reviewedGeneration?.requestManifest.image_config ??
+          imageConfigFromBody(body, { mode: t2iMode, characterPreset })
+        const generationOptions = reviewedGeneration?.requestManifest.generation_options ??
+          generationOptionsFromBody(body)
         providerCallBudget = providerCallBudgetFromBody(body, {
           plannedProviderCalls: generationOptions.candidateCount,
         })
-        const templateImage = t2iMode === TEXT_TO_IMAGE_MODE_QUALITY_CHARACTER || body.disable_template ? null : await loadTemplateImage(preset, { rootDir: __dirname })
-        const referenceImage = uploadedImageFromBody(body, 'reference', 'reference.png')
-        const paletteImage = uploadedImageFromBody(body, 'palette', 'palette.png')
+        const templateImage = reviewedGeneration?.references.structure ??
+          (t2iMode === TEXT_TO_IMAGE_MODE_QUALITY_CHARACTER || body.disable_template
+            ? null
+            : await loadTemplateImage(preset, { rootDir: __dirname }))
+        const referenceImage = reviewedGeneration?.references.identity ?? uploadedImageFromBody(body, 'reference', 'reference.png')
+        const paletteImage = reviewedGeneration?.references.palette ?? uploadedImageFromBody(body, 'palette', 'palette.png')
         if (t2iMode === TEXT_TO_IMAGE_MODE_QUALITY_CHARACTER) {
           const result = await runQualityCharacterTextToImage({
             description: body.description,
@@ -3014,10 +3580,11 @@ async function handleGenerateCharacter(req, res) {
           return
         }
         const production = await runProductionSheetTextToImage({
-          description: body.description,
+          description: reviewedInput?.description ?? body.description,
           name: body.name ?? body.options?.name ?? 'generated_character',
           preset,
-          providerPresetId: body.providerPresetId ?? body.provider_preset_id ?? body.provider_preset,
+          providerPresetId: reviewedGeneration?.providerPreset.id ??
+            body.providerPresetId ?? body.provider_preset_id ?? body.provider_preset,
           imageConfig,
           generationOptions,
           promptFields,
@@ -3026,12 +3593,46 @@ async function handleGenerateCharacter(req, res) {
           templateImage,
           referenceImage,
           paletteImage,
+          reviewedRequest: reviewedGeneration?.reviewedRequest ?? null,
+          generationProfileId: reviewedGeneration?.profile.id ?? null,
           providerBudget: providerCallBudget.providerBudget,
-          processOptions: body.options ?? {},
+          processOptions: reviewedGeneration
+            ? {
+                subjectCountGate: true,
+                generationProfile: reviewedGeneration.profile,
+              }
+            : body.options ?? {},
+          onRawProviderOutput: reviewedGeneration
+            ? async ({ buffer, fileName, metadata, candidateIndex }) => {
+                if (candidateIndex !== 1 || !/^raw_provider_output\.(?:png|jpg|webp|gif|bin)$/.test(fileName)) {
+                  throw new Error('strict full-sheet raw Provider artifact contract changed')
+                }
+                const jobDir = safeGeneratedJobDir(job.id)
+                await mkdir(jobDir, { recursive: true })
+                const outputPath = path.join(jobDir, fileName)
+                await writeFile(outputPath, buffer, { flag: 'wx' })
+                prewrittenRawProviderOutputFileName = fileName
+                updateJob(job.id, {
+                  raw_provider_output_url: generatedUrlForFile(outputPath),
+                  raw_provider_output_sha256: metadata.sha256,
+                  raw_provider_output_mime_type: metadata.mime_type,
+                  raw_provider_output_byte_length: metadata.byte_length,
+                })
+              }
+            : null,
+          backgroundMatteV2ArtifactUrlPrefix: reviewedGeneration?.profile.background_recipe_id ===
+            BACKGROUND_RECIPE_IDS.DETERMINISTIC_PIXEL_MATTE_V2
+            ? `/generated/${job.id}`
+            : null,
           env: providerEnv,
         })
         updateJob(job.id, { status: JOB_STATUS.POST_PROCESSING })
-        await writeJobArtifacts(job, production.result)
+        await writeJobArtifacts(job, production.result, prewrittenRawProviderOutputFileName
+          ? {
+              allowExistingJobDir: true,
+              verifiedExistingFiles: [prewrittenRawProviderOutputFileName],
+            }
+          : {})
         updateJob(job.id, {
           provider_call_budget: publicProviderCallBudget(providerCallBudget),
           candidate_selection: production.candidateSelection,
@@ -3047,6 +3648,33 @@ async function handleGenerateCharacter(req, res) {
     updateJob(job.id, generationFailurePatch(error, null))
   }
   sendJson(res, 202, getJob(job.id))
+}
+
+async function handleAcceptGeneratedCharacter(req, res, sourceJobId) {
+  try {
+    const raw = await readBodyBounded(req, 32 * 1024)
+    let body
+    try {
+      body = JSON.parse(raw.toString('utf8'))
+    } catch {
+      throw Object.assign(new Error('manual acceptance request must be valid JSON'), {
+        code: 'invalid_acceptance_request',
+        http_status: 400,
+      })
+    }
+    const accepted = await acceptFullSheetGeneration({
+      sourceJobId,
+      request: body,
+      generatedDir,
+    })
+    return sendJson(res, 200, accepted)
+  } catch (error) {
+    return sendJson(res, Number(error?.http_status) || 400, {
+      error: error?.code ?? 'full_sheet_manual_acceptance_failed',
+      reason: String(error?.reason ?? error?.message ?? error),
+      provider_calls_used: 0,
+    })
+  }
 }
 
 async function handleProcessSceneTiles(req, res) {
@@ -3341,6 +3969,36 @@ async function handleTwoPointFiveDMaterialSourceBenchmark(req, res) {
     return sendJson(res, 400, { error: 'benchmark_plan_failed', reason: String(error.message || error) })
   }
 
+  const expectedProviderConfig = body.expectedProviderConfig ?? body.expected_provider_config
+  let sealedProviderEnv = null
+  if (expectedProviderConfig !== undefined) {
+    let expectedBinding
+    let currentBinding
+    try {
+      expectedBinding = twoPointFiveDMaterialSourceProviderBinding(expectedProviderConfig)
+      if (!expectedBinding.selected_available) throw new Error('expectedProviderConfig must seal an available Provider')
+      currentBinding = twoPointFiveDMaterialSourceProviderBinding(
+        publicTwoPointFiveDMaterialSourceProviderConfig(
+          twoPointFiveDMaterialSourceBenchmarkProviderPresetId(body),
+        ),
+      )
+    } catch (error) {
+      return sendJson(res, 400, {
+        error: 'benchmark_provider_binding_invalid',
+        reason: String(error.message || error),
+      })
+    }
+    if (!twoPointFiveDMaterialSourceProviderBindingMatches(expectedBinding, currentBinding)) {
+      return sendJson(res, 409, {
+        error: 'benchmark_provider_binding_stale',
+        reason: 'The selected Provider model or route changed after the zero-call plan was sealed',
+        expected_provider_config: expectedBinding,
+        current_provider_config: currentBinding,
+      })
+    }
+    sealedProviderEnv = currentProviderEnv()
+  }
+
   const job = createJob({ status: JOB_STATUS.QUEUED, type: 'two_point_five_d_material_source_benchmark' })
   try {
     plan = twoPointFiveDMaterialSourceBenchmarkPlanFromBody(body, { runId: safeRunId(body.runId ?? body.run_id, job.id) })
@@ -3363,7 +4021,7 @@ async function handleTwoPointFiveDMaterialSourceBenchmark(req, res) {
         const report = await runTwoPointFiveDMaterialSourceBenchmark({
           plan: planEvidence,
           providerBudget: providerCallBudget.providerBudget,
-          env: currentProviderEnv(),
+          env: sealedProviderEnv ?? currentProviderEnv(),
         })
         updateJob(job.id, {
           status: JOB_STATUS.DONE,
@@ -3421,18 +4079,30 @@ function containedPath(root, candidate) {
 
 async function serveStatic(req, res) {
   if (req.method !== 'GET') return sendJson(res, 404, { error: 'not_found' })
+  let requestUrl
   let pathname
   try {
-    pathname = decodeURIComponent(new URL(req.url, `http://127.0.0.1:${port}`).pathname)
+    requestUrl = new URL(req.url, `http://127.0.0.1:${port}`)
+    pathname = decodeURIComponent(requestUrl.pathname)
   } catch {
     return sendJson(res, 404, { error: 'not_found' })
   }
+  if (pathname === '/' || pathname === '/index.html') {
+    res.statusCode = 302
+    res.setHeader('location', '/src/ui/studio/studio.html#character')
+    res.setHeader('cache-control', 'no-store')
+    return res.end()
+  }
+  if (pathname === '/legacy' || pathname === '/legacy/' || pathname === '/legacy.html') {
+    const studioLocation = legacyStudioRedirectLocation(requestUrl.search)
+    res.statusCode = 302
+    res.setHeader('location', studioLocation)
+    res.setHeader('cache-control', 'no-store')
+    return res.end()
+  }
   let rootPath
   let relativePath
-  if (pathname === '/' || pathname === '/index.html') {
-    rootPath = __dirname
-    relativePath = 'index.html'
-  } else if (pathname === '/editor' || pathname === '/editor/' || pathname === '/editor.html') {
+  if (pathname === '/editor' || pathname === '/editor/' || pathname === '/editor.html') {
     rootPath = __dirname
     relativePath = 'editor.html'
   } else if (pathname.startsWith('/src/')) {
@@ -3471,55 +4141,58 @@ async function serveStatic(req, res) {
     .pipe(res)
 }
 
-const server = http.createServer(async (req, res) => {
-  const url = new URL(req.url, `http://localhost:${port}`)
-  if (url.pathname.startsWith('/api/editor/')) {
-    return handleEditorProjectApi(req, res, {
-      projectRoot: __dirname,
-      workspaceRoot: editorWorkspaceDir,
-      generatedDir: editorGeneratedDir,
-      reprocessGeneratedDir: generatedDir,
-      artifactAccessRegistry: editorArtifactAccessRegistry,
-      characterReprocessCoordinator,
-      reprocessService: characterReprocessService,
-      frameRepairCoordinator,
-      frameRepairQualityGateCoordinator,
-      frameRepairService,
-    })
-  }
-  if (req.method === 'GET' && url.pathname === '/api/gemini-state') {
+const apiRouteHandlers = {
+  editor: (req, res) => handleEditorProjectApi(req, res, {
+    projectRoot: __dirname,
+    workspaceRoot: editorWorkspaceDir,
+    generatedDir: editorGeneratedDir,
+    specializedGeneratedDir: generatedDir,
+    artifactAccessRegistry: editorArtifactAccessRegistry,
+    getGeneratedJob: getJob,
+    updateGeneratedJob: updateJob,
+  }),
+  job: (req, res, jobId) => sendJson(
+    res,
+    200,
+    getJob(jobId) ?? { status: 'not_found' },
+  ),
+  geminiState: (req, res) => {
     loadLocalEnv()
     return sendJson(res, 200, publicProviderState())
-  }
-  if (req.method === 'GET' && url.pathname === '/api/benchmark-gallery') return sendJson(res, 200, await buildBenchmarkGallery({ generatedDir }))
-  if (req.method === 'GET' && url.pathname === '/api/motion-source-tool-status') return handleMotionSourceToolStatus(req, res)
-  if (req.method === 'GET' && url.pathname.startsWith('/api/jobs/')) return sendJson(res, 200, getJob(url.pathname.split('/').pop()) ?? { status: 'not_found' })
-  if (req.method === 'POST' && url.pathname === '/api/provider-config') return handleProviderConfig(req, res)
-  if (req.method === 'POST' && url.pathname === '/api/motion-source/uploads') return handleMotionSourceUpload(req, res, url)
-  if (req.method === 'DELETE' && /^\/api\/motion-source\/upload-operations\/[^/]+$/.test(url.pathname)) {
-    return handleReleaseMotionSourceUploadOperation(req, res, url.pathname.split('/').pop())
-  }
-  if (req.method === 'DELETE' && /^\/api\/motion-source\/uploads\/[^/]+$/.test(url.pathname)) {
-    return handleReleaseMotionSourceUpload(req, res, url.pathname.split('/').pop())
-  }
-  if (req.method === 'POST' && /^\/api\/motion-source\/jobs\/[^/]+\/cancel$/.test(url.pathname)) {
-    return handleCancelMotionSourceJob(req, res, url.pathname.split('/').at(-2))
-  }
-  if (req.method === 'POST' && url.pathname === '/api/analyze-motion-source') return handleAnalyzeMotionSource(req, res)
-  if (req.method === 'POST' && url.pathname === '/api/preview-motion-frames') return handlePreviewMotionFrames(req, res)
-  if (req.method === 'POST' && url.pathname === '/api/build-motion-strip') return handleBuildMotionStrip(req, res)
-  if (req.method === 'POST' && url.pathname === '/api/apply-motion-strip') return handleApplyMotionStrip(req, res)
-  if (req.method === 'POST' && url.pathname === '/api/analyze-motion-source-set') return handleAnalyzeMotionSourceSet(req, res)
-  if (req.method === 'POST' && url.pathname === '/api/apply-motion-source-set') return handleApplyMotionSourceSet(req, res)
-  if (req.method === 'POST' && url.pathname === '/api/repair-character-action') return handleRepairCharacterAction(req, res)
-  if (req.method === 'POST' && url.pathname === '/api/process-sheet') return handleProcessSheet(req, res)
-  if (req.method === 'POST' && url.pathname === '/api/generate-character') return handleGenerateCharacter(req, res)
-  if (req.method === 'POST' && url.pathname === '/api/process-scene-tiles') return handleProcessSceneTiles(req, res)
-  if (req.method === 'POST' && url.pathname === '/api/generate-scene-tiles') return handleGenerateSceneTiles(req, res)
-  if (req.method === 'POST' && url.pathname === '/api/build-two-point-five-d-tileset') return handleBuildTwoPointFiveDTileset(req, res)
-  if (req.method === 'POST' && url.pathname === '/api/two-point-five-d-material-source-benchmark') return handleTwoPointFiveDMaterialSourceBenchmark(req, res)
-  if (req.method === 'POST' && url.pathname === '/api/project-pack') return handleProjectPack(req, res)
-  if (req.method === 'POST' && url.pathname === '/api/build-frame-gif') return handleBuildFrameGif(req, res)
+  },
+  benchmarkGallery: async (req, res) => sendJson(
+    res,
+    200,
+    await buildBenchmarkGallery({ generatedDir }),
+  ),
+  providerConfig: handleProviderConfig,
+  repairCharacterAction: handleRepairCharacterAction,
+  processSheet: handleProcessSheet,
+  generateCharacterReview: handleGenerateCharacterReview,
+  generateCharacter: handleGenerateCharacter,
+  acceptGeneratedCharacter: handleAcceptGeneratedCharacter,
+  buildFrameGif: handleBuildFrameGif,
+  motionSourceToolStatus: handleMotionSourceToolStatus,
+  motionSourceUpload: handleMotionSourceUpload,
+  releaseMotionSourceUploadOperation: handleReleaseMotionSourceUploadOperation,
+  releaseMotionSourceUpload: handleReleaseMotionSourceUpload,
+  cancelMotionSourceJob: handleCancelMotionSourceJob,
+  analyzeMotionSource: handleAnalyzeMotionSource,
+  previewMotionFrames: handlePreviewMotionFrames,
+  buildMotionStrip: handleBuildMotionStrip,
+  applyMotionStrip: handleApplyMotionStrip,
+  analyzeMotionSourceSet: handleAnalyzeMotionSourceSet,
+  applyMotionSourceSet: handleApplyMotionSourceSet,
+  processSceneTiles: handleProcessSceneTiles,
+  generateSceneTiles: handleGenerateSceneTiles,
+  buildTwoPointFiveDTileset: handleBuildTwoPointFiveDTileset,
+  twoPointFiveDMaterialSourceBenchmark: handleTwoPointFiveDMaterialSourceBenchmark,
+  projectPack: handleProjectPack,
+}
+
+const server = http.createServer(async (req, res) => {
+  const url = new URL(req.url, `http://localhost:${port}`)
+  if (await routeApi({ req, res, url, handlers: apiRouteHandlers })) return
   return serveStatic(req, res)
 })
 

@@ -158,7 +158,7 @@ test('runOpenRouterCharacterBenchmark passes the selected preset into post-proce
     outputDir: root,
     runId: 'openrouter_bench_source_layout_test',
     preset: LEGACY_OCAD_MOTION_LAYOUT_ID,
-    loadTemplate: async () => ({ name: 'fixed_region_motion_template_v1.png', buffer: Buffer.from('template') }),
+    loadTemplate: async () => ({ name: 'motion_template_ocad_primary.png', buffer: Buffer.from('template') }),
     generateSource: async () => ({
       buffer: Buffer.from('generated'),
       provider: 'openrouter',
@@ -173,7 +173,7 @@ test('runOpenRouterCharacterBenchmark passes the selected preset into post-proce
         validation_expectations: ['exact_fixed_region_layout'],
       },
       inputImages: { template: true, reference: false, palette: false },
-      templateName: 'fixed_region_motion_template_v1.png',
+      templateName: 'motion_template_ocad_primary.png',
       referenceName: null,
       paletteName: null,
     }),
@@ -214,7 +214,7 @@ test('runOpenRouterCharacterBenchmark defaults to the fixed-region motion genera
           validation_expectations: ['exact_fixed_region_layout'],
         },
         inputImages: { template: true, reference: false, palette: false },
-        templateName: 'fixed_region_motion_template_v1.png',
+        templateName: 'motion_template_ocad_primary.png',
         referenceName: null,
         paletteName: null,
       }

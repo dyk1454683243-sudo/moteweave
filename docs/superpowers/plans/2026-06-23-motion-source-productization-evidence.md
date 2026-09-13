@@ -1,6 +1,7 @@
 # Motion Source Productization Evidence Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** Execute this plan task-by-task under `AGENTS.md`.
+> Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Status:** Implemented on main. The original core/CLI evidence scope landed as
 `feat: add motion source set apply evidence`; the follow-up API/UI entry landed

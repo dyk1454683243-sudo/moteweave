@@ -4,12 +4,6 @@ import { readFile } from 'node:fs/promises'
 import JSZip from 'jszip'
 import sharp from 'sharp'
 
-import {
-  createEmptyFrameRepairQualityGateState,
-  getFrameRepairQualityGateUiModel,
-  reduceFrameRepairQualityGateState,
-} from '../src/ui/editor/frameRepairQualityGateState.js'
-
 function argValue(name, fallback) {
   const index = process.argv.indexOf(name)
   return index >= 0 ? process.argv[index + 1] || fallback : fallback
@@ -162,177 +156,88 @@ function motionSourceRequest(source, operationId, options = undefined) {
 
 const baseUrl = argValue('--base-url', 'http://localhost:4173').replace(/\/$/, '')
 
-function assertProviderUnavailableQualityGateState() {
-  // Keep this projection pure: the smoke must not create an isolated project or
-  // leave a non-reusable orphan merely to prove an unavailable provider gate.
-  const cases = [
-    ...Array.from({ length: 2 }, (_, index) => ({ caseId: `basic_${index}`, difficulty: 'basic' })),
-    ...Array.from({ length: 4 }, (_, index) => ({ caseId: `medium_${index}`, difficulty: 'medium' })),
-    ...Array.from({ length: 2 }, (_, index) => ({ caseId: `hard_${index}`, difficulty: 'hard' })),
-  ]
-  const actions = [
-    { type: 'ownership', confirmed: true },
-    { type: 'setup', setup: { projectId: 'quality_gate_smoke', setupManifestSha256: 'a'.repeat(64) } },
-    { type: 'cases', cases },
-    {
-      type: 'provider_preflight',
-      value: { available: false, providerPresetId: 'preset_unavailable', reason: 'provider_unavailable' },
-    },
-    { type: 'planned', plan: { session_plan_hash: 'b'.repeat(64) } },
-  ]
-  const state = actions.reduce(reduceFrameRepairQualityGateState, createEmptyFrameRepairQualityGateState())
-  const ui = getFrameRepairQualityGateUiModel(state)
-  const providerCalls = actions.filter((action) => action.type === 'generate').length
-  assertCondition(ui.startEnabled === false, 'Quality Gate Start must remain disabled when provider preflight is unavailable')
-  assertCondition(providerCalls === 0, 'provider-unavailable Quality Gate smoke must consume zero provider calls')
-}
-
 try {
-  assertProviderUnavailableQualityGateState()
-  const htmlResponse = await fetch(`${baseUrl}/`)
-  assertCondition(htmlResponse.ok, `homepage returned ${htmlResponse.status}`)
-  const html = await htmlResponse.text()
-  for (const expected of [
-    'data-tab="sprite"',
-    'data-tab="two-point-five-d"',
-    'data-tab="motion-source"',
-    'data-tab="character-pack"',
-    'data-tab="project-pack"',
-    'data-tab="qa"',
-    'id="language-select"',
-    'data-i18n="app.language"',
-    'id="download-gif"',
-    'id="sprite-gif-preview-card"',
-    'id="scene-preview-canvas"',
-    'id="scene-preview-tileset-file"',
-    'id="scene-preview-process"',
-    'id="scene-preview-pattern"',
-    'id="scene-preview-seed"',
-    'id="scene-preview-density"',
-    'id="scene-preview-style-snap"',
-    'id="scene-preview-style-max-colors"',
-    'id="scene-preview-edge-condition"',
-    'id="scene-preview-edge-band"',
-    'id="scene-preview-edge-condition-mode"',
-    'id="scene-preview-export-summary"',
-    'id="scene-preview-links"',
-    'id="two-point-five-d"',
-    'id="tileset-editor-canvas"',
-    'id="tileset-build"',
-    'id="tileset-material-source"',
-    'id="tileset-map-solver"',
-    'id="tileset-map-border"',
-    'id="tileset-operation-list"',
-    'id="tileset-export-links"',
-    'id="tileset-evidence-summary"',
-    'id="motion-source"',
-    'id="motion-source-tab"',
-    'id="motion-source-view-guided"',
-    'id="motion-source-view-advanced"',
-    'id="motion-source-guided-sidebar"',
-    'id="motion-source-advanced-sidebar"',
-    'id="motion-guide-action"',
-    'id="motion-guide-build"',
-    'id="motion-guide-apply"',
-    'id="motion-guide-future-semantic"',
-    'id="motion-guide-future-adaptive"',
-    'id="motion-source-file"',
-    'id="motion-source-file-meta"',
-    'id="motion-source-ffmpeg-status"',
-    'id="motion-source-manifest-file"',
-    'id="motion-source-set-strip-files"',
-    'id="motion-source-action"',
-    'id="motion-source-target-frames"',
-    'id="motion-source-stride"',
-    'id="motion-source-fps"',
-    'id="motion-source-start-sec"',
-    'id="motion-source-end-sec"',
-    'id="motion-source-max-frames"',
-    'id="motion-source-selection-mode"',
-    'id="motion-source-selection-recipe"',
-    'id="motion-source-loop-expectation"',
-    'id="motion-source-temporal-matte"',
-    'id="motion-source-restore-auto"',
-    'id="motion-source-background-method"',
-    'id="motion-source-key-color"',
-    'id="motion-source-tolerance"',
-    'id="motion-source-defringe"',
-    'id="motion-source-static-offset-y"',
-    'id="motion-source-resample-strategy"',
-    'id="motion-source-analyze"',
-    'id="motion-source-preview-frames"',
-    'id="motion-source-build-strip"',
-    'id="motion-source-apply-strip"',
-    'id="motion-source-analyze-set"',
-    'id="motion-source-apply-set"',
-    'id="motion-source-cancel"',
-    'id="motion-source-resume"',
-    'id="motion-source-status"',
-    'id="motion-source-report"',
-    'id="motion-source-frame-preview-sheet"',
-    'id="motion-source-contact-sheet"',
-    'id="motion-source-strip-preview"',
-    'id="motion-source-apply-preview"',
-    'id="motion-source-frame-picker"',
-    'id="motion-hud-source"',
-    'id="motion-hud-selection"',
-    'id="motion-hud-loop"',
-    'id="motion-hud-cleanup"',
-    'id="motion-hud-grid"',
-    'id="motion-hud-binding"',
-    'id="motion-source-links"',
-    'id="character-pack-links"',
-    'id="character-pack-source-layout"',
-    'id="character-pack-generation-layout"',
-    'id="character-pack-t2i-mode"',
-    'id="character-pack-character-preset"',
-    'id="character-pack-image-size"',
-    'value="2K" selected',
-    'id="character-pack-candidate-count"',
-    'value="1" selected',
-    'id="gemini-state"',
-    'id="character-pack-cleanup-min-alpha"',
-    'id="character-pack-component-cleanup"',
-    'id="character-pack-component-cleanup-min-area"',
-    'id="character-pack-component-cleanup-min-area-ratio"',
-    'id="character-pack-auto-correct"',
-    'id="character-pack-motion-stabilize"',
-    'id="character-pack-motion-max-shift"',
-    'id="character-pack-style-report"',
-    'id="character-pack-style-max-colors"',
-    'id="character-pack-pixel-finishing"',
-    'id="character-pack-pixel-outline"',
-    'id="character-pack-pixel-outline-mode"',
-    'id="character-pack-repair-status"',
-    'id="character-pack-repair-plan"',
-    'id="character-pack-repair-run"',
-    'data-i18n="character.export.fixedSizes"',
-    '96 · 64 · 48 · 32 · 16 px · Fixed',
+  const homeResponse = await fetch(`${baseUrl}/`, { redirect: 'manual' })
+  assertCondition(homeResponse.status === 302, `homepage promotion returned ${homeResponse.status}`)
+  const studioLocation = homeResponse.headers.get('location')
+  assertCondition(
+    studioLocation === '/src/ui/studio/studio.html#character',
+    `homepage promotion returned ${studioLocation}`,
+  )
+  const indexResponse = await fetch(`${baseUrl}/index.html`, { redirect: 'manual' })
+  assertCondition(indexResponse.status === 302, `index promotion returned ${indexResponse.status}`)
+  assertCondition(indexResponse.headers.get('location') === studioLocation, 'index promotion target changed')
 
-    'id="character-pack-provider-preset"',
-    'id="character-pack-palette-file"',
-    'id="character-pack-bg-tolerance"',
-    'id="character-pack-anchor-x"',
-    'id="character-pack-anchor-y"',
-    'id="character-pack-adjust-frame"',
-    'id="character-pack-frame-nudge-x"',
-    'id="character-pack-frame-nudge-y"',
-    'id="character-pack-locked-animations"',
-    'id="character-pack-adjustment-summary"',
-    'id="refresh-benchmark-gallery"',
-    'id="character-pack-benchmark-gallery"',
-    'data-i18n="character.asset.title"',
-    'data-i18n="character.action.processLocal"',
-    'data-i18n-placeholder="character.generation.seedPlaceholder"',
-    'id="project-pack"',
-    'id="project-pack-id"',
-    'id="project-pack-character-job"',
-    'id="project-pack-scene-job"',
-    'id="project-pack-build"',
-    'id="project-pack-links"',
-  ]) {
-    assertCondition(html.includes(expected), `missing UI marker: ${expected}`)
+  const studioResponse = await fetch(`${baseUrl}${studioLocation.split('#')[0]}`)
+  assertCondition(studioResponse.ok, `Studio returned ${studioResponse.status}`)
+  const studioHtml = await studioResponse.text()
+  for (const expected of [
+    'id="studio-character-view"',
+    'id="character-local-workspace"',
+    'id="character-ai-workspace"',
+    'id="character-compat-workspace"',
+    'id="character-local-entry"',
+    'id="character-ai-entry"',
+    'id="character-compat-entry"',
+    'href="#project"',
+  ]) assertCondition(studioHtml.includes(expected), `Studio is missing ${expected}`)
+
+  const legacyRedirectCases = [
+    ['/legacy', 'motion-source', '/src/ui/studio/studio.html#action', '&next=https%3A%2F%2Fexample.test'],
+    ['/legacy', 'sprite', '/src/ui/studio/studio.html#sequence', ''],
+    ['/legacy/', 'two-point-five-d', '/src/ui/studio/studio.html#tiles', ''],
+    ['/legacy.html', 'project-pack', '/src/ui/studio/studio.html#project', ''],
+    ['/legacy/', 'qa', '/src/ui/studio/studio.html#qa', '&open=ignored'],
+    ['/legacy.html', 'character-pack', '/src/ui/studio/studio.html#character', '&next=%2Flegacy'],
+    ['/legacy', 'prompts', '/src/ui/studio/studio.html?open=scene-prompt#scene', '&open=ignored&next=https%3A%2F%2Fexample.test'],
+  ]
+  for (const [legacyPath, tab, expectedLocation, extraSearch] of legacyRedirectCases) {
+    const response = await fetch(
+      `${baseUrl}${legacyPath}?tab=${encodeURIComponent(tab)}${extraSearch}`,
+      {
+        redirect: 'manual',
+      },
+    )
+    assertCondition(response.status === 302, `${tab} legacy redirect returned ${response.status}`)
+    assertCondition(
+      response.headers.get('location') === expectedLocation,
+      `${tab} legacy redirect target changed`,
+    )
   }
+  const legacyFallbackCases = [
+    ['/legacy', ''],
+    ['/legacy/', '?tab='],
+    ['/legacy.html', '?tab=unknown'],
+    ['/legacy', '?tab=prompts&tab=prompts'],
+    ['/legacy/', '?tab=qa&tab=motion-source'],
+    ['/legacy.html', '?tab=__proto__'],
+    ['/legacy', '?tab=%2F%2Fexample.test&next=https%3A%2F%2Fexample.test'],
+  ]
+  for (const [legacyPath, search] of legacyFallbackCases) {
+    const response = await fetch(`${baseUrl}${legacyPath}${search}`, { redirect: 'manual' })
+    assertCondition(response.status === 302, `${legacyPath}${search} fallback returned ${response.status}`)
+    assertCondition(
+      response.headers.get('location') === '/src/ui/studio/studio.html#character',
+      `${legacyPath}${search} fallback target changed`,
+    )
+  }
+  const tilesStudioResponse = await fetch(`${baseUrl}/src/ui/studio/studio.html`)
+  assertCondition(tilesStudioResponse.ok, `Studio shell returned ${tilesStudioResponse.status}`)
+  const tilesStudioHtml = await tilesStudioResponse.text()
+  for (const expected of [
+    'data-studio-view="tiles"',
+    'id="studio-tiles-view"',
+    'id="studio-tiles-editor-canvas"',
+    'id="studio-tiles-source-file"',
+    'id="studio-tiles-solver"',
+    'id="studio-tiles-border"',
+    'id="studio-tiles-clear-edits"',
+    'id="studio-tiles-result-preview"',
+    'id="studio-tiles-primary"',
+  ]) {
+    assertCondition(tilesStudioHtml.includes(expected), `missing Studio Tiles marker: ${expected}`)
+  }
+  assertCondition(!tilesStudioHtml.includes('tiles-legacy-link'), 'retired Tiles escape is still present in Studio')
 
   const editorResponse = await fetch(`${baseUrl}/editor`)
   assertCondition(editorResponse.ok, `editor shell returned ${editorResponse.status}`)
@@ -367,7 +272,6 @@ try {
   ]) {
     assertCondition(editorHtml.includes(expected), `missing editor marker: ${expected}`)
   }
-  assertCondition(htmlResponse.status === 200, 'homepage route failed')
   assertCondition(editorResponse.status === 200, 'editor route failed')
   assertCondition(editorHtml.includes('id="editor-panel-body"'), 'editor panel body marker is missing')
   assertCondition(editorHtml.includes('./src/editor-app.js'), 'editor app module marker is missing')
@@ -376,102 +280,42 @@ try {
   assertCondition(repairPanelResponse.ok, `repair panel module returned ${repairPanelResponse.status}`)
   const repairPanelSource = await repairPanelResponse.text()
   for (const marker of [
-    'editor-repair-workbench',
-    'dataset.repairMode',
-    'editor-repair-filmstrip-frames',
-    'editor-repair-recipe-trigger',
-    'editor-repair-frame-trigger',
-    'Repair Frame',
-    'Quality Gate',
-    'Build Preview',
-    'Accept as revision',
-    'AI Action Repair',
+    'editor-repair-action-only',
+    'editor-repair-action-filmstrip',
+    'dataset.batchRepairRegion',
+    'Three-atlas action repair',
+    'Identity anchor + pose guide + empty output atlas',
+    'renderAiAction',
   ]) {
     assertCondition(repairPanelSource.includes(marker), `repair panel marker is missing: ${marker}`)
   }
-
-  const frameRepairPanelResponse = await fetch(`${baseUrl}/src/ui/editor/frameRepairPanel.js`)
-  assertCondition(frameRepairPanelResponse.ok, `Frame Repair panel returned ${frameRepairPanelResponse.status}`)
-  const frameRepairPanelSource = await frameRepairPanelResponse.text()
-  for (const marker of ['Target & Mask', 'Review AI Call', 'Processing', 'Result & Validation']) {
-    assertCondition(frameRepairPanelSource.includes(marker), `Frame Repair stage marker is missing: ${marker}`)
+  for (const retiredMarker of ['Processing Recipe', 'Build Preview', 'Accept as revision']) {
+    assertCondition(!repairPanelSource.includes(retiredMarker), `retired local reprocess marker is still present: ${retiredMarker}`)
   }
-
-  const frameRepairControllerResponse = await fetch(`${baseUrl}/src/ui/editor/frameRepairController.js`)
-  assertCondition(frameRepairControllerResponse.ok, `Frame Repair controller returned ${frameRepairControllerResponse.status}`)
-  const frameRepairControllerSource = await frameRepairControllerResponse.text()
-  assertCondition(frameRepairControllerSource.includes('Generate one candidate'), 'Frame Repair one-candidate marker is missing')
 
   const editorApiModuleResponse = await fetch(`${baseUrl}/src/ui/editor/api.js`)
   assertCondition(editorApiModuleResponse.ok, `editor API module returned ${editorApiModuleResponse.status}`)
   const editorApiSource = await editorApiModuleResponse.text()
-  assertCondition(editorApiSource.includes('/reprocess'), 'reprocess API client marker is missing')
-  assertCondition(editorApiSource.includes('/frame-repair/plan'), 'Frame Repair Plan API marker is missing')
-  assertCondition(editorApiSource.includes('/frame-repair/operations/'), 'Frame Repair recovery API marker is missing')
-  assertCondition(editorApiSource.includes('/accept'), 'Frame Repair specialized Accept API marker is missing')
-  const qualityGateApiFunctions = [
-    'setupFrameRepairQualityGate',
-    'planFrameRepairQualityGate',
-    'startFrameRepairQualityGate',
-    'fetchFrameRepairQualityGate',
-    'recordFrameRepairQualityGateReview',
-    'recordFrameRepairQualityGateOutcome',
-    'finalizeFrameRepairQualityGate',
-  ]
-  for (const functionName of qualityGateApiFunctions) {
-    assertCondition(
-      editorApiSource.includes(`export function ${functionName}`),
-      `Quality Gate API client route is missing: ${functionName}`,
-    )
-  }
-  const qualityGateApiExports = [...editorApiSource.matchAll(/export function ([A-Za-z]*FrameRepairQualityGate[A-Za-z]*)\(/g)]
-    .map((match) => match[1])
-    .sort()
-  assertCondition(
-    JSON.stringify(qualityGateApiExports) === JSON.stringify([...qualityGateApiFunctions].sort()),
-    `expected the 7 exact Quality Gate API client routes, found ${qualityGateApiExports.join(', ')}`,
-  )
-  assertCondition(editorApiSource.includes('/frame-repair-quality-gates/setup'), 'Quality Gate Setup route marker is missing')
-  assertCondition(editorApiSource.includes('/frame-repair-quality-gates/plan'), 'Quality Gate Plan route marker is missing')
-  assertCondition(editorApiSource.includes('/cases/${encodeURIComponent(input.caseId)}/review'), 'Quality Gate Review route marker is missing')
-  assertCondition(editorApiSource.includes('/cases/${encodeURIComponent(input.caseId)}/outcome'), 'Quality Gate Outcome route marker is missing')
-  assertCondition(editorApiSource.includes('/finalize'), 'Quality Gate Finalize route marker is missing')
+  assertCondition(!editorApiSource.includes('/reprocess'), 'retired local reprocess API client is still present')
+  assertCondition(editorApiSource.includes('/api/repair-character-action'), 'three-atlas action repair API marker is missing')
 
-  const qualityGateModules = [
-    ['frameRepairQualityGatePanel.js', [
-      'export function createFrameRepairQualityGatePanel',
-      'editor-frame-repair-quality-gate',
-      'editor-quality-gate-canvas-slot',
-      'Desktop pixel inspection is required',
-    ]],
-    ['frameRepairQualityGateState.js', [
-      'export function createEmptyFrameRepairQualityGateState',
-      'export function getFrameRepairQualityGateUiModel',
-      'export function reduceFrameRepairQualityGateState',
-    ]],
-    ['frameRepairQualityGateController.js', [
-      'export function createFrameRepairQualityGateController',
-      'generateActiveCase',
-      'recoverPendingOutcome',
-    ]],
-    ['frameRepairQualityGateShell.js', [
-      'export function createFrameRepairQualityGateRuntime',
-      'attachQualityGate',
-      'isDesktopReviewAllowed',
-    ]],
-  ]
-  for (const [fileName, markers] of qualityGateModules) {
-    const response = await fetch(`${baseUrl}/src/ui/editor/${fileName}`)
-    assertCondition(response.ok, `Quality Gate module ${fileName} returned ${response.status}`)
-    const source = await response.text()
-    for (const marker of markers) {
-      assertCondition(source.includes(marker), `Quality Gate module marker is missing from ${fileName}: ${marker}`)
-    }
-    if (fileName === 'frameRepairQualityGateController.js') {
-      assertCondition(!source.includes('requestFrameRepairCandidate'), 'Quality Gate controller must not dispatch a provider directly')
-      assertCondition(!source.includes('.enqueue('), 'Quality Gate controller must not own a provider queue')
-      assertCondition(!source.includes('submitFrameRepair('), 'Quality Gate controller must not submit Frame Repair server work directly')
-    }
+  const retiredReprocessResponse = await fetch(`${baseUrl}/api/editor/projects/retired/assets/retired/reprocess`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: '{}',
+  })
+  assertCondition(retiredReprocessResponse.status === 404, `retired reprocess route returned ${retiredReprocessResponse.status}`)
+
+  const editorShellResponse = await fetch(`${baseUrl}/src/ui/editor/shell.js`)
+  assertCondition(editorShellResponse.ok, `editor shell module returned ${editorShellResponse.status}`)
+  const editorShellSource = await editorShellResponse.text()
+  assertCondition(editorShellSource.includes('createAiActionRepairWorkflow'), 'three-atlas action repair runtime is missing')
+  for (const retiredRuntime of [
+    'createFrameRepairController',
+    'createFrameRepairLifecycle',
+    'createFrameRepairQualityGateRuntime',
+  ]) {
+    assertCondition(!editorShellSource.includes(retiredRuntime), `retired single-frame runtime is still loaded: ${retiredRuntime}`)
   }
 
   const editorScriptResponse = await fetch(`${baseUrl}/src/editor-app.js`)
@@ -489,23 +333,16 @@ try {
   assertCondition(css.includes('.quality-report-hud'), 'quality report HUD styles are missing')
   assertCondition(css.includes('.export-modal'), 'export modal styles are missing')
   assertCondition(css.includes('.motion-source-layout'), 'motion source layout styles are missing')
-  assertCondition(css.includes('.action-repair-status'), 'character action repair styles are missing')
 
   const editorCssResponse = await fetch(`${baseUrl}/src/ui/editor/editor.css`)
   assertCondition(editorCssResponse.ok, `editor styles returned ${editorCssResponse.status}`)
   const editorCss = await editorCssResponse.text()
   for (const marker of [
-    '.editor-repair-workbench[data-quality-gate-workspace="true"]',
-    '.editor-frame-repair-quality-gate[data-view="review"]',
-    '.editor-quality-gate-canvas-slot',
-    '.editor-quality-gate-evidence',
-    '.editor-quality-gate-actions',
-    'position: sticky',
-    '.editor-quality-gate-progress',
-    'overflow-x: auto',
+    '.editor-repair-action-only',
+    '.editor-repair-action-filmstrip',
     '@media (max-width: 760px)',
   ]) {
-    assertCondition(editorCss.includes(marker), `Quality Gate editor CSS marker is missing: ${marker}`)
+    assertCondition(editorCss.includes(marker), `repair workbench editor CSS marker is missing: ${marker}`)
   }
 
   const providerResponse = await fetch(`${baseUrl}/api/gemini-state`)
@@ -819,7 +656,7 @@ try {
   assertCondition(strictProjectJob.status === 'failed_project_pack', `strict project pack job status: ${strictProjectJob.status}`)
   assertCondition(strictProjectJob.reason === 'style_contract_failed', `strict project pack reason: ${strictProjectJob.reason}`)
 
-  console.log(`V8 local smoke passed: tabs markup, editor shell, Quality Gate unavailable Start disabled with 0 provider calls, AI provider state, GIF API (${gif.length} bytes), Motion upload/Preview/Auto/Manual/cancel/resume, scene/project/2.5D APIs`)
+  console.log(`V8 local smoke passed: tabs markup, editor shell, exclusive three-atlas action repair wiring, retired repair runtimes absent, AI provider state, GIF API (${gif.length} bytes), Motion upload/Preview/Auto/Manual/cancel/resume, scene/project/2.5D APIs`)
 } catch (error) {
   console.error(error.message || error)
   process.exit(1)

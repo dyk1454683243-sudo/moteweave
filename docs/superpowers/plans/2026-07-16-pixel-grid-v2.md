@@ -15,8 +15,7 @@ Source UI binding.
 - Use only checked-in resource guards.
 - Do not call a Provider.
 - Do not scan `output/`, `generated/`, or unrelated artifacts.
-- Do not modify or stage unrelated `* 2.*` files, `.superpowers/`, or exclusive
-  worktrees.
+- Preserve unrelated untracked user files and exclusive worktrees.
 - Default behavior remains disabled.
 - Do not begin Motion Selection v2 or the Guided Motion Source redesign in this
   unit.

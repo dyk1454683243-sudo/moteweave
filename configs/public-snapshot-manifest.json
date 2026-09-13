@@ -14,7 +14,6 @@
     "configs/",
     "docs/",
     "editor.html",
-    "index.html",
     "package-lock.json",
     "package.json",
     "scripts/",
@@ -25,7 +24,8 @@
     "website/"
   ],
   "exclude_paths": [
-    ".claude/"
+    ".claude/",
+    "test/fixtures/character-pack/local-image-golden/ocad-sheet/ocad_knight_walk.jpg"
   ],
   "forbidden_paths": [
     ".env",
@@ -35,8 +35,6 @@
     "generated/",
     "node_modules/",
     "output/",
-    "templates/motion_template_ocad_primary.png",
-    "test/fixtures/character-pack/local-image-golden/ocad-sheet/ocad_knight_walk.jpg",
     "workspace/"
   ]
 }

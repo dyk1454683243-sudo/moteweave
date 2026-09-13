@@ -43,18 +43,16 @@ Specifically:
 
 ## Rename Policy
 
-`AI Character Pack Tool` was the neutral temporary name. The project lead
-approved `MoteWeave` / `moteweave` for the source Preview on 2026-07-17; see
-`docs/decisions/2026-07-17-public-brand-selection.md`.
+The current neutral temporary name is `AI Character Pack Tool`.
 
-Before v1.0, a public commercial release, or any later rename, verify at minimum:
+Before v1.0 or any public commercial release, select a distinctive final name and verify at minimum:
 
 - package name availability
 - domain availability, if a web release is planned
 - GitHub or npm name availability, if publishing is planned
 - no obvious conflict with direct competitors in the same product category
 
-Potential names and final selection must be recorded in a separate decision.
+Potential names should be recorded in a separate rename shortlist decision.
 
 ## Enforcement
 

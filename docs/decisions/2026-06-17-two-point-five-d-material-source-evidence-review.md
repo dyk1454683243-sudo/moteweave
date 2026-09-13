@@ -10,7 +10,7 @@ Command:
 
 ```bash
 npm run character-pack -- tileset material-source-evidence \
-  --manifest <home>/.gemini/antigravity/brain/3fcf5fac-f4c2-46a2-9016-be474549b35c/two-point-five-d-material-source-manifest.json \
+  --manifest $HOME/.gemini/antigravity/brain/3fcf5fac-f4c2-46a2-9016-be474549b35c/two-point-five-d-material-source-manifest.json \
   --output-dir generated/two-point-five-d-material-source-evidence \
   --run-id local_2_5d_real_sources_20260617
 ```
@@ -126,7 +126,7 @@ The local material-source evidence set was rerun with layout assist enabled:
 
 ```bash
 npm run character-pack -- tileset material-source-evidence \
-  --manifest <home>/.gemini/antigravity/brain/3fcf5fac-f4c2-46a2-9016-be474549b35c/two-point-five-d-material-source-manifest.json \
+  --manifest $HOME/.gemini/antigravity/brain/3fcf5fac-f4c2-46a2-9016-be474549b35c/two-point-five-d-material-source-manifest.json \
   --output-dir generated/two-point-five-d-material-source-evidence \
   --run-id local_2_5d_real_sources_layout_assist_20260617
 ```
@@ -164,7 +164,7 @@ set was rerun as:
 
 ```bash
 npm run character-pack -- tileset material-source-evidence \
-  --manifest <home>/.gemini/antigravity/brain/3fcf5fac-f4c2-46a2-9016-be474549b35c/two-point-five-d-material-source-manifest.json \
+  --manifest $HOME/.gemini/antigravity/brain/3fcf5fac-f4c2-46a2-9016-be474549b35c/two-point-five-d-material-source-manifest.json \
   --output-dir generated/two-point-five-d-material-source-evidence \
   --run-id local_2_5d_real_sources_quality_closure_20260617
 ```
@@ -195,7 +195,7 @@ edge normalization. The same local source set was rerun as:
 
 ```bash
 npm run character-pack -- tileset material-source-evidence \
-  --manifest <home>/.gemini/antigravity/brain/3fcf5fac-f4c2-46a2-9016-be474549b35c/two-point-five-d-material-source-manifest.json \
+  --manifest $HOME/.gemini/antigravity/brain/3fcf5fac-f4c2-46a2-9016-be474549b35c/two-point-five-d-material-source-manifest.json \
   --output-dir generated/two-point-five-d-material-source-evidence \
   --run-id local_2_5d_real_sources_semantic_tileable_20260617
 ```
@@ -246,7 +246,7 @@ source set was rerun as:
 
 ```bash
 npm run character-pack -- tileset material-source-evidence \
-  --manifest <home>/.gemini/antigravity/brain/3fcf5fac-f4c2-46a2-9016-be474549b35c/two-point-five-d-material-source-manifest.json \
+  --manifest $HOME/.gemini/antigravity/brain/3fcf5fac-f4c2-46a2-9016-be474549b35c/two-point-five-d-material-source-manifest.json \
   --output-dir generated/two-point-five-d-material-source-evidence \
   --run-id local_2_5d_real_sources_slot_separation_v2_20260617
 ```

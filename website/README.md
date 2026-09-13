@@ -15,7 +15,7 @@ The complete MoteWeave application continues to run locally through the
 repository root:
 
 ```bash
-npm ci
+npm install
 npm start
 ```
 

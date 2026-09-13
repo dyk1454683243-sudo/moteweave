@@ -3,9 +3,10 @@
 This directory is the controlled offline image set for character image quality
 gates. It is intentionally separate from legacy compatibility fixtures.
 
-`../topdown_rpg_v0_sample_hero.png` is not part of this gate. Keep it available for
-the older process-sheet tests that already depend on it, but do not use it as a
-baseline for new local-image quality work.
+`../topdown_rpg_v0_sample_hero.png` and `ocad-sheet/ocad_knight_walk.jpg` are
+not part of this gate. Keep the process-sheet fixture available for older
+tests, and keep the knight JPEG as a private-only historical sample. Do not
+use either as a baseline for new local-image quality work.
 
 ## Purpose
 
@@ -38,12 +39,6 @@ baseline for new local-image quality work.
   `.jpg` for JPEG.
 - Prefer small fixture files. If a test needs large local samples, keep those
   outside the repository and document the path in a runbook instead.
-- `ocad-sheet/fixed_region_sample_hero.png` is repository-owned and
-  deterministically regenerated together with the active fixed-region template:
-
-  ```bash
-  npm run guard:focused -- node scripts/create-fixed-region-motion-assets.mjs
-  ```
 
 ## CLI
 

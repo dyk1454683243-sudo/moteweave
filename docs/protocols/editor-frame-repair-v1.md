@@ -1,8 +1,13 @@
 # Editor Frame Repair v1 Protocol
 
-**Status:** Approved contract
+**Status:** Retired on 2026-08-08; historical contract only
 **Scope:** Targeted repair of one managed Character Pack frame through the
 local Editor Workspace API
+
+> This route family and its runtime implementation have been removed. Do not
+> call, restore, or use it as a fallback. Managed action correction now uses
+> the exclusive three-atlas contract in
+> `docs/protocols/fixed-region-action-repair-atlas-v1.md`.
 
 This protocol defines the public request, job, evidence, recovery, and
 acceptance boundaries for `editor_character_frame_repair`. Plan is
@@ -12,8 +17,11 @@ successfully imports the sealed result as an immutable child revision.
 
 ## Request Envelopes
 
-Every request body is an exact plain JSON object. Aliases, omitted fields, and
-additional fields are rejected. Request JSON may not contain a client path,
+Every request body is an exact plain JSON object. Aliases, omitted required
+fields, and additional fields are rejected. `equipmentPolicy` is the only
+optional compatibility field; an omitted value is normalized to `none`, while
+an explicitly supplied value must be exactly `none`, `preserve`, or `separate`.
+Request JSON may not contain a client path,
 base64 data URL, secret-like key or value, provider credential, binary payload,
 or client-owned provider request body.
 
@@ -35,6 +43,7 @@ POST /api/editor/projects/:projectId/assets/:assetId/frame-repair/plan
     { "op": "add_rectangle", "x": 10, "y": 12, "width": 8, "height": 9 },
     { "op": "remove_rectangle", "x": 12, "y": 14, "width": 2, "height": 3 }
   ],
+  "equipmentPolicy": "none",
   "providerPresetId": "gemini-default",
   "imageConfig": { "image_size": "1K" }
 }
@@ -45,6 +54,12 @@ non-negative integers. Revision, clip, and preset identifiers use managed
 Editor id syntax. The instruction is required, trimmed, normalized to NFC,
 contains no Unicode control characters, and is at most 500 Unicode code
 points. `image_size` is exactly `1K` or `2K`.
+
+`equipmentPolicy` controls the body/equipment contract. `none` requires an
+unarmed body with empty hands, `preserve` permits only equipment already bound
+by the approved parent/description, and `separate` requires an equipment-free
+body plus review-only transparent attachment evidence. It never authorizes
+automatic acceptance or an extra provider call.
 
 `maskEdits` preserves request order and contains at most 64 operations. Each
 operation has exactly `op`, `x`, `y`, `width`, and `height`. `op` is
@@ -75,7 +90,9 @@ The body repeats every Plan field exactly and adds these four fields:
 }
 ```
 
-The complete live body therefore has exactly 13 fields. `operationId` matches
+The complete new live body therefore has exactly 14 fields. A legacy request
+that omits `equipmentPolicy` has 13 fields and is normalized to `none`.
+`operationId` matches
 `^[A-Za-z0-9_-]{16,80}$`. `expectedPlanHash` is a lowercase 64-character
 SHA-256 hexadecimal digest. Confirmation is the boolean `true`, and the call
 budget is the number `1`; aliases and every other value are rejected before
@@ -198,6 +215,7 @@ type FrameRepairPlanV1 = {
   }
   mask: CanonicalFrameMask
   instruction: string
+  equipment_policy: 'none' | 'preserve' | 'separate'
   provider: {
     id: string
     provider: string
@@ -221,21 +239,57 @@ canonical mask, normalized instruction, safe preset snapshot, fixed call
 accounting, and server implementation revision. It contains no provider key,
 image bytes, arbitrary path, raw request, or private runtime configuration.
 
-New live Plans use exactly three ordered provider references:
-`target_enlarged`, `mask_visualization`, and `clip_context`. The first image is
-the only output-layout authority. All three references use the same nearest-
-neighbor-enlarged authoring-cell geometry. `clip_context` contains one adjacent
+New live Plans use exactly two ordered provider references:
+`target_enlarged` and `clip_context`. The first image is the only output-layout
+authority, but every active mask pixel is cleared to transparent before it is
+encoded; that transparent hole is the only provider-visible location signal.
+The colored mask visualization is generated and sealed only as local
+human-review evidence and is never dispatched to a provider. Both provider
+references use the same nearest-neighbor-enlarged authoring-cell geometry.
+`clip_context` contains one adjacent
 frame rather than a multi-frame contact sheet; the previous frame is preferred,
 otherwise the next frame is used, with the target used only for a degenerate
-single-frame clip. The managed full sheet remains server-side authority for
+single-frame clip; that fallback is the same target-holed image. The managed
+full sheet remains server-side authority for
 identity, hashing, compositing, validation, and Accept, but is not sent to the
 provider. Readers continue to accept already sealed legacy evidence whose
-ordered role list includes the optional trailing `full_sheet`; historical
-evidence is never rewritten.
+ordered role list contains `target_enlarged`, `mask_visualization`, and
+`clip_context`, with an optional trailing `full_sheet`. Current dispatch strips
+`mask_visualization` even when recovering a legacy request; historical evidence
+is never rewritten.
 
 Serialization recursively sorts object keys, preserves array order, uses
 compact `JSON.stringify` encoded as UTF-8, and computes a lowercase SHA-256.
 Only the server-computed full plan hash authorizes live submission and Accept.
+
+### Provider-free equipment gate
+
+After the single candidate is normalized and composited, the server evaluates
+equipment locally. For `none` and `separate`, it first requires measurable
+change to pixels that were visible in the approved parent inside the repair
+target; transparent-background edits do not count, and an unchanged
+weapon-bearing input is blocked as `removal_not_observed`. It then
+compares suspicious silhouette protrusions, metallic
+blade-like components, and detached line components against the approved
+reference silhouette. The approved parent is the comparison authority so a
+different character identity in a clean pose template cannot create false
+weapon detections; a template is only the fallback when no parent is available.
+Stable reference details are not treated as newly introduced equipment.
+
+The deterministic `equipment_quality_gate_v1` record is embedded in
+`frame_repair_quality.json`. It includes the policy, status, controlled reason
+codes, detections, rejected-pixel count, run-length mask, mask SHA-256, and the
+body/equipment contract. It is provider-free and is recomputed from sealed
+pixels during specialized Accept. A blocked gate makes overall quality fail
+and Accept returns `422 quality_blocked`; it never retries, falls back, feeds a
+candidate back to the provider, or imports a revision. `separate` evidence is
+for human review and does not make a candidate acceptable by itself.
+
+Already sealed legacy plans without `equipment_policy` remain readable and
+must not contain an unbound equipment gate. The frozen eight-case quality-gate
+schema is unchanged; when it encounters new Frame Repair evidence, it verifies
+the embedded equipment gate independently without adding a ninth case or
+starting a provider call.
 
 ## Public Job Statuses
 

@@ -14,6 +14,33 @@ const PROVIDER_ALIASES = Object.freeze({
   openrouter_compatible: 'openrouter',
 })
 
+export function supportsGeminiImageSize(model) {
+  return String(model || '').replace(/^models\//, '').startsWith('gemini-3')
+}
+
+function geminiModelPath(model) {
+  return String(model || DEFAULT_GEMINI_MODEL).startsWith('models/')
+    ? String(model)
+    : `models/${model || DEFAULT_GEMINI_MODEL}`
+}
+
+export function buildGeminiGenerateContentUrl(providerPreset = {}) {
+  const baseUrl = String(providerPreset.baseUrl || DEFAULT_GEMINI_BASE_URL).trim()
+  const modelPath = geminiModelPath(providerPreset.model)
+  if (baseUrl.includes(':generateContent')) {
+    const endpoint = baseUrl.split(/[?#]/, 1)[0]
+    const endpointModelPath = endpoint.match(/(?:^|\/)(models\/[^/]+):generateContent\/?$/)?.[1]
+    if (/(?:^|\/)models\//.test(endpoint) && !endpointModelPath) {
+      throw new Error('Gemini generateContent endpoint model path is invalid')
+    }
+    if (endpointModelPath && endpointModelPath !== modelPath) {
+      throw new Error('Gemini generateContent endpoint model does not match the provider Preset model')
+    }
+    return baseUrl
+  }
+  return `${baseUrl.replace(/\/+$/, '')}/${modelPath}:generateContent`
+}
+
 export function normalizeProvider(value) {
   const key = String(value || 'openrouter').trim().toLowerCase().replace(/[\s-]+/g, '_')
   const provider = PROVIDER_ALIASES[key]
@@ -103,6 +130,10 @@ function normalizeProviderPreset(input = {}, index = 0, env = process.env) {
     id,
     label,
     provider,
+    routeKind: provider === 'gemini' ? 'google_native' : 'openrouter',
+    supportsSystemInstruction: provider === 'gemini',
+    supportsRoleInterleaving: provider === 'gemini',
+    supportsImageSize: provider === 'gemini' && supportsGeminiImageSize(model),
     apiKey,
     apiKeyEnv: apiKeyEnv || (provider === 'gemini' ? 'GEMINI_API_KEY' : 'OPENROUTER_API_KEY'),
     baseUrl,
@@ -152,7 +183,11 @@ export function resolveProviderPreset(env = process.env, presetId = '') {
   const presets = getProviderPresets(env)
   const defaultId = env.CHARACTER_DEFAULT_PROVIDER || env.OPENROUTER_DEFAULT_PROVIDER || presets[0]?.id
   const requestedId = safePresetId(presetId || defaultId, defaultId)
-  return presets.find((preset) => preset.id === requestedId) || presets.find((preset) => preset.id === defaultId) || presets[0]
+  const requested = presets.find((preset) => preset.id === requestedId)
+  if (String(presetId || '').trim() && !requested) {
+    throw new Error(`Unknown character provider preset: ${requestedId}`)
+  }
+  return requested || presets.find((preset) => preset.id === defaultId) || presets[0]
 }
 
 function publicProviderPreset(preset) {
@@ -160,9 +195,13 @@ function publicProviderPreset(preset) {
     id: preset.id,
     label: preset.label,
     provider: preset.provider,
+    route_kind: preset.routeKind,
     model: preset.model,
     available: preset.available,
     image_config: preset.imageConfig,
+    supports_system_instruction: preset.supportsSystemInstruction,
+    supports_role_interleaving: preset.supportsRoleInterleaving,
+    supports_image_size: preset.supportsImageSize,
   }
 }
 

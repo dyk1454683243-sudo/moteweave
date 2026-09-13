@@ -38,23 +38,13 @@ function runCommand(command, args, { cwd }) {
     const child = spawn(command, args, { cwd })
     let stdout = ''
     let stderr = ''
-    let settled = false
     child.stdout.on('data', (chunk) => {
       stdout += chunk
     })
     child.stderr.on('data', (chunk) => {
       stderr += chunk
     })
-    child.on('error', (error) => {
-      if (settled) return
-      settled = true
-      resolve({ code: null, stdout, stderr, error })
-    })
-    child.on('close', (code) => {
-      if (settled) return
-      settled = true
-      resolve({ code, stdout, stderr, error: null })
-    })
+    child.on('close', (code) => resolve({ code, stdout, stderr }))
   })
 }
 
@@ -163,9 +153,6 @@ export async function runGodotProbe({ projectDir, scriptSource, godotBin } = {})
   await writeFile(path.join(probeDir, 'project.godot'), '[application]\nconfig/name="CharacterPackProbe"\n')
   await writeFile(scriptPath, scriptSource)
   const result = await runCommand(resolvedGodotBin, ['--headless', '--path', probeDir, '--script', 'res://scan_npc.gd'], { cwd: probeDir })
-  if (result.error?.code === 'ENOENT') {
-    return { available: false, status: 'skipped', reason: 'godot_not_found' }
-  }
   return {
     available: true,
     status: result.code === 0 ? 'pass' : 'fail',
@@ -184,18 +171,14 @@ export async function probeCharacterPackZip({
   pluginZipPath,
   godotBin,
 } = {}) {
-  if (!exportZipBuffer) return { available: false, status: 'skipped', reason: 'export_zip_missing' }
   const resolvedGodotBin = configuredPath(godotBin, 'GODOT_BIN')
-  const resolvedPluginZipPath = configuredPath(pluginZipPath, 'NPC_PLUGIN_ZIP')
-  if (!resolvedGodotBin) {
-    return { available: false, status: 'skipped', reason: 'godot_not_configured' }
-  }
-  if (!resolvedPluginZipPath) {
-    return { available: false, status: 'skipped', reason: 'plugin_zip_not_configured' }
-  }
+  const resolvedPluginZipPath = configuredPath(pluginZipPath, 'GODOT_NPC_PLUGIN_ZIP')
+  if (!exportZipBuffer) return { available: false, status: 'skipped', reason: 'export_zip_missing' }
+  if (!resolvedGodotBin) return { available: false, status: 'skipped', reason: 'godot_not_configured' }
   if (needsFilesystemAccessCheck(resolvedGodotBin) && !(await executableExists(resolvedGodotBin))) {
     return { available: false, status: 'skipped', reason: 'godot_not_found' }
   }
+  if (!resolvedPluginZipPath) return { available: false, status: 'skipped', reason: 'plugin_zip_not_configured' }
   if (!(await fileExists(resolvedPluginZipPath))) {
     return { available: false, status: 'skipped', reason: 'plugin_zip_not_found' }
   }

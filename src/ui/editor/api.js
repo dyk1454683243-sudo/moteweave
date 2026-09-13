@@ -1,40 +1,23 @@
 const CONTROLLED_EDITOR_ERROR_CODES = new Set([
   'accept_conflict',
   'accept_outcome_ambiguous',
+  'action_repair_unavailable',
   'artifact_integrity_failed',
   'artifact_not_found',
   'asset_in_use',
   'asset_not_found',
   'asset_revision_conflict',
-  'case_not_found',
   'editor_project_error',
-  'evidence_conflict',
-  'evidence_integrity_failed',
-  'frame_identity_mismatch',
-  'frame_repair_unavailable',
-  'frame_repair_quality_gate_unavailable',
   'identity_mismatch',
   'invalid_accept_request',
-  'invalid_frame_repair_mask',
-  'invalid_frame_repair_plan',
-  'invalid_frame_repair_reference',
-  'invalid_frame_repair_request',
-  'invalid_frame_repair_service_input',
   'invalid_implementation_revision',
   'invalid_json',
-  'invalid_quality_gate_evidence',
-  'invalid_quality_gate_outcome',
-  'invalid_quality_gate_plan',
-  'invalid_quality_gate_request',
-  'invalid_quality_gate_review',
   'invalid_managed_metadata',
   'invalid_managed_sheet',
   'invalid_managed_source',
   'invalid_operation_identity',
   'invalid_operation_lookup',
   'invalid_recipe',
-  'invalid_reprocess_context',
-  'invalid_reprocess_request',
   'job_not_found',
   'job_not_ready',
   'missing_expected_revision',
@@ -42,12 +25,6 @@ const CONTROLLED_EDITOR_ERROR_CODES = new Set([
   'missing_source_layout',
   'noncanonical_recipe',
   'not_found',
-  'operation_conflict',
-  'operation_not_found',
-  'quality_gate_finalized',
-  'quality_gate_hard_gate_failed',
-  'quality_gate_identity_mismatch',
-  'quality_gate_paused',
   'request_too_large',
   'preview_stale',
   'profile_conflict',
@@ -56,14 +33,10 @@ const CONTROLLED_EDITOR_ERROR_CODES = new Set([
   'project_id_mismatch',
   'project_not_found',
   'quality_blocked',
-  'reprocess_unavailable',
   'revision_conflict',
   'revision_not_found',
   'specialized_accept_required',
   'stale_plan',
-  'stale_quality_gate_plan',
-  'session_id_conflict',
-  'session_not_found',
   'unexpected_request_field',
   'unsafe_artifact_path',
   'unsupported_profile',
@@ -141,11 +114,12 @@ export async function autosaveEditorProject(project) {
   })
 }
 
-export async function importGeneratedJob({ projectId, expectedRevision, kind, jobId, assetId }) {
+export async function importGeneratedJob({ projectId, expectedRevision, expectedAssetRevisionId, kind, jobId, assetId }) {
   return jsonRequest(`/api/editor/projects/${encodeURIComponent(projectId)}/import-job`, {
     method: 'POST',
     body: JSON.stringify({
       expectedRevision,
+      expectedAssetRevisionId: expectedAssetRevisionId || undefined,
       kind,
       jobId,
       assetId: assetId || undefined,
@@ -153,108 +127,15 @@ export async function importGeneratedJob({ projectId, expectedRevision, kind, jo
   })
 }
 
-export function buildCharacterReprocessPreview(input, { signal } = {}) {
-  return jsonRequest(`/api/editor/projects/${encodeURIComponent(input.projectId)}/assets/${encodeURIComponent(input.assetId)}/reprocess`, {
+export function acceptFixedRegionActionRepairCandidate(input, { signal } = {}) {
+  return jsonRequest(`/api/editor/projects/${encodeURIComponent(input.projectId)}/assets/${encodeURIComponent(input.assetId)}/action-repair/${encodeURIComponent(input.jobId)}/accept`, {
     method: 'POST',
     signal,
     body: JSON.stringify({
       expectedRevision: input.expectedRevision,
       expectedAssetRevisionId: input.expectedAssetRevisionId,
-      recipe: input.recipe,
+      expectedPlanHash: input.expectedPlanHash,
     }),
-  })
-}
-
-export function acceptCharacterReprocessPreview(input, { signal } = {}) {
-  return jsonRequest(`/api/editor/projects/${encodeURIComponent(input.projectId)}/assets/${encodeURIComponent(input.assetId)}/reprocess/${encodeURIComponent(input.jobId)}/accept`, {
-    method: 'POST',
-    signal,
-    body: JSON.stringify({
-      expectedRevision: input.expectedRevision,
-      expectedAssetRevisionId: input.expectedAssetRevisionId,
-      expectedRecipeHash: input.expectedRecipeHash,
-      warningConfirmed: input.warningConfirmed === true,
-    }),
-  })
-}
-
-export function planCharacterFrameRepair(input, { signal } = {}) {
-  return jsonRequest(`/api/editor/projects/${encodeURIComponent(input.projectId)}/assets/${encodeURIComponent(input.assetId)}/frame-repair/plan`, {
-    method: 'POST',
-    signal,
-    body: JSON.stringify(input.body),
-  })
-}
-
-export function generateCharacterFrameRepair(input, { signal } = {}) {
-  return jsonRequest(`/api/editor/projects/${encodeURIComponent(input.projectId)}/assets/${encodeURIComponent(input.assetId)}/frame-repair`, {
-    method: 'POST',
-    signal,
-    body: JSON.stringify(input.body),
-  })
-}
-
-export function recoverCharacterFrameRepair(input, { signal } = {}) {
-  return jsonRequest(`/api/editor/projects/${encodeURIComponent(input.projectId)}/assets/${encodeURIComponent(input.assetId)}/frame-repair/operations/${encodeURIComponent(input.operationId)}`, {
-    method: 'GET',
-    signal,
-  })
-}
-
-export function acceptCharacterFrameRepair(input, { signal } = {}) {
-  return jsonRequest(`/api/editor/projects/${encodeURIComponent(input.projectId)}/assets/${encodeURIComponent(input.assetId)}/frame-repair/${encodeURIComponent(input.jobId)}/accept`, {
-    method: 'POST',
-    signal,
-    body: JSON.stringify(input.body),
-  })
-}
-
-export function fetchCharacterProviderState({ signal } = {}) {
-  return jsonRequest('/api/gemini-state', {
-    method: 'GET',
-    signal,
-  })
-}
-
-export function setupFrameRepairQualityGate(input, { signal } = {}) {
-  return jsonRequest(`/api/editor/projects/${encodeURIComponent(input.sourceProjectId)}/frame-repair-quality-gates/setup`, {
-    method: 'POST', signal, body: JSON.stringify(input.body),
-  })
-}
-
-export function planFrameRepairQualityGate(input, { signal } = {}) {
-  return jsonRequest(`/api/editor/projects/${encodeURIComponent(input.projectId)}/frame-repair-quality-gates/plan`, {
-    method: 'POST', signal, body: JSON.stringify(input.body),
-  })
-}
-
-export function startFrameRepairQualityGate(input, { signal } = {}) {
-  return jsonRequest(`/api/editor/projects/${encodeURIComponent(input.projectId)}/frame-repair-quality-gates`, {
-    method: 'POST', signal, body: JSON.stringify(input.body),
-  })
-}
-
-export function fetchFrameRepairQualityGate(input, { signal } = {}) {
-  return jsonRequest(`/api/editor/projects/${encodeURIComponent(input.projectId)}/frame-repair-quality-gates/${encodeURIComponent(input.sessionId)}`, {
-    method: 'GET', signal,
-  })
-}
-
-export function recordFrameRepairQualityGateReview(input, { signal } = {}) {
-  return jsonRequest(`/api/editor/projects/${encodeURIComponent(input.projectId)}/frame-repair-quality-gates/${encodeURIComponent(input.sessionId)}/cases/${encodeURIComponent(input.caseId)}/review`, {
-    method: 'POST', signal, body: JSON.stringify(input.body),
-  })
-}
-
-export function recordFrameRepairQualityGateOutcome(input, { signal } = {}) {
-  return jsonRequest(`/api/editor/projects/${encodeURIComponent(input.projectId)}/frame-repair-quality-gates/${encodeURIComponent(input.sessionId)}/cases/${encodeURIComponent(input.caseId)}/outcome`, {
-    method: 'POST', signal, body: JSON.stringify(input.body),
-  })
-}
-
-export function finalizeFrameRepairQualityGate(input, { signal } = {}) {
-  return jsonRequest(`/api/editor/projects/${encodeURIComponent(input.projectId)}/frame-repair-quality-gates/${encodeURIComponent(input.sessionId)}/finalize`, {
-    method: 'POST', signal, body: JSON.stringify(input.body),
   })
 }
 

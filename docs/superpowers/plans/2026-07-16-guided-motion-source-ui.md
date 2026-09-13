@@ -19,7 +19,7 @@ pipeline behavior.
   profile, or job-state contracts for UI convenience.
 - Do not scan `output/`, `generated/`, unrelated artifacts, or the exclusive
   implementation worktree.
-- Do not modify or stage unrelated `.superpowers/` or `* 2.*` files.
+- Preserve unrelated untracked user files.
 
 ## Task 1: Freeze Design And Lineage
 

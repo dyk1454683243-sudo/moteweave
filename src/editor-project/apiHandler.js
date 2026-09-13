@@ -1,8 +1,20 @@
 import { createReadStream } from 'node:fs'
+import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 
+import {
+  FIXED_REGION_ACTION_REPAIR_ACCEPTANCE_FILE,
+  FIXED_REGION_ACTION_REPAIR_JOB_TYPE,
+  assertFixedRegionActionRepairAcceptanceManifest,
+  assertFixedRegionActionRepairReviewContract,
+  fixedRegionActionRepairArtifactKey,
+  sha256ActionRepairBytes,
+} from '../character-pack/fixedRegionActionRepairReview.js'
 import { createDefaultEditorProject } from './defaults.js'
-import { importGeneratedJobAsAsset } from './artifactRegistry.js'
+import {
+  importAcceptedFixedRegionActionRepairAsAsset,
+  importGeneratedJobAsAsset,
+} from './artifactRegistry.js'
 import {
   EditorAssetLibraryError,
   removeAssetFromProject,
@@ -20,6 +32,7 @@ import {
   projectRelativePath,
   resolveContainedRegularFile,
   resolveEditorProjectPaths,
+  resolveGeneratedJobArtifactFile,
   resolveManagedRevisionArtifactFile,
 } from './paths.js'
 import { isSafeRelativePath } from './safety.js'
@@ -48,7 +61,7 @@ async function readBody(req, { maxBytes = Number.POSITIVE_INFINITY } = {}) {
     if (!exceeded) chunks.push(chunk)
   }
   if (exceeded) {
-    const error = new Error('quality gate request exceeds its byte limit')
+    const error = new Error('editor request exceeds its byte limit')
     error.code = 'request_too_large'
     throw error
   }
@@ -82,20 +95,9 @@ function expectedRevisionFromBody(body) {
   return value == null ? null : Number(value)
 }
 
-const CHARACTER_REPROCESS_ERROR_STATUS = Object.freeze({
-  invalid_frame_repair_request: 400,
-  invalid_frame_repair_plan: 400,
-  invalid_frame_repair_mask: 400,
-  invalid_frame_repair_reference: 400,
-  invalid_frame_repair_service_input: 400,
-  frame_identity_mismatch: 400,
-  invalid_operation_identity: 400,
-  invalid_operation_lookup: 400,
-  invalid_reprocess_request: 400,
+const EDITOR_OPERATION_ERROR_STATUS = Object.freeze({
   invalid_recipe: 400,
   invalid_accept_request: 400,
-  noncanonical_recipe: 400,
-  invalid_reprocess_context: 400,
   unexpected_request_field: 400,
   identity_mismatch: 400,
   unsafe_artifact_path: 400,
@@ -112,65 +114,21 @@ const CHARACTER_REPROCESS_ERROR_STATUS = Object.freeze({
   revision_not_found: 404,
   job_not_found: 404,
   artifact_not_found: 404,
-  operation_not_found: 404,
   revision_conflict: 409,
   asset_revision_conflict: 409,
-  preview_stale: 409,
   accept_conflict: 409,
   stale_plan: 409,
-  operation_conflict: 409,
   job_not_ready: 409,
   quality_blocked: 422,
-  warning_confirmation_required: 422,
   artifact_integrity_failed: 422,
-  reprocess_unavailable: 503,
-  frame_repair_unavailable: 503,
+  action_repair_unavailable: 503,
   provider_unavailable: 503,
   provider_configuration_error: 503,
 })
 
-const FRAME_REPAIR_QUALITY_GATE_ERROR_STATUS = Object.freeze({
-  invalid_quality_gate_request: 400,
-  invalid_quality_gate_plan: 400,
-  invalid_quality_gate_review: 400,
-  invalid_quality_gate_outcome: 400,
-  invalid_quality_gate_evidence: 400,
-  unexpected_request_field: 400,
-  unsafe_artifact_path: 400,
-  request_too_large: 413,
-  project_not_found: 404,
-  asset_not_found: 404,
-  revision_not_found: 404,
-  job_not_found: 404,
-  artifact_not_found: 404,
-  setup_manifest_not_found: 404,
-  session_not_found: 404,
-  case_not_found: 404,
-  operation_not_found: 404,
-  project_exists: 409,
-  revision_conflict: 409,
-  asset_revision_conflict: 409,
-  stale_quality_gate_plan: 409,
-  session_id_conflict: 409,
-  quality_gate_identity_mismatch: 409,
-  accept_outcome_ambiguous: 409,
-  evidence_conflict: 409,
-  evidence_integrity_failed: 409,
-  artifact_integrity_failed: 422,
-  quality_gate_hard_gate_failed: 422,
-  quality_gate_paused: 422,
-  quality_gate_finalized: 422,
-  provider_unavailable: 503,
-  provider_configuration_error: 503,
-})
-
-function statusForError(error, { frameRepairRoute = false, qualityGateRoute = false } = {}) {
-  if (qualityGateRoute && FRAME_REPAIR_QUALITY_GATE_ERROR_STATUS[error?.code]) {
-    return FRAME_REPAIR_QUALITY_GATE_ERROR_STATUS[error.code]
-  }
-  if (frameRepairRoute && error?.code === 'identity_mismatch') return 409
-  if (CHARACTER_REPROCESS_ERROR_STATUS[error?.code]) {
-    return CHARACTER_REPROCESS_ERROR_STATUS[error.code]
+function statusForError(error) {
+  if (EDITOR_OPERATION_ERROR_STATUS[error?.code]) {
+    return EDITOR_OPERATION_ERROR_STATUS[error.code]
   }
   if (error?.code === 'invalid_json') return 400
   if (error instanceof EditorAssetLibraryError && error.code === 'asset_not_found') return 404
@@ -180,39 +138,7 @@ function statusForError(error, { frameRepairRoute = false, qualityGateRoute = fa
   return 400
 }
 
-function safeQualityGateDetails(value, depth = 0) {
-  if (depth > 3 || value == null ||
-      (typeof value === 'number' && !Number.isFinite(value))) return null
-  if (typeof value === 'boolean') return value
-  if (typeof value === 'number') return value
-  if (typeof value === 'string') {
-    return /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}$/.test(value) ? value : null
-  }
-  if (Array.isArray(value)) {
-    if (value.length > 32) return null
-    const items = value.map((item) => safeQualityGateDetails(item, depth + 1))
-    return items.some((item) => item === null) ? null : items
-  }
-  if (typeof value !== 'object' || Object.getPrototypeOf(value) !== Object.prototype) return null
-  const entries = []
-  for (const [key, item] of Object.entries(value)) {
-    if (!/^[a-z][a-z0-9_]{0,63}$/.test(key) ||
-        /(?:path|secret|token|key|header|stack|cause|buffer|base64|env)/i.test(key)) continue
-    const safe = safeQualityGateDetails(item, depth + 1)
-    if (safe !== null) entries.push([key, safe])
-  }
-  return entries.length > 0 && entries.length <= 32 ? Object.fromEntries(entries) : null
-}
-
-function errorBody(error, { qualityGateRoute = false } = {}) {
-  if (qualityGateRoute) {
-    const details = safeQualityGateDetails(error?.details)
-    return {
-      error: error?.code ?? 'frame_repair_quality_gate_error',
-      reason: 'frame repair quality gate request failed',
-      ...(details ? { details } : {}),
-    }
-  }
+function errorBody(error) {
   return {
     error: error.code ?? 'editor_project_error',
     reason: String(error.message || error),
@@ -336,20 +262,109 @@ export async function resolveRegisteredWorkspaceArtifact(rawPath, {
   })
 }
 
+function actionRepairApiError(code, message) {
+  const error = new Error(message)
+  error.code = code
+  return error
+}
+
+function parseFixedRegionActionRepairAcceptRequest(body) {
+  const expectedKeys = ['expectedAssetRevisionId', 'expectedPlanHash', 'expectedRevision']
+  const keys = Object.keys(body ?? {}).sort()
+  if (keys.length !== expectedKeys.length || expectedKeys.some((key, index) => keys[index] !== key)) {
+    throw actionRepairApiError('invalid_accept_request', 'action repair Accept request has unexpected fields')
+  }
+  if (!Number.isSafeInteger(body.expectedRevision) || body.expectedRevision < 0 ||
+      typeof body.expectedAssetRevisionId !== 'string' || !body.expectedAssetRevisionId ||
+      !/^[A-Za-z0-9._-]{1,120}$/.test(body.expectedAssetRevisionId) ||
+      body.expectedAssetRevisionId.includes('..') ||
+      typeof body.expectedPlanHash !== 'string' || !/^[a-f0-9]{64}$/.test(body.expectedPlanHash)) {
+    throw actionRepairApiError('invalid_accept_request', 'action repair Accept request is invalid')
+  }
+  return body
+}
+
+async function captureFixedRegionActionRepairAcceptance({ job, generatedDir }) {
+  const manifestPath = await resolveGeneratedJobArtifactFile({
+    jobId: job.id,
+    fileName: FIXED_REGION_ACTION_REPAIR_ACCEPTANCE_FILE,
+    allowedFiles: new Set([FIXED_REGION_ACTION_REPAIR_ACCEPTANCE_FILE]),
+    generatedDir,
+  })
+  const manifestBuffer = await readFile(manifestPath)
+  if (manifestBuffer.byteLength <= 0 || manifestBuffer.byteLength > 4 * 1024 * 1024 ||
+      sha256ActionRepairBytes(manifestBuffer) !== job.action_repair_manifest_sha256) {
+    throw actionRepairApiError('artifact_integrity_failed', 'action repair acceptance manifest changed')
+  }
+  let manifest
+  try {
+    manifest = assertFixedRegionActionRepairAcceptanceManifest(
+      JSON.parse(manifestBuffer.toString('utf8')),
+    )
+  } catch {
+    throw actionRepairApiError('artifact_integrity_failed', 'action repair acceptance manifest is invalid')
+  }
+  const allowedFiles = new Set(manifest.artifacts.map((entry) => entry.file_name))
+  const captured = []
+  let totalBytes = 0
+  for (const entry of manifest.artifacts) {
+    const filePath = await resolveGeneratedJobArtifactFile({
+      jobId: job.id,
+      fileName: entry.file_name,
+      allowedFiles,
+      generatedDir,
+    })
+    const content = await readFile(filePath)
+    totalBytes += content.byteLength
+    if (content.byteLength !== entry.byte_length || content.byteLength <= 0 ||
+        totalBytes > 512 * 1024 * 1024 || sha256ActionRepairBytes(content) !== entry.sha256) {
+      throw actionRepairApiError('artifact_integrity_failed', 'action repair candidate artifact changed')
+    }
+    captured.push({
+      key: entry.key,
+      fileName: entry.file_name,
+      content,
+      size: content.byteLength,
+      sha256: entry.sha256,
+    })
+  }
+  captured.push({
+    key: fixedRegionActionRepairArtifactKey(FIXED_REGION_ACTION_REPAIR_ACCEPTANCE_FILE),
+    fileName: FIXED_REGION_ACTION_REPAIR_ACCEPTANCE_FILE,
+    content: manifestBuffer,
+    size: manifestBuffer.byteLength,
+    sha256: job.action_repair_manifest_sha256,
+  })
+  const reviewEntry = captured.find((entry) => entry.key === 'action_repair_review')
+  if (!reviewEntry) throw actionRepairApiError('artifact_integrity_failed', 'action repair review contract is missing')
+  let reviewContract
+  try {
+    reviewContract = assertFixedRegionActionRepairReviewContract(
+      JSON.parse(reviewEntry.content.toString('utf8')),
+    )
+  } catch {
+    throw actionRepairApiError('artifact_integrity_failed', 'action repair review contract is invalid')
+  }
+  return { manifest, manifestBuffer, reviewContract, captured }
+}
+
+function acceptedActionRepairRevision(project, assetId, jobId) {
+  const asset = project?.assets?.[assetId]
+  if (!asset) return null
+  const revision = Object.values(asset.revisions ?? {}).find((item) => item.source_job_id === jobId)
+  return revision ? { asset, revision } : null
+}
+
 export async function handleEditorProjectApi(req, res, options = {}) {
   const {
     projectRoot = process.cwd(),
     workspaceRoot = path.join(projectRoot, 'workspace'),
     generatedDir = path.join(projectRoot, 'generated'),
-    reprocessGeneratedDir = path.join(projectRoot, 'generated'),
+    specializedGeneratedDir = path.join(projectRoot, 'generated'),
     artifactAccessRegistry,
-    characterReprocessCoordinator = null,
-    reprocessService = null,
-    frameRepairCoordinator = null,
-    frameRepairService = null,
-    frameRepairQualityGateCoordinator = null,
+    getGeneratedJob = null,
+    updateGeneratedJob = null,
   } = options
-  void reprocessGeneratedDir
   if (
     !artifactAccessRegistry ||
     typeof artifactAccessRegistry.register !== 'function' ||
@@ -427,10 +442,8 @@ export async function handleEditorProjectApi(req, res, options = {}) {
       if (req.method === 'POST' && parts[4] === 'import-job' && parts.length === 5) {
         const body = await readJsonBody(req)
         const jobId = body.jobId ?? body.job_id
-        const recordedJob = reprocessService?.getJob?.(jobId)
-        const recordedFrameRepairJob = frameRepairService?.getJob?.(jobId)
-        if (recordedJob?.type === 'editor_character_reprocess' ||
-            recordedFrameRepairJob?.type === 'editor_character_frame_repair') {
+        const recordedGeneratedJob = getGeneratedJob?.(jobId)
+        if (recordedGeneratedJob?.type === 'fixed_region_source_provider_repair') {
           const error = new Error('specialized editor jobs require specialized acceptance')
           error.code = 'specialized_accept_required'
           throw error
@@ -444,14 +457,31 @@ export async function handleEditorProjectApi(req, res, options = {}) {
           projectRoot,
           workspaceRoot,
           mutate: async (project) => {
+            const assetId = body.assetId ?? body.asset_id
+            const expectedAssetRevisionId = body.expectedAssetRevisionId ?? body.expected_asset_revision_id
+            if (expectedAssetRevisionId != null) {
+              if (typeof expectedAssetRevisionId !== 'string' || !expectedAssetRevisionId.trim()) {
+                const error = new Error('expectedAssetRevisionId must be a non-empty string')
+                error.code = 'invalid_accept_request'
+                throw error
+              }
+              const targetAsset = project.assets?.[assetId]
+              if (!targetAsset || targetAsset.active_revision_id !== expectedAssetRevisionId ||
+                  !targetAsset.revisions?.[expectedAssetRevisionId]) {
+                const error = new Error('active asset revision changed before candidate acceptance')
+                error.code = 'asset_revision_conflict'
+                throw error
+              }
+            }
             imported = await importGeneratedJobAsAsset({
               project,
               kind: body.kind,
               jobId,
               generatedDir,
+              specializedContextGeneratedDir: specializedGeneratedDir,
               projectRoot,
               workspaceRoot,
-              assetId: body.assetId ?? body.asset_id,
+              assetId,
               name: body.name,
               productionStatus: body.productionStatus ?? body.production_status,
               readyOverrideReason: body.readyOverrideReason ?? body.ready_override_reason,
@@ -499,184 +529,144 @@ export async function handleEditorProjectApi(req, res, options = {}) {
         })
       }
 
-      if (parts[4] === 'frame-repair-quality-gates') {
-        const knownRoute = (
-          req.method === 'POST' && parts.length === 5
-        ) || (
-          req.method === 'POST' && parts.length === 6 && ['setup', 'plan'].includes(parts[5])
-        ) || (
-          req.method === 'GET' && parts.length === 6
-        ) || (
-          req.method === 'POST' && parts.length === 7 && parts[6] === 'finalize'
-        ) || (
-          req.method === 'POST' && parts.length === 9 && parts[6] === 'cases' &&
-          ['review', 'outcome'].includes(parts[8])
-        )
-        if (!knownRoute) return sendJson(res, 404, { error: 'not_found' })
-        if (!frameRepairQualityGateCoordinator) {
-          return sendJson(res, 503, {
-            error: 'frame_repair_quality_gate_unavailable',
-            reason: 'frame repair quality gate is unavailable',
-          })
-        }
-        const readQualityGateBody = () => readJsonBody(req, { maxBytes: 128 * 1024 })
-        if (req.method === 'POST' && parts[5] === 'setup' && parts.length === 6) {
-          const body = await readQualityGateBody()
-          const result = await frameRepairQualityGateCoordinator.setupQualityGate({
-            sourceProjectId: projectId,
-            body,
-          })
-          return sendJson(res, 201, result)
-        }
-        if (req.method === 'POST' && parts[5] === 'plan' && parts.length === 6) {
-          const body = await readQualityGateBody()
-          const result = await frameRepairQualityGateCoordinator.planQualityGate({ projectId, body })
-          return sendJson(res, 200, result)
-        }
-        if (req.method === 'POST' && parts.length === 5) {
-          const body = await readQualityGateBody()
-          const result = await frameRepairQualityGateCoordinator.startQualityGate({ projectId, body })
-          return sendJson(res, 201, result)
-        }
-        if (req.method === 'GET' && parts[5] && parts.length === 6) {
-          const result = await frameRepairQualityGateCoordinator.getQualityGate({
-            projectId,
-            sessionId: parts[5],
-          })
-          return sendJson(res, 200, result)
-        }
-        if (req.method === 'POST' && parts[5] && parts[6] === 'cases' && parts[7] &&
-            parts[8] === 'review' && parts.length === 9) {
-          const body = await readQualityGateBody()
-          const result = await frameRepairQualityGateCoordinator.recordQualityGateReview({
-            projectId,
-            sessionId: parts[5],
-            caseId: parts[7],
-            body,
-          })
-          return sendJson(res, 200, result)
-        }
-        if (req.method === 'POST' && parts[5] && parts[6] === 'cases' && parts[7] &&
-            parts[8] === 'outcome' && parts.length === 9) {
-          const body = await readQualityGateBody()
-          const result = await frameRepairQualityGateCoordinator.recordQualityGateOutcome({
-            projectId,
-            sessionId: parts[5],
-            caseId: parts[7],
-            body,
-          })
-          return sendJson(res, 200, result)
-        }
-        if (req.method === 'POST' && parts[5] && parts[6] === 'finalize' && parts.length === 7) {
-          const body = await readQualityGateBody()
-          const result = await frameRepairQualityGateCoordinator.finalizeQualityGate({
-            projectId,
-            sessionId: parts[5],
-            body,
-          })
-          return sendJson(res, 200, result)
-        }
-      }
-
       if (parts[4] === 'assets' && parts[5]) {
         const assetId = parts[5]
 
-        if (req.method === 'POST' && parts[6] === 'frame-repair' &&
-            parts[7] === 'plan' && parts.length === 8) {
-          if (!frameRepairCoordinator) {
-            return sendJson(res, 503, {
-              error: 'frame_repair_unavailable',
-              reason: 'targeted frame repair is unavailable',
-            })
-          }
-          const body = await readJsonBody(req)
-          const result = await frameRepairCoordinator.planFrameRepair({ projectId, assetId, body })
-          return sendJson(res, 200, result)
-        }
-
-        if (req.method === 'POST' && parts[6] === 'frame-repair' && parts.length === 7) {
-          if (!frameRepairCoordinator) {
-            return sendJson(res, 503, {
-              error: 'frame_repair_unavailable',
-              reason: 'targeted frame repair is unavailable',
-            })
-          }
-          const body = await readJsonBody(req)
-          const result = await frameRepairCoordinator.submitFrameRepair({ projectId, assetId, body })
-          return sendJson(res, 202, result)
-        }
-
-        if (req.method === 'GET' && parts[6] === 'frame-repair' &&
-            parts[7] === 'operations' && parts[8] && parts.length === 9) {
-          if (!frameRepairCoordinator) {
-            return sendJson(res, 503, {
-              error: 'frame_repair_unavailable',
-              reason: 'targeted frame repair is unavailable',
-            })
-          }
-          const result = await frameRepairCoordinator.getFrameRepairOperation({
-            projectId,
-            assetId,
-            operationId: parts[8],
-          })
-          return sendJson(res, 200, result)
-        }
-
-        if (req.method === 'POST' && parts[6] === 'frame-repair' && parts[7] &&
+        if (req.method === 'POST' && parts[6] === 'action-repair' && parts[7] &&
             parts[8] === 'accept' && parts.length === 9) {
-          if (!frameRepairCoordinator) {
+          if (typeof getGeneratedJob !== 'function' || typeof updateGeneratedJob !== 'function') {
             return sendJson(res, 503, {
-              error: 'frame_repair_unavailable',
-              reason: 'targeted frame repair is unavailable',
+              error: 'action_repair_unavailable',
+              reason: 'action repair acceptance is unavailable',
             })
           }
-          const body = await readJsonBody(req)
-          const result = await frameRepairCoordinator.acceptFrameRepair({
-            projectId,
-            assetId,
-            jobId: parts[7],
-            body,
+          const body = parseFixedRegionActionRepairAcceptRequest(await readJsonBody(req, { maxBytes: 32 * 1024 }))
+          const jobId = parts[7]
+          const job = getGeneratedJob(jobId)
+          if (!job) throw actionRepairApiError('job_not_found', 'action repair candidate job not found')
+          if (job.type !== 'fixed_region_source_provider_repair') {
+            throw actionRepairApiError('identity_mismatch', 'candidate is not a three-atlas action repair job')
+          }
+          if (job.status !== 'done') {
+            throw actionRepairApiError('job_not_ready', 'action repair candidate is not ready for acceptance')
+          }
+          if (job.project_id !== projectId || job.asset_id !== assetId ||
+              job.parent_revision_id !== body.expectedAssetRevisionId ||
+              job.action_repair_plan_hash !== body.expectedPlanHash ||
+              job.provider_call_budget?.used_provider_calls !== 1 ||
+              job.repair_status !== 'source_repaired' || job.source_scope_status !== 'scope_pass' ||
+              job.outside_selected_changed_pixels !== 0 ||
+              typeof job.action_repair_manifest_sha256 !== 'string' ||
+              !/^[a-f0-9]{64}$/.test(job.action_repair_manifest_sha256)) {
+            throw actionRepairApiError('identity_mismatch', 'action repair candidate job identity is incomplete')
+          }
+          if (job.accepted === true) {
+            const current = await loadEditorProject({ projectId, projectRoot, workspaceRoot })
+            const accepted = acceptedActionRepairRevision(current.project, assetId, jobId)
+            if (!accepted || accepted.revision.parent_revision_id !== job.parent_revision_id ||
+                accepted.revision.id !== job.accepted_revision_id) {
+              throw actionRepairApiError('accept_conflict', 'accepted action repair revision identity changed')
+            }
+            return sendJson(res, 200, {
+              project: current.project,
+              asset: accepted.asset,
+              revision: accepted.revision,
+              saved: 'already_accepted',
+            })
+          }
+          const captured = await captureFixedRegionActionRepairAcceptance({
+            job,
+            generatedDir: specializedGeneratedDir,
           })
-          return sendJson(res, 200, result)
-        }
+          const manifest = captured.manifest
+          if (manifest.job_id !== job.id || manifest.identity.project_id !== projectId ||
+              manifest.identity.asset_id !== assetId ||
+              manifest.identity.parent_revision_id !== body.expectedAssetRevisionId ||
+              manifest.identity.source_job_id !== job.source_job_id ||
+              manifest.review.plan_hash !== body.expectedPlanHash ||
+              manifest.review.review_id !== job.action_repair_review_id ||
+              manifest.review.reference_manifest_sha256 !== job.action_repair_reference_manifest_sha256 ||
+              captured.reviewContract.plan_hash !== body.expectedPlanHash) {
+            throw actionRepairApiError('identity_mismatch', 'sealed action repair candidate identity changed')
+          }
 
-        if (req.method === 'POST' && parts[6] === 'reprocess' && parts.length === 7) {
-          if (!characterReprocessCoordinator) {
-            return sendJson(res, 503, {
-              error: 'reprocess_unavailable',
-              reason: 'local character reprocess is unavailable',
+          const existingLoaded = await loadEditorProject({ projectId, projectRoot, workspaceRoot })
+          const existing = acceptedActionRepairRevision(existingLoaded.project, assetId, jobId)
+          if (existing) {
+            if (existing.revision.parent_revision_id !== manifest.identity.parent_revision_id) {
+              throw actionRepairApiError('accept_conflict', 'accepted action repair revision identity changed')
+            }
+            await updateGeneratedJob(jobId, {
+              accepted: true,
+              requires_user_confirmation: false,
+              accepted_revision_id: existing.revision.id,
+            })
+            return sendJson(res, 200, {
+              project: existingLoaded.project,
+              asset: existing.asset,
+              revision: existing.revision,
+              saved: 'already_accepted',
             })
           }
-          const body = await readJsonBody(req)
-          const result = await characterReprocessCoordinator.submitCharacterReprocessPreview({
-            projectId,
-            assetId,
-            body,
-          })
-          return sendJson(res, 202, result)
-        }
 
-        if (
-          req.method === 'POST' &&
-          parts[6] === 'reprocess' &&
-          parts[7] &&
-          parts[8] === 'accept' &&
-          parts.length === 9
-        ) {
-          if (!characterReprocessCoordinator) {
-            return sendJson(res, 503, {
-              error: 'reprocess_unavailable',
-              reason: 'local character reprocess is unavailable',
+          let imported
+          let saved
+          try {
+            saved = await mutateEditorProject({
+              projectId,
+              expectedRevision: body.expectedRevision,
+              projectRoot,
+              workspaceRoot,
+              mutate: async (project) => {
+                const asset = project.assets?.[assetId]
+                if (!asset || asset.active_revision_id !== body.expectedAssetRevisionId ||
+                    !asset.revisions?.[body.expectedAssetRevisionId]) {
+                  throw actionRepairApiError('asset_revision_conflict', 'active asset revision changed before action repair acceptance')
+                }
+                imported = await importAcceptedFixedRegionActionRepairAsAsset({
+                  project,
+                  assetId,
+                  jobId,
+                  projectRoot,
+                  workspaceRoot,
+                  verifiedReviewContract: captured.reviewContract,
+                  verifiedAcceptanceManifest: manifest,
+                  verifiedArtifactManifest: captured.captured,
+                })
+                return imported.project
+              },
             })
+          } catch (error) {
+            if (['revision_conflict', 'accept_conflict'].includes(error?.code)) {
+              const current = await loadEditorProject({ projectId, projectRoot, workspaceRoot })
+              const accepted = acceptedActionRepairRevision(current.project, assetId, jobId)
+              if (accepted && accepted.revision.parent_revision_id === manifest.identity.parent_revision_id) {
+                await updateGeneratedJob(jobId, {
+                  accepted: true,
+                  requires_user_confirmation: false,
+                  accepted_revision_id: accepted.revision.id,
+                })
+                return sendJson(res, 200, {
+                  project: current.project,
+                  asset: accepted.asset,
+                  revision: accepted.revision,
+                  saved: 'already_accepted',
+                })
+              }
+            }
+            throw error
           }
-          const body = await readJsonBody(req)
-          const result = await characterReprocessCoordinator.acceptCharacterReprocessPreview({
-            projectId,
-            assetId,
-            jobId: parts[7],
-            body,
+          await updateGeneratedJob(jobId, {
+            accepted: true,
+            requires_user_confirmation: false,
+            accepted_revision_id: imported.revision.id,
           })
-          return sendJson(res, 200, result)
+          return sendJson(res, 200, {
+            project: saved.project,
+            asset: saved.project.assets[assetId],
+            revision: imported.revision,
+            saved: saved.saved,
+          })
         }
 
         if (req.method === 'POST' && parts[6] === 'unlink' && parts.length === 7) {
@@ -740,11 +730,7 @@ export async function handleEditorProjectApi(req, res, options = {}) {
 
     return sendJson(res, 404, { error: 'not_found' })
   } catch (error) {
-    const qualityGateRoute = parts[4] === 'frame-repair-quality-gates'
-    return sendJson(res, statusForError(error, {
-      frameRepairRoute: parts[6] === 'frame-repair',
-      qualityGateRoute,
-    }), errorBody(error, { qualityGateRoute }))
+    return sendJson(res, statusForError(error), errorBody(error))
   }
 }
 

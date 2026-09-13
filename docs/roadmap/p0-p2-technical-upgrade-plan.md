@@ -153,103 +153,33 @@ RSS and `3` peak processes.
 
 ## P0: Release And Repository Readiness
 
-Status: complete on 2026-07-17 under
-`docs/superpowers/plans/2026-07-17-public-preview-release-readiness.md`.
+Status: v0.5.0 release readiness completed and publication approved on
+2026-08-13.
 
-Public source-preview and website cutover completed on 2026-07-17: the
-history-independent `dyk1454683243-sudo/moteweave` mirror is public with
-protected `main`; serial Node 22/24 CI, authenticated and anonymous install,
-release verification, full tests, provider-free smoke, and source-archive
-checks passed. The `v0.5.0-preview.1` tag and source-only prerelease are live.
-The Git-integrated production cutover at `https://moteweave.pages.dev/` was
-verified from protected `main` commit
-`34f44d472b2f56f12d2a2884243a51b47d5f8179` and passed its production checks.
-The retained `https://gametool.pages.dev/` project provides a verified
-path-preserving HTTP `302` transition. Provider calls remained `0`.
-
-The follow-up `v0.5.0-preview.2` snapshot completed on 2026-07-17 under
-`docs/superpowers/plans/2026-07-17-public-preview-2-release-readiness.md`. It
-publishes only the completed Generation Release Gate fail-closed hardening on
-top of the release-safe MoteWeave baseline. It did not reopen Provider,
-semantic, adaptive-candidate, packaging, or hosted-service scope, and the
-accepted `v0.5.0-preview.1` ref remains unchanged at `96078b5`.
-
-Public PR `#4`, the source-only `v0.5.0-preview.2` prerelease, generated source
-archives, protected `main@5a28665`, and the Git-integrated production site all
-passed. The tagged candidate and protected main share tree `19ceaf4`; public
-branch, PR, tag, and main Node 22/24 CI passed. A credential-free clone passed
-release checking, guarded locked install, and provider-free smoke. The new site
-serves the preview.2 CTA and canonical/OG metadata over HTTP `200`, while the
-legacy site retains its path-preserving HTTP `302`. Provider calls remained
-`0`.
-
-The provider-free first-user acceptance follow-up completed on 2026-07-18
-under
-`docs/superpowers/plans/2026-07-18-provider-free-first-user-acceptance.md`,
-with its decision recorded in
-`docs/decisions/2026-07-18-provider-free-first-user-acceptance.md`. It closes
-real Character UI request-truth gaps and adds a fail-closed Motion
-reprocess/re-export action on the private engineering line. The guarded local
-journey passed with zero Provider calls, parsed all four package families, and
-the full suite passed `1555/1555`. Preview 3 readiness planning is GO, while
-publication remains NO-GO pending an exact candidate, clean release gates, and
-fresh project-lead approval. Preview 2 and all public surfaces remain unchanged.
-
-The sole Preview 3 comparison baseline is the completed Preview 2 private
-publication record `7ff88c1`. Preview 2 remains bound to private snapshot source
-`91bb57e`, public tag candidate `21cd29e`, protected public `main@5a28665`, and
-shared public tree `19ceaf4`. Preview 1 and Preview 2 release worktrees are
-closed to new development and retained as read-only historical evidence.
-
-Private `v0.5.0-preview.3` readiness now proceeds under
-`docs/superpowers/plans/2026-07-18-public-preview-3-release-readiness.md` from
-accepted feature head `e8a4b93`. The scope is limited to the verified
-provider-free first-user UI and Motion reprocess/re-export delta. Semantic PR
-`#18` remains excluded. Private candidate assembly and clean snapshot evidence
-are approved; any public mirror branch/PR, tag, prerelease, merge, or Pages
-update remains NO-GO until its separately defined approval gate.
-
-- Release `v0.5.0-preview.1` as a source-only GitHub prerelease from a new,
-  history-free public snapshot repository.
-- Keep the private repository as the Preview engineering source of truth and
-  treat the public repository as a reviewed release mirror.
-- Use the approved `MoteWeave` / `moteweave` brand across the source Preview,
-  while retaining separate explicit approvals for public repository visibility,
-  final tag creation, and the new Pages deployment.
-- Integrate the website/A-E baseline and Frame Repair Live Quality Gate into one
-  private release commit before any export.
-- Replace assets without provable redistribution evidence, neutralize named-IP
-  fixture identifiers, remove real workstation paths, and require provenance
-  for every active binary asset.
-- Keep `package.json` private, support Node 22/24, and add deterministic
-  `release:check` and `release:export` commands.
-- Run release verification without Provider calls or bundled third-party
-  binaries.
-- Use `docs/runbooks/github-release-readiness.md` before visibility changes,
-  tagging, or website cutover.
+- Keep public release metadata aligned across `package.json`,
+  `package-lock.json`, `README.md`, and `CHANGELOG.md`.
+- Preserve `.env`, `generated/`, `output/`, dependencies, and local scratch
+  files as untracked release-excluded data.
+- Use `docs/runbooks/github-release-readiness.md` before publishing or tagging.
+- Treat the recorded v0.4 live scene gate as a release smoke only.
 
 Done when:
 
-- the final display name, package/repository slug, and Pages project name have
-  explicit project-lead approval;
-- both release-source branch heads are ancestors of one verified private release
-  commit;
-- the public snapshot contains no unproven asset, real secret, personal path,
-  ignored artifact directory, untracked scratch file, or private Git history;
-- README, package metadata, lockfile, CHANGELOG, website metadata, and the
-  active target release version agree;
-- guarded Node 22/24 tests, release checks, site checks, and local smoke pass
-  provider-free from a fresh exported snapshot;
-- the new repository passes private clean-clone review before explicit approval
-  changes it to public;
-- the final-brand website links only to the real public repository and
-  prerelease;
-- the final-brand Git-integrated Pages production deployment is built from
-  protected `main`, returns HTTP `200`, and passes repository/Release CTA,
-  canonical URL, OG metadata, security-header, responsive-layout, and
-  capability-boundary checks;
-- the retained legacy Pages project returns a verified path-preserving HTTP
-  `302` transition for both root and nested paths, with no reverse redirect.
+- `npm test` is green.
+- README and release notes describe the implemented v0.5.0 release honestly,
+  including the v0.4 Scene/Project claim boundaries.
+- Git status is reviewed and only intended files are staged.
+
+Completion evidence: `package.json`, `package-lock.json`, README, CHANGELOG,
+and the v0.5.0 release notes agree on version and publication boundary;
+ATTRIBUTIONS covers every direct dependency and maintained public-format or
+research reference; the guarded full suite passed `1218 / 1218` in 149.328
+seconds at 793,760 KiB peak process-tree RSS and 5 peak processes. The focused
+Motion lifecycle file passed `11 / 11` after its test-only process-startup
+window was made robust under full-suite load. Protected generated/output,
+dependency, secret, cache, and scratch paths remain excluded. Readiness
+verification made no Provider call or generated product artifact; the Git tag
+and GitHub Release are separate publication records.
 
 ## P1: Scene Quality Evidence And API Boundaries
 

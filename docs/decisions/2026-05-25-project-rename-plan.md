@@ -2,7 +2,7 @@
 
 Date: 2026-05-25
 
-Status: Superseded by `2026-07-17-public-brand-selection.md`
+Status: Partially Implemented
 
 ## Context
 
@@ -13,10 +13,6 @@ The repository previously used temporary names containing `frameronin` and `Roni
 Use `AI Character Pack Tool` as the neutral temporary name while selecting a distinctive final v1.0 name.
 
 The temporary neutral name is now present in the package name, README title, browser title, and default provider app labels. The final public product name remains undecided and should be selected before v1.0 or any broad public launch.
-
-This temporary-name decision was superseded on 2026-07-17 when the project lead
-approved `MoteWeave` / `moteweave` for the source Preview. See
-`docs/decisions/2026-07-17-public-brand-selection.md`.
 
 ## Rename Scope
 

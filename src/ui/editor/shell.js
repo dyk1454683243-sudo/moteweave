@@ -1,11 +1,8 @@
 import {
-  acceptCharacterFrameRepair, acceptCharacterReprocessPreview, autosaveEditorProject, buildCharacterReprocessPreview,
-  createEditorProject, deleteEditorAsset, exportEditorProjectPack, fetchEditorArtifactJson,
-  fetchCharacterProviderState, fetchJob, generateCharacterFrameRepair, importGeneratedJob,
-  loadEditorProject, planCharacterFrameRepair, recoverCharacterFrameRepair, repairCharacterAction,
-  saveEditorProject, unlinkEditorAsset, waitForJob,
+  autosaveEditorProject, createEditorProject, deleteEditorAsset, exportEditorProjectPack,
+  fetchEditorArtifactJson, importGeneratedJob, loadEditorProject,
+  saveEditorProject, unlinkEditorAsset,
 } from './api.js'
-import { TOPDOWN_RPG_V0 } from '../../character-pack/profile.js'
 import { buildAssetLibraryEntry } from '../../editor-project/assetLibrary.js'
 import {
   createAnimationRuntimeState, frameStateForLayer, resetLayerElapsed, resolveLayerClip,
@@ -22,6 +19,7 @@ import {
   updateSceneFlowNode,
 } from '../../editor-project/sceneFlow.js'
 import { commitHistory, createCommandHistory, redoHistory, undoHistory } from '../../editor-project/history.js'
+import { resolveFrameBatchRepairSelection } from '../../editor-project/frameBatchRepairSelection.js'
 import {
   appendLayerToScene, canAddAssetToScene, clampPositionToScene, createLayerFromAsset,
   interactionZoneBoxInView, layerBoxInView, moveSceneLayer, snapPoint, updateSceneLayer,
@@ -41,24 +39,15 @@ import {
 import { renderEditorSceneFrame } from './sceneRenderer.js'
 import { createSceneRenderLifecycle } from './sceneRenderLifecycle.js'
 import { createRepairArtifactClient } from './artifactClient.js'
-import { createRepairComparisonRenderer } from './repairComparisonRenderer.js'
-import { createFrameRepairController } from './frameRepairController.js'
-import { createFrameRepairLifecycle } from './frameRepairLifecycle.js'
-import { createFrameRepairQualityGateRuntime } from './frameRepairQualityGateShell.js'
-import { hashRepairRecipeBytes } from './repairHash.js'
-import { createRepairPreviewLifecycle } from './repairPreviewLifecycle.js'
+import { createAiActionRepairWorkflow } from './aiActionRepairWorkflow.js'
 import { createRepairWorkbenchController } from './repairWorkbenchController.js'
-import { buildRepairUiStateModel, createRepairWorkbenchPanel } from './repairWorkbenchPanel.js'
-import { addEditorLog, createEmptyFrameRepairState, createEmptyLocalRepairState, editorState } from './state.js'
+import { createRepairWorkbenchPanel } from './repairWorkbenchPanel.js'
+import { addEditorLog, createEmptyActionRepairSelectionState, editorState } from './state.js'
 let animationFrameRequest = null
 let unbindPlaytestInput = null
 let repairWorkbench = null
 let repairController = null
-let targetedFrameRepair = null
-let frameRepairQualityGate = null
-let qualityGateProjectAdoption = false
-let frameRepairProviderAbort = null
-let frameRepairProviderPromise = null
+let aiActionRepairWorkflow = null
 let mountedRepairSelectionKey = null
 let previousBottomPanel = null
 const elements = {
@@ -66,40 +55,6 @@ const elements = {
   stagePanel: document.querySelector('.editor-stage-panel'),
 }
 const repairArtifactClient = createRepairArtifactClient()
-const repairPreviewLifecycle = createRepairPreviewLifecycle({
-  buildPreview: buildCharacterReprocessPreview,
-  acceptPreview: acceptCharacterReprocessPreview,
-  fetchJob,
-  hashDraft: hashRepairRecipeBytes,
-  onUpdate: (event) => repairController?.handleLifecycleUpdate(event),
-  onLateAccept: ({ selection, outcomeUnknown, error }) => {
-    const message = outcomeUnknown
-      ? `Repair Accept outcome for ${selection.projectId} is unknown (${error?.message ?? 'network error'}); reload that project before retrying.`
-      : `Repair accepted for ${selection.projectId}; reload that project to view it.`
-    addEditorLog(message)
-    const live = document.querySelector('#editor-stage-live')
-    if (live) live.textContent = message
-  },
-  onInvalidate: () => {
-    if (editorState.repair?.local) editorState.repair.local.warningConfirmation = null
-  },
-})
-const targetedFrameRepairLifecycle = createFrameRepairLifecycle({
-  plan: planCharacterFrameRepair,
-  generate: generateCharacterFrameRepair,
-  recover: recoverCharacterFrameRepair,
-  fetchJob,
-  accept: acceptCharacterFrameRepair,
-  onUpdate: (event) => targetedFrameRepair?.handleLifecycleUpdate(event),
-  onLateAccept: ({ selection, outcomeUnknown, error }) => {
-    const message = outcomeUnknown
-      ? `Frame Repair Accept outcome for ${selection.projectId} is unknown (${error?.message ?? 'network error'}); reload that project before retrying.`
-      : `Frame Repair accepted for ${selection.projectId}; reload that project to view it.`
-    addEditorLog(message)
-    const live = document.querySelector('#editor-stage-live')
-    if (live) live.textContent = message
-  },
-})
 function clone(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value))
 }
@@ -305,6 +260,9 @@ function resetRepairStateForSelection(asset = selectedRepairAsset()) {
   editorState.repair.aiAction = {
     ...ai,
     selectedAction: Object.keys(asset?.clips ?? {})[0] ?? '',
+    selectedRegionKeys: [],
+    instruction: 'Correct the selected action slots while preserving the character identity.',
+    equipmentPolicy: 'none',
     plan: null,
     job: null,
     importResult: null,
@@ -320,136 +278,34 @@ function preferredRepairAction() {
   if (actions.includes(ai.selectedAction)) return ai.selectedAction
   return actions[0] ?? ''
 }
-function repairUnsavedReason() {
-  const project = editorState.project
-  if (!project) return 'Load a project before building a repair Preview'
-  if (editorState.dirty) return 'Save scene and project changes before building or accepting a repair Preview'
-  const name = $('#editor-project-name')?.value.trim()
-  if (name && name !== project.name) return 'Save the project name before building or accepting a repair Preview'
-  return null
-}
-function adoptAcceptedRepair(result) {
-  if (!result?.project) return
-  const acceptedAssetId = result.asset?.id ?? editorState.selectedAssetId
-  acceptProject(result.project)
-  const acceptedAsset = result.asset ?? result.project?.assets?.[acceptedAssetId]
-  editorState.selectedAssetId = acceptedAsset?.id ?? null
-  editorState.selectedLayerId = null
-  editorState.activePanel = 'repair'
-  mountedRepairSelectionKey = null
-  if (acceptedAsset) void ensureRepairController().openAsset(acceptedAsset)
-}
-async function adoptQualityGateProject(project) {
-  if (!project) return
-  const selectedId = editorState.selectedAssetId
-  qualityGateProjectAdoption = true
-  try {
-    acceptProject(project)
-  } finally {
-    qualityGateProjectAdoption = false
-  }
-  const selected = project.assets?.[selectedId]?.kind === 'character_pack'
-    ? project.assets[selectedId]
-    : Object.values(project.assets ?? {}).find((asset) => asset?.kind === 'character_pack') ?? null
-  editorState.selectedAssetId = selected?.id ?? null
-  editorState.selectedLayerId = null
-  editorState.activePanel = 'repair'
-  mountedRepairSelectionKey = null
-  if (selected) await ensureRepairController().openAsset(selected)
-  ensureFrameRepairQualityGate().reopen()
-  renderAll()
-}
-function loadFrameRepairProviderState() {
-  if (editorState.repair.frame?.providerState || frameRepairProviderPromise) return frameRepairProviderPromise
-  frameRepairProviderAbort?.abort()
-  const controller = new AbortController()
-  frameRepairProviderAbort = controller
-  const operation = fetchCharacterProviderState({ signal: controller.signal })
-    .then((providerState) => {
-      if (controller.signal.aborted) return null
-      editorState.repair.frame.providerState = providerState
-      editorState.repair.frame.error = null
-      renderAll()
-      return providerState
-    })
-    .catch((error) => {
-      if (error?.name === 'AbortError' || controller.signal.aborted) return null
-      editorState.repair.frame.error = error
-      addEditorLog(`Frame Repair provider state unavailable: ${error.message ?? error}`)
-      renderAll()
-      return null
-    })
-    .finally(() => {
-      if (frameRepairProviderAbort === controller) frameRepairProviderAbort = null
-      if (frameRepairProviderPromise === operation) frameRepairProviderPromise = null
-    })
-  frameRepairProviderPromise = operation
-  return operation
+function selectedBatchRepairSelection() {
+  return resolveFrameBatchRepairSelection({
+    targets: editorState.repair.local.frameBatchRepairTargets,
+    selectedRegionKeys: editorState.repair.aiAction.selectedRegionKeys,
+  })
 }
 function ensureRepairController() {
   if (repairController) return repairController
-  targetedFrameRepair ??= createFrameRepairController({
-    state: editorState,
-    lifecycle: targetedFrameRepairLifecycle,
-    artifactClient: repairArtifactClient,
-    profile: TOPDOWN_RPG_V0,
-    requestRender: renderAll,
-    onProjectAccepted: adoptAcceptedRepair,
-    announce: (message) => { $('#editor-stage-live').textContent = message },
-  })
   repairController = createRepairWorkbenchController({
     state: editorState,
-    profile: TOPDOWN_RPG_V0,
     artifactClient: repairArtifactClient,
-    lifecycle: repairPreviewLifecycle,
     getSelectedAsset: selectedRepairAsset,
     requestRender: renderAll,
     addLog: addEditorLog,
     renderAiActionContent: renderExistingAiActionRepair,
-    getUnsavedReason: repairUnsavedReason,
-    frameRepairController: targetedFrameRepair,
   })
-  void loadFrameRepairProviderState()
   return repairController
-}
-function ensureFrameRepairQualityGate() {
-  if (frameRepairQualityGate) return frameRepairQualityGate
-  frameRepairQualityGate = createFrameRepairQualityGateRuntime({
-    repairWorkbench: ensureRepairController(),
-    frameRepair: targetedFrameRepair,
-    getCurrentProject: () => editorState.project,
-    adoptProject: adoptQualityGateProject,
-    artifactClient: repairArtifactClient,
-    requestRender: renderAll,
-    announce: (message) => { $('#editor-stage-live').textContent = message },
-    matchMedia: window.matchMedia.bind(window),
-  })
-  return frameRepairQualityGate
 }
 function ensureRepairWorkbench() {
   if (repairWorkbench) return repairWorkbench
   repairWorkbench = createRepairWorkbenchPanel({
     root: $('#editor-panel-body'),
-    lifecycle: repairPreviewLifecycle,
-    createRenderer: (canvas) => createRepairComparisonRenderer({
-      canvas,
-      requestFrame: window.requestAnimationFrame.bind(window),
-      cancelFrame: window.cancelAnimationFrame.bind(window),
-      observeResize: (callback) => {
-        const observer = new ResizeObserver((entries) => callback(entries[0]?.contentRect))
-        observer.observe(canvas)
-        return observer
-      },
-    }),
-    onProjectAccepted: adoptAcceptedRepair,
     announce: (message) => { $('#editor-stage-live').textContent = message },
   })
   ensureRepairController().attach(repairWorkbench)
-  ensureFrameRepairQualityGate().attachPanel(repairWorkbench)
   return repairWorkbench
 }
 function closeRepairSession(reason) {
-  if (!qualityGateProjectAdoption) frameRepairQualityGate?.close(reason)
   repairWorkbench?.close(reason)
   if (!repairWorkbench) repairController?.close(reason)
   mountedRepairSelectionKey = null
@@ -469,8 +325,6 @@ function ensureSceneHistory(scene = activeScene()) {
   return editorState.sceneHistories[key]
 }
 function acceptProject(project) {
-  const frameRepairProviderState = editorState.repair.frame?.providerState ?? null
-  if (!qualityGateProjectAdoption) frameRepairQualityGate?.handleProjectSwitch()
   closeRepairSession('project_switch')
   stopPlaytest({ render: false, log: false })
   editorState.project = project
@@ -480,11 +334,11 @@ function acceptProject(project) {
   editorState.sceneHistories = {}
   editorState.animationRuntime = createAnimationRuntimeState(runtimeNow())
   editorState.repair = {
-    local: createEmptyLocalRepairState(),
-    frame: { ...createEmptyFrameRepairState(), providerState: frameRepairProviderState },
+    local: createEmptyActionRepairSelectionState(),
     aiAction: {
       ...editorState.repair.aiAction,
       selectedAction: '',
+      selectedRegionKeys: [],
       plan: null,
       job: null,
       importResult: null,
@@ -1061,22 +915,50 @@ function renderRepairPlan(wrap) {
   const ai = editorState.repair.aiAction
   const { plan, job } = ai
   if (!plan && !job && !ai.message) return
+  const { asset, revision } = repairContext()
+  const batch = selectedBatchRepairSelection()
+  const selected = plan?.selected_region_keys?.join(', ') ??
+    job?.selected_region_keys?.join(', ') ??
+    (batch.available ? batch.regionKeys.join(', ') : preferredRepairAction())
+  const sourceMask = plan?.preflight?.source_region_mask
+  const sourceMaskSummary = Array.isArray(sourceMask?.regions)
+    ? `${sourceMask.width}x${sourceMask.height}: ${sourceMask.regions.map((region) => `${region.key}[${region.x},${region.y},${region.w},${region.h}]`).join(' ')}`
+    : 'pending'
   const status = document.createElement('div')
   status.className = 'editor-repair-status'
   status.dataset.status = ai.status
   status.append(
     keyValue('status', ai.message || ai.status),
-    keyValue('selected', plan?.selected_animation ?? job?.selected_animation ?? preferredRepairAction()),
-    keyValue('provider calls', plan?.estimated_provider_calls ?? job?.estimated_provider_calls ?? '-'),
+    keyValue('asset / parent', `${asset?.id ?? '-'} / ${revision?.id ?? '-'}`),
+    keyValue('selected action slots', selected || '-'),
+    keyValue('exact source-region mask', sourceMaskSummary),
+    keyValue('reference inputs', plan?.preflight?.reference_roles?.join(', ') ?? 'identity atlas, pose guide atlas, empty output atlas'),
+    keyValue('source target slots holed', plan?.reference_policy?.source_target_regions_holed === false ? 'no' : '-'),
+    keyValue('provider / model', `${plan?.provider?.provider ?? job?.provider ?? '-'} / ${plan?.provider?.model ?? job?.model ?? '-'}`),
+    keyValue('image size', plan?.image_config?.image_size ?? job?.image_config?.image_size ?? ai.imageSize),
+    keyValue('provider calls planned / used', `${plan?.estimated_provider_calls ?? job?.estimated_provider_calls ?? '-'} / ${job?.provider_call_budget?.used_provider_calls ?? '-'}`),
+    keyValue('review id / plan hash', `${plan?.review_id ?? job?.action_repair_review_id ?? '-'} / ${plan?.plan_hash ?? job?.action_repair_plan_hash ?? '-'}`),
+    keyValue('reference manifest', plan?.reference_manifest_sha256 ?? job?.action_repair_reference_manifest_sha256 ?? '-'),
+    keyValue('pixel scope', job?.source_scope_status
+      ? `${job.source_scope_status}; outside selected = ${job.outside_selected_changed_pixels ?? '-'}`
+      : 'pending'),
+    keyValue('acceptance', ai.importResult ? `accepted as ${ai.importResult.revision?.id ?? 'revision'}` : 'manual confirmation required'),
   )
   const links = linkList([
     ['plan', plan?.repair_plan_url ?? job?.repair_plan_url],
+    ['sealed review contract', plan?.action_repair_review_contract_url ?? job?.action_repair_review_contract_url],
     ['prompt', plan?.repair_prompt_url ?? job?.repair_prompt_url],
-    ['target', plan?.repair_target_animation_reference_url ?? job?.repair_target_animation_reference_url],
+    ['identity anchors', plan?.repair_identity_anchor_atlas_url ?? job?.repair_identity_anchor_atlas_url],
+    ['pose guide', plan?.repair_pose_guide_atlas_url ?? job?.repair_pose_guide_atlas_url],
+    ['empty output atlas', plan?.repair_empty_output_atlas_url ?? job?.repair_empty_output_atlas_url],
     ['summary', job?.repair_summary_url],
-    ['repaired strip', job?.repaired_animation_strip_url],
-    ['repaired sheet', job?.repaired_normalized_sheet_url ?? job?.repaired_source_sheet_url],
-    ['validation', job?.repair_validation_report_url],
+    ['raw provider atlas', job?.raw_provider_repair_output_url],
+    ['atlas extraction', job?.atlas_extraction_report_url],
+    ['review candidate', job?.review_candidate_source_sheet_url],
+    ['scope validation', job?.source_scope_report_url],
+    ['equipment validation', job?.equipment_quality_report_url],
+    ['validation', job?.candidate_validation_report_url],
+    ['sealed acceptance manifest', job?.action_repair_acceptance_manifest_url],
   ])
   status.append(links)
   wrap.append(status)
@@ -1087,11 +969,36 @@ function renderExistingAiActionRepair(container) {
   resetRepairStateForSelection(asset)
   const ai = editorState.repair.aiAction
   const action = preferredRepairAction()
+  const batch = selectedBatchRepairSelection()
+  const busy = ['planning', 'running', 'accepting'].includes(ai.status)
   const body = document.createElement('div')
   body.className = 'editor-repair-ai-action-body'
-  body.append(
-    selectControl('action', action, actions.length ? actions : [''], {
-      disabled: !actions.length || ['planning', 'running'].includes(ai.status),
+  if (batch.available) {
+    const selection = document.createElement('p')
+    selection.className = 'editor-repair-batch-summary'
+    selection.textContent = batch.canPlan
+      ? `${batch.outputFrameCount} linked output frame(s) → ${batch.sourceRegionCount} source action slot(s) in ${batch.actions.length} action group(s) → exactly 1 provider call. The model receives only an identity-anchor atlas, grayscale pose-guide atlas, and independent empty output atlas.`
+      : 'Select every incorrect action frame with the checkboxes below. Mirrored or repeated output frames that share one source slot are linked automatically.'
+    body.append(selection)
+    if (batch.canPlan) {
+      const clearButton = button('Clear selected frames', 'secondary', busy)
+      clearButton.addEventListener('click', () => {
+        editorState.repair.aiAction = {
+          ...editorState.repair.aiAction,
+          selectedRegionKeys: [],
+          plan: null,
+          job: null,
+          importResult: null,
+          status: 'idle',
+          message: '',
+        }
+        renderAll()
+      })
+      body.append(clearButton)
+    }
+  } else {
+    body.append(selectControl('action', action, actions.length ? actions : [''], {
+      disabled: !actions.length || busy,
       onChange: (value) => {
         ai.selectedAction = value
         ai.plan = null
@@ -1099,9 +1006,39 @@ function renderExistingAiActionRepair(container) {
         ai.importResult = null
         renderAll()
       },
+    }))
+  }
+  const instructionLabel = document.createElement('label')
+  instructionLabel.className = 'editor-field'
+  const instructionTitle = document.createElement('span')
+  instructionTitle.textContent = 'action correction instruction'
+  const instruction = document.createElement('textarea')
+  instruction.rows = 3
+  instruction.maxLength = 500
+  instruction.value = ai.instruction
+  instruction.disabled = busy
+  instruction.addEventListener('change', () => {
+    ai.instruction = instruction.value.trim()
+    ai.plan = null
+    ai.job = null
+    ai.importResult = null
+    renderAll()
+  })
+  instructionLabel.append(instructionTitle, instruction)
+  body.append(
+    instructionLabel,
+    selectControl('equipment / held-object policy', ai.equipmentPolicy, ['none', 'preserve', 'separate'], {
+      disabled: busy,
+      onChange: (value) => {
+        ai.equipmentPolicy = value
+        ai.plan = null
+        ai.job = null
+        ai.importResult = null
+        renderAll()
+      },
     }),
     selectControl('image size', ai.imageSize, ['1K', '2K'], {
-      disabled: ['planning', 'running'].includes(ai.status),
+      disabled: busy,
       onChange: (value) => {
         ai.imageSize = value
         ai.plan = null
@@ -1117,7 +1054,7 @@ function renderExistingAiActionRepair(container) {
   providerInput.type = 'text'
   providerInput.value = ai.providerPresetId
   providerInput.placeholder = 'default'
-  providerInput.disabled = ['planning', 'running'].includes(ai.status)
+  providerInput.disabled = busy
   providerInput.addEventListener('change', () => {
     ai.providerPresetId = providerInput.value.trim()
     ai.plan = null
@@ -1127,29 +1064,41 @@ function renderExistingAiActionRepair(container) {
   body.append(provider)
   const actionsRow = document.createElement('div')
   actionsRow.className = 'editor-row-actions'
-  const canPlan = Boolean(revision?.source_job_id && action)
-  const planButton = button('Plan', 'secondary', !canPlan || ['planning', 'running'].includes(ai.status))
+  const canPlan = Boolean(
+    revision?.source_job_id && String(ai.instruction ?? '').trim() &&
+    (batch.available ? batch.canPlan : action),
+  )
+  const planButton = button(batch.available ? 'Review selected action repair' : 'Review action repair', 'secondary', !canPlan || busy)
   planButton.addEventListener('click', planRepairAction)
-  const runButton = button('Run & import revision', '', !ai.plan?.can_run || ai.status === 'running')
+  const runButton = button('Generate one candidate', '', !ai.plan?.can_run || busy || ai.status === 'candidate_ready')
   runButton.addEventListener('click', runRepairAction)
-  actionsRow.append(planButton, runButton)
+  const acceptButton = button(
+    'Accept candidate as revision',
+    '',
+    ai.status !== 'candidate_ready' || ai.job?.status !== 'done' || Boolean(ai.importResult),
+  )
+  acceptButton.addEventListener('click', acceptRepairActionCandidate)
+  actionsRow.append(planButton, runButton, acceptButton)
   body.append(actionsRow)
   container.append(body)
   renderRepairPlan(body)
 }
 function renderRepairUnavailableState(root, asset, local = null) {
-  const state = local
-    ? local.status === 'loading' ? 'loading' : local.error?.code === 'artifact_not_found' ? 'missing_artifact' : local.error?.code === 'unsafe_artifact_path' ? 'unsafe_artifact_path' : 'failed'
-    : !editorState.project ? 'no_project' : !asset ? 'no_asset' : 'unsupported_asset'
-  const model = buildRepairUiStateModel({ state, errorCode: local?.error?.code, details: local?.error?.message })
+  const state = local?.status ?? (!editorState.project ? 'no_project' : !asset ? 'no_asset' : 'unsupported_asset')
+  const messages = {
+    no_project: 'Load a project to use three-atlas action repair.',
+    no_asset: 'Select a Character Pack asset to begin.',
+    unsupported_asset: 'Three-atlas action repair is available for Character Pack assets.',
+    loading: 'Loading authoritative action-slot mapping…',
+  }
   const wrap = document.createElement('div')
   wrap.className = 'editor-repair-load-state'
   wrap.dataset.status = state
   wrap.setAttribute('aria-live', 'polite')
   const message = document.createElement('p')
-  message.textContent = [model.message, model.errorText].filter(Boolean).join(' ')
+  message.textContent = local?.message || messages[state] || 'Three-atlas action repair is unavailable.'
   wrap.append(message)
-  if (model.actionAvailability.retry) {
+  if (asset && local?.status === 'failed') {
     const retryButton = button('Retry', 'secondary')
     retryButton.addEventListener('click', () => { void ensureRepairController().openAsset(asset) })
     wrap.append(retryButton)
@@ -1175,8 +1124,8 @@ function renderRepairPanel() {
     local.selection?.projectRevision === editorState.project.revision &&
     local.selection?.assetId === asset.id &&
     local.selection?.revisionId === revision.id
-  if (!selectionMatches || !local.draft) {
-    if (!selectionMatches || ['idle', 'paused'].includes(local.status)) {
+  if (!selectionMatches || local.status !== 'ready') {
+    if (!selectionMatches || local.status === 'idle') {
       void ensureRepairController().openAsset(asset)
     }
     renderRepairUnavailableState(root, asset, editorState.repair.local)
@@ -2660,109 +2609,24 @@ function currentProjectFields() {
     name: $('#editor-project-name').value.trim(),
   }
 }
-function repairRequest({ live = false } = {}) {
-  const ai = editorState.repair.aiAction
-  const { revision } = repairContext()
-  const action = preferredRepairAction()
-  return {
-    jobId: revision?.source_job_id,
-    animation: action,
-    actions: action ? [action] : [],
-    providerPresetId: ai.providerPresetId || undefined,
-    imageConfig: { image_size: ai.imageSize || '1K' },
-    ...(live
-      ? { confirm_live_generation: true, maxProviderCalls: 1 }
-      : { dryRunPlan: true }),
-  }
+function ensureAiActionRepairWorkflow() {
+  if (!aiActionRepairWorkflow) aiActionRepairWorkflow = createAiActionRepairWorkflow({
+    state: editorState,
+    getRepairContext: repairContext,
+    getPreferredAction: preferredRepairAction,
+    getBatchSelection: selectedBatchRepairSelection,
+    getAssetRevision: assetRevision,
+    saveProject: saveCurrentProject,
+    adoptProject: acceptProject,
+    render: renderAll,
+    log: addEditorLog,
+    confirm: (message) => window.confirm(message),
+  })
+  return aiActionRepairWorkflow
 }
-async function planRepairAction() {
-  const { asset, revision } = repairContext()
-  const action = preferredRepairAction()
-  if (!asset || !revision?.source_job_id || !action) return
-  Object.assign(editorState.repair.aiAction, { status: 'planning', message: 'planning repair' })
-  renderAll()
-  try {
-    const plan = await repairCharacterAction(repairRequest())
-    editorState.repair.aiAction = {
-      ...editorState.repair.aiAction,
-      selectedAction: action,
-      plan,
-      job: null,
-      importResult: null,
-      status: plan.can_run ? 'planned' : 'blocked',
-      message: plan.can_run ? 'repair plan ready' : plan.preflight?.errors?.[0] ?? 'repair plan blocked',
-      assetId: asset.id,
-      revisionId: revision.id,
-    }
-    addEditorLog(`Repair plan: ${action}`)
-    renderAll()
-  } catch (error) {
-    Object.assign(editorState.repair.aiAction, { status: 'error', message: error.message || String(error) })
-    addEditorLog(editorState.repair.aiAction.message)
-    renderAll()
-  }
-}
-async function runRepairAction() {
-  let { asset, revision } = repairContext()
-  const action = preferredRepairAction()
-  if (!asset || !revision?.source_job_id || !action || !editorState.repair.aiAction.plan?.can_run) return
-  const ok = window.confirm(`${action} will use one provider call and import a new asset revision. Continue?`)
-  if (!ok) return
-  if (editorState.dirty) {
-    const saved = await saveCurrentProject()
-    if (!saved) return
-    asset = editorState.project.assets?.[asset.id]
-    revision = assetRevision(asset)
-  }
-  Object.assign(editorState.repair.aiAction, { status: 'running', message: 'repair job queued' })
-  renderAll()
-  try {
-    let job = await repairCharacterAction(repairRequest({ live: true }))
-    job = await waitForJob(job, (current) => {
-      editorState.repair.aiAction.job = current
-      editorState.repair.aiAction.message = current.status ?? 'running'
-      renderAll()
-    })
-    editorState.repair.aiAction.job = job
-    if (job.status !== 'done') {
-      Object.assign(editorState.repair.aiAction, { status: 'error', message: job.reason || job.status || 'repair failed' })
-      addEditorLog(editorState.repair.aiAction.message)
-      renderAll()
-      return
-    }
-    const imported = await importGeneratedJob({
-      projectId: editorState.project.id,
-      expectedRevision: editorState.project.revision,
-      kind: 'character_pack',
-      jobId: job.id,
-      assetId: asset.id,
-    })
-    const previousAi = { ...editorState.repair.aiAction, selectedAction: action }
-    acceptProject(imported.project)
-    editorState.selectedAssetId = asset.id
-    editorState.selectedLayerId = null
-    editorState.activePanel = 'repair'
-    editorState.repair.aiAction = {
-      ...editorState.repair.aiAction,
-      selectedAction: previousAi.selectedAction,
-      providerPresetId: previousAi.providerPresetId,
-      imageSize: previousAi.imageSize,
-      plan: null,
-      job,
-      importResult: imported,
-      status: 'imported',
-      message: `imported ${imported.revision.id}`,
-      assetId: asset.id,
-      revisionId: imported.revision.id,
-    }
-    addEditorLog(`Repair imported: ${asset.id} ${imported.revision.id}`)
-    renderAll()
-  } catch (error) {
-    Object.assign(editorState.repair.aiAction, { status: 'error', message: error.message || String(error) })
-    addEditorLog(editorState.repair.aiAction.message)
-    renderAll()
-  }
-}
+function planRepairAction() { return ensureAiActionRepairWorkflow().plan() }
+function runRepairAction() { return ensureAiActionRepairWorkflow().run() }
+function acceptRepairActionCandidate() { return ensureAiActionRepairWorkflow().accept() }
 function cleanupEditorShell() {
   if (animationFrameRequest != null) {
     window.cancelAnimationFrame(animationFrameRequest)
@@ -2770,17 +2634,11 @@ function cleanupEditorShell() {
   }
   unbindPlaytestInput?.()
   unbindPlaytestInput = null
-  frameRepairQualityGate?.dispose()
-  frameRepairQualityGate = null
+  aiActionRepairWorkflow = null
   repairWorkbench?.destroy()
   repairWorkbench = null
   repairController?.dispose()
   repairController = null
-  targetedFrameRepair?.dispose()
-  targetedFrameRepair = null
-  frameRepairProviderAbort?.abort()
-  frameRepairProviderAbort = null
-  frameRepairProviderPromise = null
   mountedRepairSelectionKey = null
   editorState.sceneRender.token += 1
 }
@@ -2921,7 +2779,6 @@ function bindEvents() {
 }
 export function initEditorShell() {
   bindEvents()
-  ensureFrameRepairQualityGate()
   addEditorLog('Editor ready')
   renderAll()
 }

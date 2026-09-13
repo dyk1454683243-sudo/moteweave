@@ -17,7 +17,7 @@ asset container.
 {
   "id": "asset_character_sample_hero",
   "kind": "character_pack",
-  "name": "Sample Hero",
+  "name": "sample_hero",
   "profile": "topdown_rpg_v0",
   "active_revision_id": "rev_002",
   "revisions": {

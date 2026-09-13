@@ -42,7 +42,40 @@ framePipeline.js
 sourceQualityGate.js
   Evaluates fixed-region source sheets before runtime normalization: per-region
   occupancy, visible bounds, halo/background residue, edge pressure, layout
-  alignment, expected static reuse, and source-action motion.
+  alignment, expected static reuse, source-action motion, and selected-region
+  provider-free equipment evidence.
+
+equipmentPolicy.js
+  Defines `none`, `preserve`, and `separate`; compiles prompt constraints;
+  detects newly introduced weapon-like protrusions/components relative to an
+  approved reference; emits a deterministic rejected-pixel mask and overlay;
+  and can derive review-only body/equipment PNG layers without mutating input.
+
+fixedRegionActionRepairAtlas.js
+  Builds the product action-correction exchange format for selected fixed source
+  regions: a verified unselected identity-anchor atlas, a grayscale per-slot
+  pose-guide atlas, and an independent empty output atlas. It extracts a single
+  provider atlas back into exact source-sized regions and emits no pixels outside
+  the selected slots. Selected wrong crops, full sheets, and prior candidates are
+  never provider references.
+
+fixedRegionActionRepairReview.js
+  Seals the provider-free Review identity, source/template hashes, exact
+  three-reference manifest, provider/model/configuration, selection, and strict
+  one-call budget. It also seals every passing candidate and Character Pack
+  artifact consumed by the specialized manual Accept route.
+
+sourceRegionRepair.js
+  Plans the one-call fixed-region action-correction path. Pose defects, unwanted
+  weapons or props, and incorrect hand poses share the same selected-slot
+  protocol. An explicit `regionKeys` selection remains exact and is never
+  expanded to every frame in the named actions. The provider receives only the
+  three atlases above; the source character is never punched out or attached.
+  Local extraction, completeness, equipment, and pixel-scope checks are
+  provider-free. A passing result remains a review-only candidate until a later
+  explicit user acceptance, never retries, and never feeds a candidate back as
+  reference. `separate` emits review evidence, not an accepted runtime equipment
+  system.
 
 sheetSlicer.js
   Computes source grid boundaries, projection correction, and cell slicing.

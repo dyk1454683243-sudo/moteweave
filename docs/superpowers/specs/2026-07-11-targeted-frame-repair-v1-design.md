@@ -68,13 +68,9 @@ The user approved three visual-companion decisions on 2026-07-11:
    and Onion modes; the right rail shows validation and acceptance, and the
    filmstrip marks the repaired frame.
 
-Local visual evidence:
-
-- `.superpowers/brainstorm/4735-1783751584/content/frame-repair-layout-options.html`;
-- `.superpowers/brainstorm/4735-1783751584/content/frame-repair-flow-options.html`;
-- `.superpowers/brainstorm/4735-1783751584/content/frame-repair-result-review-options.html`.
-
-These files are local design evidence only and must not be staged or shipped.
+Three historical local visual explorations informed layout direction. They
+were never staged or shipped and are no longer retained or required; this
+tracked design specification remains the implementation authority.
 
 Approved desktop information architecture:
 
@@ -993,6 +989,6 @@ artifact/protocol addition must land as an explicit contract unit with tests.
 
 ## Repository Hygiene Note
 
-At design time, `main` contained unrelated untracked `.superpowers/` visual
-evidence and duplicate `* 2.js` / `* 2.md` files. They are not part of this
-spec and must not be staged, edited, moved, or deleted by implementation work.
+At design time, `main` contained unrelated untracked visual evidence and
+duplicate files. They were never part of this specification or an execution
+input.
