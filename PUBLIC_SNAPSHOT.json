@@ -25,8 +25,8 @@
     },
     {
       "path": ".github/workflows/public-release.yml",
-      "sha256": "0edcb10692e9765e1e84d891898b20ab42f5792e70e9ee7e16b5a97812334f40",
-      "size": 1027,
+      "sha256": "8dc11e6c1d7faa32997d4ab4de68d6c4b2bfad50210a899c5288c3f8fbd77886",
+      "size": 1216,
       "mode": "644"
     },
     {
