@@ -168,7 +168,7 @@ The first benchmark set should include:
 
 ```text
 test/fixtures/character-pack/topdown_rpg_v0_sample_hero.png
-<input-file>
+$HOME/Desktop/image.png
 ```
 
 Additional real AI outputs can be added one at a time. The benchmark should not require a live OpenRouter call.

@@ -1,6 +1,7 @@
 # AI Character Pack Upload Pipeline Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** Execute this plan task-by-task under `AGENTS.md`.
+> Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Build the upload-first `topdown_rpg_v0` character pack pipeline that turns an 8x8 source sheet into `normalized_sheet.png`, `animations.json`, `metadata.json`, `debug_report.json`, debug overlays, row previews, and a browser playable preview.
 
@@ -1130,7 +1131,7 @@ import { processSheetBuffer } from '../../src/character-pack/processSheet.js'
 test('processSheetBuffer turns fixture into a valid character pack', async () => {
   const source = await readFile('test/fixtures/character-pack/topdown_rpg_v0_sample_hero.png')
   const result = await processSheetBuffer(source, {
-    name: 'Sample Hero',
+    name: 'sample_hero',
     description: 'silver hair sword fighter',
     sourceFileName: 'topdown_rpg_v0_sample_hero.png',
     backgroundMode: 'flood',

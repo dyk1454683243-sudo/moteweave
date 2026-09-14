@@ -1,6 +1,7 @@
 # Scene Tile Raw Output Quality Pass Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** Execute this plan task-by-task under `AGENTS.md`.
+> Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Reduce scene tile correction dependency by making raw provider source sheets behave more like independent reusable dual-grid tile inventories before WFC, LDtk auto-layer rules, or map-editor expansion.
 
@@ -393,7 +394,7 @@ Do not stage:
 - `.agents/`
 - `.env`
 - files under `generated/`
-- manual Gemini scratch images under `/tmp` or `<home>/.gemini/`
+- manual Gemini scratch images under `/tmp` or `$HOME/.gemini/`
 
 ## Self-Review
 

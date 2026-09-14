@@ -40,33 +40,11 @@ function generatedUrlJobId(value) {
   return segments[1]
 }
 
-function generatedQualityGateSessionId(value) {
-  if (!value.startsWith('/generated/frame-repair-quality-gates/') || value.includes('%') ||
-      value.includes('?') || value.includes('#') || value.includes('\\')) return null
-  const segments = value.slice(1).split('/')
-  if (segments.length !== 4 || segments[0] !== 'generated' ||
-      segments[1] !== 'frame-repair-quality-gates') return null
-  const sessionId = segments[2]
-  const fileName = segments[3]
-  if (!/^frqg_[a-z0-9][a-z0-9_-]{15,79}$/.test(sessionId)) return null
-  const fixed = new Set([
-    'session_plan.json', 'blind_order.json', 'frame_repair_quality_gate.json',
-    'frame_repair_quality_gate.md', 'frame_repair_quality_gate_contact_sheet.png',
-    'artifact_manifest.json',
-  ])
-  const caseFile = /^case_[a-z0-9][a-z0-9_-]{0,63}_(?:review|outcome)\.json$/.test(fileName)
-  return fixed.has(fileName) || caseFile ? sessionId : null
-}
-
 function assertControlledUrl(identity, url, allowedManagedUrls, allowedGeneratedUrls) {
   const value = String(url ?? '')
   if (isSafeManagedUrl(value) && allowedManagedUrls.has(value)) return value
   const jobId = generatedUrlJobId(value)
   if (jobId && identity === `job:${jobId}` && allowedGeneratedUrls.has(value)) return value
-  const sessionId = generatedQualityGateSessionId(value)
-  if (sessionId && identity === `quality-gate:${sessionId}` && allowedGeneratedUrls.has(value)) {
-    return value
-  }
   throw unsafeArtifactUrlError()
 }
 

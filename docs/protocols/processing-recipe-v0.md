@@ -1,22 +1,20 @@
 # Processing Recipe Protocol v0
 
-**Status:** Character Workbench core binding active; other targets reserved
+**Status:** Historical Editor Repair contract; generation metadata compatibility only
 **Owner:** Editor Workspace and existing processing pipelines  
 **Introduced:** 2026-06-22
 
 ## Purpose
 
-`processing_recipe_v0` records user-visible processing choices so the
-Character Workbench can re-run the existing Character Pack pipeline in a
-traceable way.
+`processing_recipe_v0` historically recorded user-visible processing choices
+for the retired Character Workbench local-reprocess flow. As of 2026-08-08 it
+is not an executable Editor Repair surface.
 
-A recipe does not mutate old artifacts. It describes a new processing job that
-produces new artifacts, which the user may accept as a new asset revision.
-
-The Character Workbench factory, strict validator, and Character Pack option
-adapter described below are active. Reprocess job submission, legacy migration,
-hash orchestration, and acceptance are separate work; non-character target
-values remain protocol reservations rather than active Workbench routes.
+A stored recipe does not mutate old artifacts. The schema remains readable for
+existing immutable revisions and for generation/export metadata compatibility,
+but production runtime no longer exposes its former Preview or Accept routes,
+service, coordinator, or UI controls. The remainder of this document preserves
+the historical field contract and must not be read as active route authority.
 
 ## Character Processing Recipe Shape
 
@@ -107,15 +105,15 @@ Initial values:
 - `scene_pack`
 - `two_point_five_d`
 
-Only `character_pack` has an active Character Workbench validator and option
-adapter. Other values reserve a shared protocol shape and may omit Workbench-
-specific style or fixed-region staging sections. The common
+Only `character_pack` historically had a Character Workbench validator and
+option adapter. Other values reserve a shared protocol shape and may omit
+Workbench-specific style or fixed-region staging sections. The common
 `validateProcessingRecipe()` validator must therefore remain broader than
 `validateCharacterWorkbenchRecipe()`.
 
 ## Existing Parameter Mapping
 
-The active Character Workbench adapter maps only to live
+The retired Character Workbench adapter mapped only to
 `processSheetBuffer()` option names:
 
 - `source.source_layout` -> `sourceLayout`
@@ -178,13 +176,13 @@ local drafts may keep it `null`. A non-null revision must match
 ## Legacy Output Migration
 
 The generic protocol validator accepts either legacy positive-integer
-`outputs.scales` or positive-integer `outputs.frame_sizes`. Character Workbench
-execution accepts only the canonical frame-size list above.
+`outputs.scales` or positive-integer `outputs.frame_sizes`. Historical
+Character Workbench execution accepted only the canonical frame-size list above.
 
 A future Workbench ingress migration may open a legacy Recipe that contains
 only `outputs.scales`; it must replace that field with the fixed v1 frame sizes
 and surface the stable diagnostic `legacy_output_scales_migrated`. Scale values
-must not be reinterpreted as frame sizes. The active strict validator does not
+must not be reinterpreted as frame sizes. The retained strict validator does not
 silently migrate legacy input; migration must occur before strict validation.
 
 ## Two-Hash Ownership
@@ -226,7 +224,7 @@ Common protocol validation rejects recipes when:
 - neither valid legacy output scales nor valid output frame sizes are present;
 - raw provider keys, tokens, or base64 image payloads appear in the JSON.
 
-The active Character Workbench wrapper additionally requires:
+The historical Character Workbench wrapper additionally required:
 
 - `target_pipeline === "character_pack"` and
   `pipeline_contract === "character_pack_process_v1"`;

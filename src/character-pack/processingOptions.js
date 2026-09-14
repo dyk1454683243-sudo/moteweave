@@ -12,7 +12,7 @@ function optionEnabled(value, fallback = true) {
 export function resolveBackgroundOptions(options = {}) {
   return {
     tolerance: clampNumber(options.backgroundTolerance ?? options.background_tolerance, 0, 80, 24),
-    cleanup_min_alpha: clampNumber(options.cleanupMinAlpha ?? options.cleanup_min_alpha, 0, 80, 18),
+    cleanup_min_alpha: clampNumber(options.cleanupMinAlpha ?? options.cleanup_min_alpha ?? options.minAlpha ?? options.min_alpha, 0, 80, 18),
     matte_residue_cleanup: optionEnabled(options.matteResidueCleanup ?? options.matte_residue_cleanup, true),
     matte_residue_tolerance: clampNumber(options.matteResidueTolerance ?? options.matte_residue_tolerance, 0, 120, 40),
     matte_residue_passes: Math.round(clampNumber(options.matteResiduePasses ?? options.matte_residue_passes, 0, 4, 2)),
@@ -33,8 +33,8 @@ export function resolveAnchorOffset(options = {}) {
 export function resolveComponentCleanupOptions(options = {}) {
   return {
     enabled: options.componentCleanup !== false && options.component_cleanup !== false,
-    min_area: clampNumber(options.componentCleanupMinArea ?? options.component_cleanup_min_area, 1, 64, 4),
-    min_area_ratio: clampNumber(options.componentCleanupMinAreaRatio ?? options.component_cleanup_min_area_ratio, 0, 0.25, 0),
+    min_area: clampNumber(options.componentCleanupMinArea ?? options.component_cleanup_min_area ?? options.minArea ?? options.min_area, 1, 64, 4),
+    min_area_ratio: clampNumber(options.componentCleanupMinAreaRatio ?? options.component_cleanup_min_area_ratio ?? options.minAreaRatio ?? options.min_area_ratio, 0, 0.25, 0),
   }
 }
 

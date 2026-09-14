@@ -65,7 +65,6 @@ test('editor shell marks future-only controls as disabled', async () => {
 test('editor shell only talks to the editor API and does not inject raw SVG or provider secrets', async () => {
   const api = await text('src/ui/editor/api.js')
   const shell = await text('src/ui/editor/shell.js')
-  const qualityGateShell = await text('src/ui/editor/frameRepairQualityGateShell.js')
   const exportPanel = await text('src/ui/editor/exportPanel.js')
   const domControls = await text('src/ui/editor/domControls.js')
   const sceneCanvas = await text('src/ui/editor/sceneCanvas.js')
@@ -74,7 +73,7 @@ test('editor shell only talks to the editor API and does not inject raw SVG or p
   const playtestPanel = await text('src/ui/editor/playtestPanel.js')
   const animationRuntime = await text('src/editor-project/animationRuntime.js')
   const app = await text('src/editor-app.js')
-  const combined = [api, shell, qualityGateShell, exportPanel, domControls, sceneCanvas, sceneRenderer, sceneRenderLifecycle, playtestPanel, animationRuntime, app].join('\n')
+  const combined = [api, shell, exportPanel, domControls, sceneCanvas, sceneRenderer, sceneRenderLifecycle, playtestPanel, animationRuntime, app].join('\n')
 
   assert.match(api, /\/api\/editor\/projects/)
   assert.match(api, /\/import-job/)
@@ -115,6 +114,7 @@ test('editor shell only talks to the editor API and does not inject raw SVG or p
   assert.doesNotMatch(combined, /\/generated\/|\/output\//)
   assert.doesNotMatch(combined, /globalFrame|activeFrame|currentFrame/)
   assert.doesNotMatch(playtestPanel, /Collision|Shadow|Surface audio|Touch joystick|Gamepad|Y-sort/)
+  assert.doesNotMatch(shell, /repair_target_animation_reference_url|repaired_animation_strip_url|repaired_normalized_sheet_url|repair_validation_report_url/)
 })
 
 test('editor shell styles use responsive panels without new UI dependencies', async () => {
@@ -136,8 +136,8 @@ test('editor shell styles use responsive panels without new UI dependencies', as
   assert.match(css, /\.editor-flow-board/)
   assert.match(css, /\.editor-flow-card/)
   assert.match(css, /\.editor-playback-fields/)
-  assert.match(css, /\.editor-repair-grid/)
-  assert.match(css, /\.editor-repair-card/)
+  assert.match(css, /\.editor-repair-action-filmstrip/)
+  assert.match(css, /\.editor-repair-action-frame/)
   assert.match(css, /\.editor-export-console/)
   assert.match(css, /\.editor-handoff-inspector/)
   assert.match(css, /\.editor-unsupported-items/)
@@ -157,105 +157,68 @@ test('editor shell delegates the focused Repair workbench and restores workspace
   assert.ok(shell.split('\n').length < 3000, 'editor shell must remain below 3000 lines')
   assert.match(shell, /createRepairWorkbenchController/)
   assert.match(shell, /createRepairWorkbenchPanel/)
-  assert.match(shell, /const acceptedAssetId = result\.asset\?\.id \?\? editorState\.selectedAssetId/)
-  assert.match(shell, /result\.project\?\.assets\?\.\[acceptedAssetId\]/)
+  assert.match(shell, /createAiActionRepairWorkflow/)
+  assert.match(shell, /function ensureAiActionRepairWorkflow\(\)/)
+  assert.doesNotMatch(shell, /async function runRepairAction|async function acceptRepairActionCandidate/)
   assert.match(shell, /function closeRepairSession\(reason\)/)
   assert.match(shell, /closeRepairSession\('project_switch'\)/)
   assert.match(shell, /closeRepairSession\(editorState\.project \? 'selection_cleared' : 'project_switch'\)/)
   assert.match(shell, /dataset\.workspaceMode = 'repair'/)
   assert.match(shell, /delete elements\.main\.dataset\.workspaceMode/)
   assert.match(shell, /delete elements\.stagePanel\.dataset\.workspaceMode/)
-  assert.doesNotMatch(shell, /async function openRepairForAsset|function handleRepairLifecycleUpdate|function dispatchRepairFilmstrip/)
-  assert.match(controller, /async function openRepairForAsset/)
-  assert.match(controller, /function handleRepairLifecycleUpdate/)
-  assert.match(controller, /function dispatchRepairFilmstrip/)
+  assert.doesNotMatch(shell, /buildCharacterReprocessPreview|acceptCharacterReprocessPreview|createRepairPreviewLifecycle/)
+  assert.match(controller, /async function openAsset/)
+  assert.match(controller, /buildFrameBatchRepairTargets/)
+  assert.match(controller, /toggleFrameBatchRepairRegion/)
+  assert.doesNotMatch(controller, /reprocess|Recipe|buildPreview|acceptPreview/i)
   assert.match(panel, /createRepairWorkbenchPanel/)
+  assert.match(panel, /Three-atlas action repair/)
+  assert.doesNotMatch(panel, /Processing Recipe|Build Preview|Accept as revision/)
 
   assert.match(css, /\.editor-main\[data-workspace-mode="repair"\]/)
   assert.match(css, /\.editor-stage-panel\[data-workspace-mode="repair"\]/)
-  assert.match(css, /grid-template-areas:\s*"header header"\s*"canvas recipe"\s*"filmstrip recipe"\s*"quality quality"/)
-  assert.match(css, /minmax\(280px, 1fr\)/)
-  assert.match(css, /overflow-x:\s*auto/)
+  assert.match(css, /\.editor-repair-action-only/)
+  assert.match(css, /\.editor-repair-action-filmstrip/)
   assert.match(css, /@media \(max-width: 760px\)/)
-  assert.match(css, /\.editor-repair-recipe-backdrop:not\(\[hidden\]\)\s*\{[^}]*height:\s*auto/)
-  assert.match(css, /prefers-reduced-motion: reduce/)
 })
 
-test('editor shell wires one specialized Frame Repair lifecycle/controller and no general import path', async () => {
-  const shell = await text('src/ui/editor/shell.js')
+test('editor shell exposes only the three-atlas action repair product runtime', async () => {
   const api = await text('src/ui/editor/api.js')
-  const panel = await text('src/ui/editor/frameRepairPanel.js')
+  const shell = await text('src/ui/editor/shell.js')
   const workbench = await text('src/ui/editor/repairWorkbenchPanel.js')
+  const runtime = [api, shell, workbench].join('\n')
 
   for (const marker of [
     'createFrameRepairLifecycle', 'createFrameRepairController', 'frameRepairController',
     'planCharacterFrameRepair', 'generateCharacterFrameRepair', 'recoverCharacterFrameRepair',
-    'acceptCharacterFrameRepair', 'fetchCharacterProviderState', 'handleLifecycleUpdate',
-  ]) assert.match(shell, new RegExp(marker))
-  assert.match(shell, /frameRepairController:\s*targetedFrameRepair/)
-  assert.match(shell, /targetedFrameRepair\?\.dispose/)
-  assert.match(api, /\/frame-repair\/plan/)
-  assert.match(api, /\/frame-repair\/operations\//)
-  assert.match(api, /\/frame-repair\/\$\{encodeURIComponent\(input\.jobId\)\}\/accept/)
-  assert.doesNotMatch(panel, /importGeneratedJob|repairCharacterAction/)
-  assert.match(workbench, /Repair Frame/)
+    'acceptCharacterFrameRepair', 'fetchCharacterProviderState',
+    'createFrameRepairQualityGateRuntime', 'ensureFrameRepairQualityGate',
+  ]) assert.doesNotMatch(runtime, new RegExp(marker))
+  assert.match(shell, /createAiActionRepairWorkflow/)
+  assert.match(shell, /function runRepairAction\(\)/)
+  assert.doesNotMatch(workbench, /from '\.\/frameRepairPanel\.js'/)
+  assert.doesNotMatch(workbench, /from '\.\/frameRepairQualityGatePanel\.js'/)
+  assert.match(workbench, /dataset\.batchRepairRegion/)
+  assert.match(workbench, /renderAiAction/)
+  assert.doesNotMatch(runtime, /\/reprocess|editor_character_reprocess/)
 })
 
-test('editor shell owns one bounded Frame Repair Quality Gate runtime', async () => {
+test('editor shell does not initialize the retired single-frame quality-gate runtime', async () => {
   const shell = await text('src/ui/editor/shell.js')
-  const runtime = await text('src/ui/editor/frameRepairQualityGateShell.js')
-  const workbench = await text('src/ui/editor/repairWorkbenchPanel.js')
-  const css = await text('src/ui/editor/editor.css')
-
-  assert.equal((shell.match(/createFrameRepairQualityGateRuntime\(\{/g) ?? []).length, 1)
-  assert.equal((runtime.match(/createFrameRepairQualityGateController\(\{/g) ?? []).length, 1)
-  for (const marker of [
-    'setupFrameRepairQualityGate', 'planFrameRepairQualityGate', 'startFrameRepairQualityGate',
-    'fetchFrameRepairQualityGate', 'recordFrameRepairQualityGateReview',
-    'recordFrameRepairQualityGateOutcome', 'finalizeFrameRepairQualityGate',
-    'attachPanel', 'reopen', 'handleProjectSwitch', 'dispose',
-  ]) assert.match(runtime, new RegExp(marker))
-  assert.match(runtime, /const DESKTOP_REVIEW_QUERY = '\(min-width: 761px\)'/)
-  assert.equal((runtime.match(/addEventListener\?\.\('change', onMediaChange\)/g) ?? []).length, 1)
-  assert.equal((runtime.match(/removeEventListener\?\.\('change', onMediaChange\)/g) ?? []).length, 1)
-  assert.match(runtime, /identity: `quality-gate:\$\{session\.id\}`/)
-  assert.match(runtime, /url,\s*allowedGeneratedUrls,/)
-  assert.match(runtime, /function reopen\(\)[\s\S]*controller\.rehydrate\(\)/)
-  assert.match(runtime, /active\?\.blind\?\.a === 'after'/)
-  assert.doesNotMatch(runtime, /runAll|autoNext|automaticNext|retry|batch/i)
-  assert.match(shell, /adoptProject: adoptQualityGateProject/)
-  assert.match(shell, /frameRepairQualityGate\?\.handleProjectSwitch\(\)/)
-  assert.match(shell, /frameRepairQualityGate\?\.dispose\(\)/)
-  assert.match(shell, /ensureFrameRepairQualityGate\(\)\.attachPanel\(repairWorkbench\)/)
-  assert.match(shell, /ensureFrameRepairQualityGate\(\)\.reopen\(\)/)
-  assert.doesNotMatch(shell, /handleAction\('rehydrate'\)/)
-  assert.match(workbench, /if \(opened\) void handleQualityGateAction\('rehydrate'\)/)
+  assert.equal((shell.match(/createFrameRepairQualityGateRuntime\(\{/g) ?? []).length, 0)
+  assert.doesNotMatch(shell, /adoptQualityGateProject|frameRepairQualityGate|ensureFrameRepairQualityGate/)
   assert.ok(shell.split('\n').length < 3000, 'editor shell must remain below 3000 lines')
-
-  assert.match(css, /\.editor-repair-workbench\[data-quality-gate-workspace="true"\][^{]*\{[^}]*grid-template-rows:\s*minmax\(0, 1fr\)/)
-  assert.match(css, /\.editor-frame-repair-quality-gate\[data-view="review"\]\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\) minmax\(18rem, 24rem\)/)
-  assert.match(css, /grid-template-areas:\s*"session session"\s*"canvas evidence"\s*"progress progress"/)
-  assert.match(css, /\.editor-frame-repair-quality-gate\s*\{[^}]*block-size:\s*100%[^}]*max-block-size:\s*100%[^}]*min-width:\s*0[^}]*min-height:\s*0[^}]*overflow:\s*hidden/)
-  assert.match(css, /\.editor-quality-gate-progress\s*\{[^}]*overflow-x:\s*auto/)
-  assert.match(css, /\.editor-quality-gate-actions\s*\{[^}]*position:\s*sticky/)
-  assert.doesNotMatch(css, /\.editor-(?:frame-repair-)?quality-gate[^,{]*\{[^}]*position:\s*fixed/)
-  assert.match(css, /@media \(max-width: 1080px\)[\s\S]*\.editor-frame-repair-quality-gate\[data-view="review"\]/)
-  assert.match(css, /@media \(max-width: 760px\)[\s\S]*\.editor-repair-workbench\[data-quality-gate-workspace="true"\]/)
 })
 
-test('Frame Repair responsive styles preserve the existing drawer and bounded horizontal layout', async () => {
+test('Repair responsive styles contain no retired single-frame surfaces', async () => {
   const css = await text('src/ui/editor/editor.css')
   for (const marker of [
     '.editor-frame-repair-rail', '.editor-frame-repair-steps', '.editor-frame-repair-step',
     '.editor-frame-repair-stage-content',
     '.editor-frame-repair-mask-tools', '.editor-frame-repair-call-summary',
     '.editor-frame-repair-quality', '.editor-frame-repair-diagnostic',
-    '.editor-repair-frame-option[data-repaired="true"]',
-  ]) assert.match(css, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
-  assert.match(css, /\.editor-frame-repair-step\[aria-current="step"\]/)
-  assert.match(css, /\.editor-frame-repair-diagnostic\[data-tone="unknown"\]/)
-  assert.match(css, /grid-template-rows:\s*auto auto auto minmax\(0, 1fr\)/)
-  assert.match(css, /overflow-wrap:\s*anywhere/)
+    '.editor-frame-repair-quality-gate', '.editor-quality-gate-',
+  ]) assert.doesNotMatch(css, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')))
+  assert.match(css, /\.editor-repair-action-frame:has\(input:checked\)/)
   assert.match(css, /@media \(max-width: 760px\)/)
-  assert.match(css, /prefers-reduced-motion: reduce/)
 })

@@ -61,3 +61,21 @@ contract.
 Completed on 2026-07-17. The guarded focused command passed `32 / 32` tests in
 `559 ms` at `148752 KiB` peak process-tree RSS, below the focused ceilings. No
 Provider, build, browser, server, or live generation process was invoked.
+
+## Private Main Integration Record
+
+The completed A-E product baseline and Frame Repair branch were reconciled from
+the latest private `origin/main` in merge commit `bd05448`. This hardening was
+then applied as `2fd9292` without conflict. Integration verification remained
+provider-free:
+
+- affected focused set: `32 / 32` passed in `628 ms`, peak process-tree RSS
+  `138704 KiB`;
+- complete suite: `1529 / 1529` passed in `133993 ms`, peak process-tree RSS
+  `842576 KiB`;
+- local smoke: passed in `3454 ms`, peak process-tree RSS `701680 KiB`, with
+  zero Provider calls and no retained server process.
+
+The private integration excludes the later MoteWeave public-mirror branding,
+release metadata, and deployment commits. Those remain on the reviewed public
+snapshot path instead of being used as the feature-development baseline.

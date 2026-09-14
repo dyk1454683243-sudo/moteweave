@@ -1,42 +1,13 @@
-import { createEmptyFrameRepairState } from './frameRepairState.js'
-
-export { createEmptyFrameRepairState }
-
-export function createEmptyLocalRepairState() {
+export function createEmptyActionRepairSelectionState() {
   return {
     selection: null,
-    sourceContext: null,
-    profile: null,
-    draft: null,
-    validationContext: null,
-    lastValidCanonical: null,
-    validation: { status: 'fail', blocking_errors: ['repair_not_open'], invalidPaths: [] },
-    draftHashGeneration: 0,
-    currentDraftSettingsHash: null,
-    preview: null,
-    previewModel: {
-      state: 'no_preview',
-      frames: [],
-      modeAvailability: {},
-      acceptance: { canAccept: false, reason: 'no_preview' },
-      diagnostics: [],
-    },
-    acceptInFlight: false,
-    warningConfirmation: null,
+    frameBatchRepairTargets: null,
+    clips: {},
+    sourceSheetUrl: null,
     filmstrip: { frames: [], selectedIndex: 0, playing: false },
-    renderFrame: null,
-    differenceCache: new Map(),
-    view: {
-      clipId: '',
-      frameIndex: null,
-      mode: 'before',
-      zoom: 1,
-      pan: { x: 0, y: 0 },
-      overlays: { cuts: true, anchor: true, baseline: true, bbox: true, debug: false },
-    },
+    view: { clipId: '', frameIndex: null },
     status: 'idle',
     message: '',
-    diagnostics: [],
     error: null,
     openGeneration: 0,
   }
@@ -55,10 +26,12 @@ export const editorState = {
     layer_clocks: {},
   },
   repair: {
-    local: createEmptyLocalRepairState(),
-    frame: createEmptyFrameRepairState(),
+    local: createEmptyActionRepairSelectionState(),
     aiAction: {
       selectedAction: '',
+      selectedRegionKeys: [],
+      instruction: 'Correct the selected action slots while preserving the character identity.',
+      equipmentPolicy: 'none',
       providerPresetId: '',
       imageSize: '1K',
       plan: null,

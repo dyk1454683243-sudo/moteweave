@@ -1,5 +1,13 @@
 # Character Finishing Workbench v1 Verification
 
+**Status:** Retired historical verification record (2026-08-08). The local
+Recipe/Build Preview/Accept workflow described below is no longer registered or
+shown in the Editor. Current Repair uses only the shared three-atlas action
+repair contract in `docs/protocols/fixed-region-action-repair-atlas-v1.md`.
+
+The measurements and route traces below are preserved as historical evidence;
+they do not describe active product capability.
+
 Verified locally on 2026-07-11. This document records observed behavior from the
 `codex/character-finishing-workbench-v1` worktree; it is not an independent CI
 result.

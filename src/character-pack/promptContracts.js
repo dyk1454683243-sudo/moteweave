@@ -1,5 +1,11 @@
 import { TOPDOWN_RPG_V0 } from './profile.js'
 import {
+  EQUIPMENT_POLICY,
+  equipmentPolicyContract,
+  equipmentPromptRules,
+  normalizeEquipmentPolicy,
+} from './equipmentPolicy.js'
+import {
   FIXED_REGION_MOTION_LAYOUT_ID,
   getSourceLayoutActions,
   resolveSourceLayout,
@@ -12,7 +18,8 @@ import {
 } from './textToImagePrompt.js'
 
 export const PROMPT_CONTRACT_SCHEMA_VERSION = 1
-export const PROMPT_CONTRACT_VERSION = 'character_prompt_contract_v1_15'
+export const PROMPT_CONTRACT_VERSION = 'character_prompt_contract_v1_18'
+export const LEGACY_PROMPT_CONTRACT_VERSION = 'character_prompt_contract_v1_17'
 
 const DEFAULT_SUBJECT = 'a readable fantasy pixel RPG character'
 
@@ -21,8 +28,13 @@ const STYLE_RULES = Object.freeze([
   'Create one complete game-ready pixel art character sprite sheet.',
 ])
 
-const IDENTITY_RULES = Object.freeze([
+const LEGACY_IDENTITY_RULES = Object.freeze([
   'Keep the same character identity, scale, outline thickness, palette, pixel density, lighting, and costume in every frame.',
+])
+
+const FULL_SHEET_IDENTITY_RULES = Object.freeze([
+  ...LEGACY_IDENTITY_RULES,
+  'The whole sheet may depict only one character identity. Every slot must contain exactly one complete instance of that same identity.',
 ])
 
 function backgroundRulesFor(backgroundMode = 'auto') {
@@ -45,11 +57,16 @@ function backgroundRulesFor(backgroundMode = 'auto') {
   ])
 }
 
-const NEGATIVE_RULES = Object.freeze([
+const LEGACY_NEGATIVE_RULES = Object.freeze([
   'Default to empty hands: do not add ladders, weapons, shields, tools, props, or handheld items unless the written character description explicitly requests them.',
   'Keep each pose as one clean character silhouette: no extra or duplicated arms or hands, ghost limbs, motion blur, action trails, afterimages, summoned limbs, copied effects, signature powers, or extra anatomy unless explicitly requested.',
   'Show motion across frames or regions, not as multiple limb positions inside one cell or region.',
   'Do not include text, numbers, labels, UI, captions, grid lines, frame boxes, borders, watermark, scenery, or extra characters.',
+])
+
+const FULL_SHEET_NEGATIVE_RULES = Object.freeze([
+  ...LEGACY_NEGATIVE_RULES,
+  'Do not add a second person, extra head, detached body fragment, duplicate character, or template-character mixture in any slot.',
 ])
 
 const STRUCTURAL_TEMPLATE_RULES = Object.freeze([
@@ -163,9 +180,15 @@ function buildTopdownLayoutContract() {
   })
 }
 
-function buildFixedRegionMotionLayoutContract() {
+function buildFixedRegionMotionLayoutContract({ strictFullSheet = false } = {}) {
   const layout = resolveSourceLayout(FIXED_REGION_MOTION_LAYOUT_ID)
   const sourceActions = getSourceLayoutActions(layout).map((action) => action.action)
+  const templateAuthority = strictFullSheet
+    ? 'Use the first attached template image only as the structural authority for format, region placement, action order, body orientation, facing direction, silhouette rhythm, pose rhythm, sprite proportion, sprite scale, spacing, canvas size, canvas ratio, and sprite sheet layout.'
+    : 'Use the first attached template image as the structural template for format, region placement, action order, body orientation, facing direction, silhouette rhythm, pose rhythm, sprite proportion, sprite scale, spacing, canvas size, canvas ratio, sprite sheet layout, pixel art style, and output rules.'
+  const multipleTemplateGuidance = strictFullSheet
+    ? 'If more than one structural template image is attached, infer only the shared layout, pose language, and proportions from those template images.'
+    : 'If more than one template image is attached before the subject reference, infer the shared layout, pose language, proportions, pixel-art style, and output rules from those template images.'
   return Object.freeze({
     id: layout.id,
     label: layout.label,
@@ -175,9 +198,9 @@ function buildFixedRegionMotionLayoutContract() {
     template_role: 'strict_structural_fixed_regions',
     prompt_lines: Object.freeze([
       'Canvas layout: one square sprite sheet image using the fixed-region motion source layout shown by the first attached template image.',
-      'Use the first attached template image as the structural template for format, region placement, action order, body orientation, facing direction, silhouette rhythm, pose rhythm, sprite proportion, sprite scale, spacing, canvas size, canvas ratio, sprite sheet layout, pixel art style, and output rules.',
+      templateAuthority,
       'Replace only the placeholder character with the requested subject; preserve the template layout and motion plan.',
-      'If more than one template image is attached before the subject reference, infer the shared layout, pose language, proportions, pixel-art style, and output rules from those template images.',
+      multipleTemplateGuidance,
       'Do not target a literal tiny pixel canvas size; render a clean square image that local post-processing can hard-scale into the final source sheet.',
       'Every required fixed region should contain one complete readable character pose for that source action.',
       'Keep the whole character inside each assigned fixed region with clear padding.',
@@ -188,6 +211,8 @@ function buildFixedRegionMotionLayoutContract() {
       'Within every numbered multi-region action, keep one camera view and one facing direction across the entire action. Change only the body and limb phase; never rotate the character between front, back, and side views.',
       'All six walk or run regions for one named action belong to that action and direction only. Do not mix walk, run, idle, climb, defence, or poses from an adjacent action group.',
       'All six climb regions must keep one consistent climb-facing view matching the template while showing coherent alternating climbing phases. Do not turn between front, back, and side views.',
+      'The six climb regions are a character-only motion reference, not a request for a climbing scene or equipment.',
+      'Pose hands and feet as if gripping invisible supports; draw no ladder, rails, rungs, rope, wall, cliff, ledge, platform, pole, handhold, vertical bar, support object, or surrounding scenery.',
       'Do not infer or move action boundaries from whitespace, sprite size, or neighboring poses; the fixed regions and their action ownership in the template are authoritative.',
       'Draw the matching body motion for each template action: idle, walk, run, empty-hand action, attract/interact gesture, jump, sit, defence stance, death/downed, and climb-style body motion.',
       'Static single-region actions remain single source poses; multi-region actions should show readable phase changes across their numbered source regions.',
@@ -212,22 +237,26 @@ const LAYOUT_CONTRACT_BUILDERS = Object.freeze({
   [FIXED_REGION_MOTION_LAYOUT_ID]: buildFixedRegionMotionLayoutContract,
 })
 
-export function buildCharacterPromptContract({
+function buildCharacterPromptContractInternal({
   description = '',
   preset = TOPDOWN_RPG_V0.id,
   promptFields = {},
   characterPreset,
   backgroundMode = 'auto',
+  equipmentPolicy = EQUIPMENT_POLICY.PRESERVE,
   t2iMode = TEXT_TO_IMAGE_MODE_PRODUCTION_SHEET,
-} = {}) {
+} = {}, { strictFullSheet = false } = {}) {
   const normalizedPreset = normalizePreset(preset)
   const layoutBuilder = LAYOUT_CONTRACT_BUILDERS[normalizedPreset] ?? LAYOUT_CONTRACT_BUILDERS[TOPDOWN_RPG_V0.id]
-  const layoutContract = layoutBuilder()
+  const layoutContract = layoutBuilder({ strictFullSheet })
   const structuredFields = normalizePromptFields(promptFields)
   const characterPresetInfo = normalizeCharacterT2iPreset(characterPreset)
+  const normalizedEquipmentPolicy = normalizeEquipmentPolicy(equipmentPolicy, {
+    defaultPolicy: EQUIPMENT_POLICY.PRESERVE,
+  })
   return Object.freeze({
     schema_version: PROMPT_CONTRACT_SCHEMA_VERSION,
-    contract_version: PROMPT_CONTRACT_VERSION,
+    contract_version: strictFullSheet ? PROMPT_CONTRACT_VERSION : LEGACY_PROMPT_CONTRACT_VERSION,
     preset: layoutContract.id,
     t2i_mode: t2iMode,
     subject: normalizeSubject(description),
@@ -242,12 +271,33 @@ export function buildCharacterPromptContract({
       structural_rules: STRUCTURAL_TEMPLATE_RULES,
     }),
     layout_contract: layoutContract,
-    identity_contract: Object.freeze({ rules: IDENTITY_RULES }),
+    identity_contract: Object.freeze({
+      rules: strictFullSheet ? FULL_SHEET_IDENTITY_RULES : LEGACY_IDENTITY_RULES,
+    }),
     style_contract: Object.freeze({ rules: STYLE_RULES }),
     background_contract: Object.freeze({ mode: backgroundMode, rules: backgroundRulesFor(backgroundMode) }),
-    negative_contract: Object.freeze({ rules: NEGATIVE_RULES }),
-    validation_contract: Object.freeze({ expectations: layoutContract.validation_expectations }),
+    equipment_contract: Object.freeze({
+      ...equipmentPolicyContract(normalizedEquipmentPolicy),
+      rules: equipmentPromptRules(normalizedEquipmentPolicy),
+    }),
+    negative_contract: Object.freeze({
+      rules: strictFullSheet ? FULL_SHEET_NEGATIVE_RULES : LEGACY_NEGATIVE_RULES,
+    }),
+    validation_contract: Object.freeze({
+      expectations: Object.freeze([
+        ...layoutContract.validation_expectations,
+        `equipment_policy_${normalizedEquipmentPolicy}`,
+      ]),
+    }),
   })
+}
+
+export function buildCharacterPromptContract(options = {}) {
+  return buildCharacterPromptContractInternal(options, { strictFullSheet: false })
+}
+
+export function buildFullSheetCharacterPromptContract(options = {}) {
+  return buildCharacterPromptContractInternal(options, { strictFullSheet: true })
 }
 
 function linesFromContract(contract) {
@@ -262,6 +312,7 @@ function linesFromContract(contract) {
     contract.background_contract.rules[1],
     ...contract.negative_contract.rules,
     `Character: ${contract.structured_subject ?? contract.subject}`,
+    ...(contract.equipment_contract?.rules ?? equipmentPromptRules(EQUIPMENT_POLICY.PRESERVE)),
     'Only output the sprite sheet image.',
   ]
 }
@@ -277,6 +328,13 @@ function hasImage(image) {
 
 function buildTemplateImageGuidance(contract) {
   if (contract.layout_contract.kind === 'fixed_regions') {
+    return 'The attached template image is the approved strict pose and layout template, not a style reference and not a character identity reference. Use it as the first reference image for the output structure: replace the placeholder character with the requested subject while keeping its non-uniform fixed-region layout, source action order, region boundaries, body orientation, facing directions, silhouette rhythm, controllable movement semantics, sprite proportion, sprite scale, spacing, canvas size, canvas ratio, sprite sheet layout, and feet-center anchor logic. Do not copy the placeholder character, creature type, colors, costume, facial features, or rendering style from the template.'
+  }
+  return 'The attached template image is the approved strict structural 8x8 layout template, not a style reference and not a character identity reference. Preserve only its uniform 8 columns x 8 rows layout, 64 equal cell slots, row order, column order, action timing, direction order, pose logic, sprite scale, spacing, padding, and feet-center anchor logic. Do not copy empty template cells: empty-looking template slots are placeholders that must be replaced with complete character poses in the same row and column slot. If the template contains missing cells, cropped placeholder art, tan padding, wide gaps, or uneven columns, the written topdown row/column map is authoritative. Do not reinterpret it as a non-uniform motion sheet. Do not copy the placeholder character, creature type, colors, costume, or facial features from the template.'
+}
+
+function buildLegacyTemplateImageGuidance(contract) {
+  if (contract.layout_contract.kind === 'fixed_regions') {
     return 'The attached template image is the approved strict pose and layout template, not a style reference and not a character identity reference. Use it as the first reference image for the output structure: replace the placeholder character with the requested subject while keeping its non-uniform fixed-region layout, source action order, region boundaries, body orientation, facing directions, silhouette rhythm, controllable movement semantics, sprite proportion, sprite scale, spacing, canvas size, canvas ratio, sprite sheet layout, pixel art style, and feet-center anchor logic. Do not copy the placeholder character, creature type, colors, costume, or facial features from the template.'
   }
   return 'The attached template image is the approved strict structural 8x8 layout template, not a style reference and not a character identity reference. Preserve only its uniform 8 columns x 8 rows layout, 64 equal cell slots, row order, column order, action timing, direction order, pose logic, sprite scale, spacing, padding, and feet-center anchor logic. Do not copy empty template cells: empty-looking template slots are placeholders that must be replaced with complete character poses in the same row and column slot. If the template contains missing cells, cropped placeholder art, tan padding, wide gaps, or uneven columns, the written topdown row/column map is authoritative. Do not reinterpret it as a non-uniform motion sheet. Do not copy the placeholder character, creature type, colors, costume, or facial features from the template.'
@@ -289,7 +347,7 @@ export function compileProviderPrompt({ contract, templateImage, referenceImage,
 
   const imageGuidance = [
     'The written layout contract and structural template override all reference and palette images. Reference images must not override layout, frame count, cell boundaries, or fixed-region positions.',
-    hasImage(templateImage) ? buildTemplateImageGuidance(resolvedContract) : '',
+    hasImage(templateImage) ? buildLegacyTemplateImageGuidance(resolvedContract) : '',
     hasImage(referenceImage)
       ? 'The optional second attached image is a weak appearance reference. Use only broad silhouette, palette family, and outline finish that are compatible with the written character description. DO NOT copy character content from it: hair color, exact hairstyle, clothing color, clothing design, fabric type, weapons, shields, items, held objects, facial features, skin color, body details, scenery, or props unless explicitly requested in the written character description.'
       : '',
@@ -299,6 +357,56 @@ export function compileProviderPrompt({ contract, templateImage, referenceImage,
   ].filter(Boolean)
 
   return `${basePrompt}\n${imageGuidance.join('\n')}`
+}
+
+export function buildProviderPromptSections({ contract, templateImage, referenceImage, paletteImage } = {}) {
+  const resolvedContract = contract ?? buildFullSheetCharacterPromptContract()
+  const contentParts = [
+    {
+      type: 'text',
+      role: 'task',
+      text: `TASK\n${compileCharacterPromptContract(resolvedContract)}`,
+    },
+  ]
+  if (hasImage(templateImage)) {
+    contentParts.push({
+      type: 'text',
+      role: 'structure',
+      text: `STRUCTURE\n${buildTemplateImageGuidance(resolvedContract)} Structure controls only layout, slot geometry, pose, facing, scale, spacing, and baseline. It has no character-identity authority.`,
+    })
+    contentParts.push({ type: 'image', role: 'structure' })
+  }
+  if (hasImage(referenceImage)) {
+    contentParts.push({
+      type: 'text',
+      role: 'identity',
+      text: 'IDENTITY\nThe attached identity image is the sole authority for species, anatomy, face, hair, costume, proportions, palette placement, outline, and pixel density. Use exactly this one identity in every slot. Do not zoom it, duplicate it, mix it with the template character, or invent a second identity.',
+    })
+    contentParts.push({ type: 'image', role: 'identity' })
+  } else {
+    contentParts.push({
+      type: 'text',
+      role: 'identity_text',
+      text: 'IDENTITY\nNo identity image is supplied. The structured written character description is the sole identity authority. Keep that one identity unchanged across the entire sheet.',
+    })
+  }
+  if (hasImage(paletteImage)) {
+    contentParts.push({
+      type: 'text',
+      role: 'palette',
+      text: 'PALETTE\nThe attached board contains color swatches only. Use it only for color ramps, contrast, saturation range, outline weight, and pixel finish. It has no layout, pose, object, or identity authority.',
+    })
+    contentParts.push({ type: 'image', role: 'palette' })
+  }
+  contentParts.push({
+    type: 'text',
+    role: 'output_contract',
+    text: 'OUTPUT CONTRACT\nReturn one complete sprite-sheet image only. Each required slot contains one complete instance of the same character. No second person, extra head, detached body fragment, duplicate character, text, labels, grid lines, side panels, or bonus poses.',
+  })
+  return {
+    system_instruction: 'Generate one production sprite sheet containing only one consistent character identity across the entire image. Follow the explicit role boundaries: STRUCTURE controls geometry, IDENTITY controls appearance, PALETTE controls color finish, and the written Equipment Policy has final priority.',
+    content_parts: contentParts,
+  }
 }
 
 export function summarizePromptContract(contract) {
@@ -313,6 +421,7 @@ export function summarizePromptContract(contract) {
     character_preset: resolvedContract.character_preset ?? null,
     prompt_fields: resolvedContract.prompt_fields ?? {},
     background_mode: resolvedContract.background_contract?.mode ?? 'auto',
+    equipment_policy: resolvedContract.equipment_contract?.policy ?? EQUIPMENT_POLICY.PRESERVE,
     layout_id: resolvedContract.layout_contract.id,
     layout_kind: resolvedContract.layout_contract.kind,
     validation_expectations: [...resolvedContract.validation_contract.expectations],

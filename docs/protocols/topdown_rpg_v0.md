@@ -76,25 +76,32 @@ hurt / happy / sit / talk
 
 This is intentionally different from OCAD fixed-region source previews. OCAD-mode names such as `rundown`, `climb`, `attract_left`, `defence`, and `die` must not be inferred back into the 8x8 preview protocol.
 
-## Generation Template
+## Legacy And Repair Geometry Template
 
-The current primary 8x8 generation constraint image is:
+The maintained 8x8 geometry image is:
 
 ```text
 templates/motion_template_ocha_8x8.png
 ```
 
-This template is used as an equal-cell pose/action/control reference, not as a style reference and not as a character identity reference. Its job is to bias the image provider toward the standard `topdown_rpg_v0` 8x8 sheet layout.
+This file remains available to legacy layout processing and the separately
+sealed three-atlas repair geometry contract. It is not an approved
+authoritative exact-outline Structure for `full_sheet_topdown_v1`. The strict
+full-sheet Review must fail before Provider dispatch until a layout-specific
+authoritative Structure is approved; it must not send this generic robot
+placeholder or substitute the fixed-region reference.
 
 When the non-uniform OCAD source layout is selected, the generation constraint image switches to:
 
 ```text
-templates/fixed_region_motion_template_v1.png
+templates/motion_template_ocad_primary.png
 ```
 
 In that mode, source action semantics such as `attractL`, `item`, `defence`, `die`, and `climb` are preserved in `debug_report.json` while the normalized runtime sheet keeps the `topdown_rpg_v0` animation names above.
 
-Historical auxiliary templates are not part of the active runtime or generation contract. Current template selection is defined in `src/character-pack/templateStore.js`.
+Historical auxiliary templates are not part of the active runtime contract.
+Legacy template selection and strict-generation Structure authority are
+separate decisions defined in `src/character-pack/templateStore.js`.
 
 ## Executable Source Of Truth
 

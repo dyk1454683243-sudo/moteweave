@@ -1,13 +1,12 @@
 {
   "schema_version": 1,
-  "release_version": "0.5.0-preview.3",
+  "release_version": "0.5.0",
   "source_only": true,
   "npm_publish": false,
   "required_ancestors": [
     "8263e85c0469b969bc78840a42946ed52ff62881",
     "8a5c6f849572e70443ff606d45e323881957db12",
-    "09ed8b63b77b5fca9b866dbd1157ddd5c11a846d",
-    "e8a4b938bd8d8e683aec8746aad76bb7cf4443ef"
+    "0c4916c95a2fd4eb9676fa9da453c6d6ccd14c1a"
   ],
   "privacy": {
     "synthetic_home_path_allowlist": [

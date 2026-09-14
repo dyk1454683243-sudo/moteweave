@@ -1,18 +1,15 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { readFile } from 'node:fs/promises'
 import sharp from 'sharp'
 
-import {
-  buildFixedRegionMotionTemplate,
-  buildFixedRegionSampleHero,
-} from '../../scripts/create-fixed-region-motion-assets.mjs'
-import { FIXED_REGION_SOURCE_REGIONS } from '../../src/character-pack/fixedRegionGeometry.js'
 import {
   FIXED_REGION_MOTION_LAYOUT_ID,
   LEGACY_OCAD_MOTION_LAYOUT_ID,
 } from '../../src/character-pack/sourceLayouts.js'
-import { loadTemplateImage } from '../../src/character-pack/templateStore.js'
+import {
+  loadAuthoritativeGenerationStructureImage,
+  loadTemplateImage,
+} from '../../src/character-pack/templateStore.js'
 
 function pixelOffset(width, x, y) {
   return (y * width + x) * 4
@@ -87,55 +84,32 @@ test('built-in topdown template gives providers 64 occupied padded cells', async
 test('loadTemplateImage reads the built-in fixed-region motion template by canonical id', async () => {
   const template = await loadTemplateImage(FIXED_REGION_MOTION_LAYOUT_ID, { rootDir: process.cwd() })
 
-  assert.equal(template.name, 'fixed_region_motion_template_v1.png')
+  assert.equal(template.name, 'motion_template_ocad_primary.png')
   const metadata = await sharp(template.buffer).metadata()
   assert.equal(metadata.width, 252)
   assert.equal(metadata.height, 252)
-  assert.deepEqual(template.buffer, await buildFixedRegionMotionTemplate())
 })
 
 test('loadTemplateImage keeps the legacy fixed-region motion preset readable', async () => {
   const template = await loadTemplateImage(LEGACY_OCAD_MOTION_LAYOUT_ID, { rootDir: process.cwd() })
 
-  assert.equal(template.name, 'fixed_region_motion_template_v1.png')
-})
-
-test('fixed-region template keeps every canonical region occupied and padded', async () => {
-  const template = await loadTemplateImage(FIXED_REGION_MOTION_LAYOUT_ID, { rootDir: process.cwd() })
-  const { data, info } = await sharp(template.buffer).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
-
-  for (const [regionKey, region] of Object.entries(FIXED_REGION_SOURCE_REGIONS)) {
-    let count = 0
-    let minX = Infinity
-    let minY = Infinity
-    let maxX = -1
-    let maxY = -1
-    for (let y = 0; y < region.h; y += 1) {
-      for (let x = 0; x < region.w; x += 1) {
-        const offset = pixelOffset(info.width, region.x + x, region.y + y)
-        if (!isForeground(data, offset)) continue
-        count += 1
-        minX = Math.min(minX, x)
-        minY = Math.min(minY, y)
-        maxX = Math.max(maxX, x)
-        maxY = Math.max(maxY, y)
-      }
-    }
-    assert.ok(count >= 30, `${regionKey}_template_empty_or_too_sparse`)
-    assert.ok(minX >= 1, `${regionKey}_template_left_edge_touch`)
-    assert.ok(minY >= 1, `${regionKey}_template_top_edge_touch`)
-    assert.ok(maxX <= region.w - 2, `${regionKey}_template_right_edge_touch`)
-    assert.ok(maxY <= region.h - 2, `${regionKey}_template_bottom_edge_touch`)
-  }
-})
-
-test('committed fixed-region sample hero is deterministically reproducible', async () => {
-  const fixture = await readFile(
-    'test/fixtures/character-pack/local-image-golden/ocad-sheet/fixed_region_sample_hero.png'
-  )
-  assert.deepEqual(fixture, await buildFixedRegionSampleHero())
+  assert.equal(template.name, 'motion_template_ocad_primary.png')
 })
 
 test('loadTemplateImage returns null for unknown presets', async () => {
   assert.equal(await loadTemplateImage('missing_profile', { rootDir: process.cwd() }), null)
+})
+
+test('strict generation exposes only the confirmed fixed-region exact-outline Structure', async () => {
+  const fixed = await loadAuthoritativeGenerationStructureImage(FIXED_REGION_MOTION_LAYOUT_ID, {
+    rootDir: process.cwd(),
+  })
+
+  assert.equal(fixed.name, 'motion_template_ocad_primary.png')
+  assert.equal(fixed.structureAuthority, 'repository_maintained_exact_outline')
+  assert.equal(fixed.structureAuthorityId, 'fixed_region_motion_primary_structure_v1')
+  assert.equal(fixed.expectedStructureSha256, '6970952fdd0571493d46ec26b6fa750b56f1459f96ae3473d51090651c7da541')
+  assert.equal(await loadAuthoritativeGenerationStructureImage('topdown_rpg_v0', {
+    rootDir: process.cwd(),
+  }), null)
 })

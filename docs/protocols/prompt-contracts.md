@@ -9,21 +9,32 @@ The default AI generation preset is `fixed_region_motion_v0`.
 sheets, compatibility checks, and focused topdown repair work.
 `ocad_motion_v0` is accepted only as a legacy alias for historical metadata.
 
+`character_prompt_contract_v1_18` is opt-in through the two strict full-sheet
+Profiles. Requests without `generationProfileId` retain the v1.17 compiled
+prompt and legacy Provider transport: one user text part followed by its legacy
+image order, with no injected System Instruction or role-interleaved V1.18
+sections. This preserves the meaning of existing generation requests.
+
 Quality-character text-to-image uses a separate single-image contract:
 `quality_character_prompt_contract_v1_0`. It is not a sheet layout contract.
 It asks for one centered full-body sprite-source character with generous
 padding, neutral idle pose, compact production scale, and enough simplification
 to remain readable when downscaled to a 96x96 RPG sprite.
 
-## Contract Metadata
+## Strict Profile Contract Metadata
 
 ```json
 {
   "schema_version": 1,
-  "contract_version": "character_prompt_contract_v1_15",
+  "contract_version": "character_prompt_contract_v1_18",
   "preset": "topdown_rpg_v0",
   "layout_id": "topdown_rpg_v0",
   "layout_kind": "uniform_grid",
+  "equipment_contract": {
+    "policy": "preserve",
+    "automatic_acceptance_allowed": false,
+    "automatic_retry_allowed": false
+  },
   "validation_expectations": [
     "exact_8x8_grid",
     "exact_64_cells",
@@ -44,10 +55,104 @@ to remain readable when downscaled to a 96x96 RPG sprite.
     "template_empty_cells_must_be_filled",
     "layout_template_has_priority_over_reference_images",
     "reference_images_must_not_override_layout",
-    "compact_horizontal_attack_rows"
+    "compact_horizontal_attack_rows",
+    "equipment_policy_preserve"
   ]
 }
 ```
+
+## v1.18 Full-Sheet Identity And Reference Roles
+
+`character_prompt_contract_v1_18` keeps the v1.17 Equipment Policy as the final
+authority and makes the full-sheet reference roles disjoint:
+
+- The System Instruction requires exactly one consistent character identity
+  across the whole sheet.
+- `STRUCTURE` controls only layout, slot geometry, pose, facing, proportion,
+  scale, spacing, and baseline. It is not an identity, palette, or rendering
+  style authority.
+- `IDENTITY`, when present, is the sole authority for species, anatomy, face,
+  hair, costume, proportions, and appearance. When absent, the structured
+  written description is the sole identity authority.
+- `PALETTE`, when present, contains only extracted color swatches and controls
+  color ramps, contrast, saturation, outline weight, and pixel finish. It has
+  no subject silhouette, layout, pose, object, or identity authority.
+- Every required slot must contain one complete instance of the same identity.
+  A second person, extra head, detached body fragment, duplicate character, or
+  mixture with the template character is forbidden.
+
+These validation expectations are Provider output targets and a human review
+checklist. They do not authorize a local heuristic to accept or reject a strict
+Sheet. The current product persists explicit human acceptance only; formal
+rejection is deferred.
+
+For Gemini Native full-sheet Profiles, the provider request order is sealed as:
+
+1. `systemInstruction`;
+2. `TASK` text;
+3. `STRUCTURE` text and image;
+4. `IDENTITY` text and optional image;
+5. `PALETTE` text and optional image;
+6. final `OUTPUT CONTRACT` text.
+
+The Review manifest stores these exact sections and the ordered reference
+hashes. Live generation sends the stored sections and stored derived images;
+it does not rebuild role inputs after Review.
+
+## v1.17 Explicit Equipment Policy
+
+`character_prompt_contract_v1_17` adds an inspectable equipment contract with
+three exact policies: `none`, `preserve`, and `separate`. General character
+generation defaults to `preserve` for compatibility with explicitly armed
+characters. Targeted frame and fixed-region source repair default to `none`.
+
+The compiled prompt adds policy-specific hard negatives after the character
+description, so `none` and `separate` are the final authority even when old
+metadata or a reference mentions equipment. `none` forbids held objects and
+weapon-like streaks, `preserve` forbids inventing or changing equipment, and
+`separate` requires an empty-hands body image with equipment kept out of that
+body layer. Every policy records that automatic acceptance and automatic retry
+are disallowed. This prompt contract is paired with the provider-free pixel
+gate; wording alone is not treated as proof.
+
+### Fixed-region action correction
+
+For a managed `fixed_region_motion_v0` character, a wrong pose, wrong facing,
+incorrect hand pose, and unwanted held weapon or prop are all the same product
+operation: correction of one or more selected source action slots. The default
+`none` equipment policy means the corrected body has empty hands and no weapon,
+shield, tool, projectile, detached attack arc, or weapon-like streak.
+
+This operation does not attach a punched-out source sheet. Its three input
+images have disjoint roles:
+
+1. `identity_anchor_atlas.png` contains only verified-correct, unselected crops
+   from the current character and is the sole identity/style authority.
+2. `pose_guide_atlas.png` contains grayscale structural poses derived from the
+   approved motion template and carries no character identity authority.
+3. `empty_output_atlas.png` is an independent coordinate board whose named
+   target interiors are transparent. It is not derived by erasing the current
+   character.
+
+No selected wrong crop, full source sheet, full normalized sheet, provider
+candidate, or previous repair output is a provider reference. The provider
+returns one independent atlas. Local code extracts only the selected slots and
+patches those exact fixed regions; every other source pixel remains byte-for-byte
+authoritative. A candidate is review-only until a separate explicit acceptance
+action, and neither automatic retry nor candidate feedback is allowed. The full
+protocol is defined in
+`docs/protocols/fixed-region-action-repair-atlas-v1.md`.
+
+## v1.16 Fixed-region Climb Support-Prop Exclusion
+
+`character_prompt_contract_v1_16` keeps the v1.15 action-direction lock and
+clarifies that the six fixed-region climb poses are character-only motion
+references, not requests for a climbing scene or equipment.
+
+The fixed-region provider prompt now requires hands and feet to pose as if they
+are gripping invisible supports. It explicitly forbids ladders, rails, rungs,
+rope, walls, cliffs, ledges, platforms, poles, handholds, vertical bars,
+support objects, and surrounding scenery in the climb regions.
 
 ## v1.15 Fixed-region Action Direction Lock
 
@@ -265,11 +370,23 @@ prompt.txt
 
 The compiled provider prompt treats attached images as role-specific inputs:
 
-- Template image: strict structural control only.
-- Reference image: weak appearance reference only.
-- Palette image: palette/style reference only.
+- Structure image: strict layout, slot, pose, facing, proportion, scale,
+  spacing, and baseline control only. Full-sheet V1 accepts only the sealed,
+  layout-specific authoritative outline. It may remap color and apply the
+  documented transparent padding plus nearest-neighbor resize, but it must not
+  redraw, simplify, synthesize, or replace the visible pose contours with a
+  generic block/robot guide or a template from another layout.
+- Identity image: optional strong appearance authority. When supplied, the
+  derived board contains exactly one significant subject and is the sole
+  character-identity authority.
+- Palette image: optional pure-swatch board. It controls only palette and pixel
+  finish and contains no original subject silhouette.
 
-The written layout contract and structural template override all reference and palette images. Reference and palette images must not override layout, frame count, cell boundaries, or fixed-region positions.
+The written layout contract and Structure image own layout, frame count, cell
+boundaries, and fixed-region positions. Identity and Palette images cannot
+override those properties. Structure and Palette images cannot override the
+Identity authority. The written Equipment Policy has final priority over all
+image roles.
 
 ## Compatibility Rules
 

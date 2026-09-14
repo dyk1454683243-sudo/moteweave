@@ -1,7 +1,26 @@
+import { createHash } from 'node:crypto'
+
+import {
+  applyDeterministicPixelMatteV2,
+  BACKGROUND_MATTE_V2_ALGORITHM,
+  BACKGROUND_MATTE_V2_ARTIFACT_FILES,
+  BACKGROUND_MATTE_V2_AUXILIARY_ARTIFACT_FILES,
+  assertBackgroundMatteV2ArtifactUrlPrefix,
+  buildBackgroundMatteV2ArtifactBundle,
+  hardenBackgroundAlpha,
+} from './backgroundMatteV2.js'
 import {
   encodeRgbaPng,
   loadRgba,
 } from './imageCodec.js'
+import {
+  calibrateFixedRegionTemplateImage,
+  stageTemplateCalibrationSource,
+} from './fixedRegionCalibration.js'
+import {
+  assertFullSheetGenerationProfileRequest,
+  resolveFullSheetGenerationProfile,
+} from './generationProfiles.js'
 import JSZip from 'jszip'
 import { processSheetBuffer } from './processSheet.js'
 import {
@@ -10,8 +29,17 @@ import {
   refinePixelFrames,
 } from './pixelGridRefinement.js'
 import { generateCharacterSource } from './providers/geminiProvider.js'
+import { sniffProviderImageMimeType } from './providers/providerImageUtils.js'
 import { isNonRetryableProviderError, providerErrorFailureStatus } from './providers/providerErrors.js'
-import { prepareSourceForProcessing } from './sourcePreparation.js'
+import {
+  prepareSourceForProcessing,
+  removeBackground,
+} from './sourcePreparation.js'
+import {
+  ALPHA_PROVENANCE,
+  BACKGROUND_MODES,
+  resolveBackgroundMode,
+} from './backgroundProcessingContract.js'
 import {
   applyPixelStyleCorrection,
   buildPixelStyleReport,
@@ -32,12 +60,22 @@ import { isFixedRegionMotionLayoutId } from './sourceLayouts.js'
 import {
   evaluateProductionSheetReleaseGate,
   evaluateQualityCharacterReleaseGate,
+  MANUAL_REVIEW_ARTIFACT_DISPOSITION,
+  MANUAL_REVIEW_STATUS,
 } from './generationReleaseGate.js'
+import { evaluateSourceSubjectCount } from './subjectCountGate.js'
 
 const STATUS_SCORE = Object.freeze({
   pass: 1000,
   warning: 650,
   fail: 0,
+})
+
+const RAW_PROVIDER_EXTENSION_BY_MIME_TYPE = Object.freeze({
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/webp': 'webp',
+  'image/gif': 'gif',
 })
 
 export const T2I_GOLDEN_CASES = Object.freeze([
@@ -69,10 +107,73 @@ function round(value, digits = 4) {
 }
 
 function normalizeBackgroundForFinishing(backgroundMode) {
-  const mode = String(backgroundMode || 'auto').trim()
-  if (mode === 'flood_edge') return 'auto'
-  if (mode === 'alpha' || mode === 'transparent') return 'auto'
-  return mode || 'auto'
+  const mode = resolveBackgroundMode(backgroundMode, { allowAlreadyProcessed: true })
+  if (mode.canonical === BACKGROUND_MODES.LEGACY_FLOOD) return 'flood'
+  if (mode.canonical === BACKGROUND_MODES.LEGACY_EDGE_PALETTE) return 'edge_palette'
+  if (mode.canonical === BACKGROUND_MODES.ALPHA) return 'alpha_cleanup'
+  return mode.canonical
+}
+
+function normalizedProviderMimeType(value) {
+  const mimeType = String(value ?? '').split(';')[0].trim().toLowerCase()
+  if (mimeType === 'image/jpg') return 'image/jpeg'
+  return mimeType || null
+}
+
+export function buildRawProviderOutputArtifact(generated) {
+  if (!Buffer.isBuffer(generated?.buffer) || generated.buffer.length === 0) {
+    throw new Error('selected Provider output bytes are missing')
+  }
+  const buffer = Buffer.from(generated.buffer)
+  const declaredMimeType = normalizedProviderMimeType(generated.mimeType)
+  const detectedMimeType = sniffProviderImageMimeType(buffer)
+  const mimeType = detectedMimeType ?? declaredMimeType ?? 'application/octet-stream'
+  const extension = RAW_PROVIDER_EXTENSION_BY_MIME_TYPE[mimeType] ?? 'bin'
+  const dimensions = generated.rawProviderImageDimensions ?? null
+  return {
+    buffer,
+    fileName: `raw_provider_output.${extension}`,
+    metadata: {
+      file: `raw_provider_output.${extension}`,
+      byte_length: buffer.length,
+      sha256: createHash('sha256').update(buffer).digest('hex'),
+      declared_mime_type: declaredMimeType,
+      detected_mime_type: detectedMimeType,
+      mime_type: mimeType,
+      mime_matches_declared: declaredMimeType === null || detectedMimeType === null
+        ? null
+        : declaredMimeType === detectedMimeType,
+      ...(dimensions ? { width: dimensions.width, height: dimensions.height } : {}),
+      processing: 'none',
+    },
+  }
+}
+
+export async function buildBackgroundRemovedProviderOutputArtifact(background, rawProviderOutput) {
+  const buffer = await encodeRgbaPng(background.image)
+  return {
+    buffer,
+    fileName: 'background_removed_provider_output.png',
+    metadata: {
+      file: 'background_removed_provider_output.png',
+      byte_length: buffer.length,
+      sha256: createHash('sha256').update(buffer).digest('hex'),
+      mime_type: 'image/png',
+      width: background.image.width,
+      height: background.image.height,
+      processing: 'background_removal_only',
+      source_file: rawProviderOutput.fileName,
+      source_sha256: rawProviderOutput.metadata.sha256,
+      background_removal: {
+        mode: background.mode,
+        warnings: background.warnings ?? [],
+        ...(background.options ? { options: background.options } : {}),
+        ...(background.contract ? { contract: background.contract } : {}),
+        alpha_provenance: background.alpha_provenance ?? ALPHA_PROVENANCE.UNKNOWN,
+        input_decode: background.input_decode ?? null,
+      },
+    },
+  }
 }
 
 function validationStatus(result) {
@@ -111,6 +212,7 @@ export function scoreProductionSheetCandidate({ result, error } = {}) {
   const sourceEmptyRegions = Number(sourceQualitySummary.empty_region_count ?? 0)
   const status = validation.status ?? 'fail'
   const releaseGate = evaluateProductionSheetReleaseGate({ debugReport: result.debugReport })
+  const manualReviewRequired = releaseGate.manual_review_required === true
   const score =
     (STATUS_SCORE[status] ?? 0) -
     warnings.length * 15 -
@@ -127,11 +229,24 @@ export function scoreProductionSheetCandidate({ result, error } = {}) {
   return {
     score: round(score),
     status,
-    reason: releaseGate.blocking_errors[0] ?? blocking[0] ?? sourceQualityBlocking[0] ?? warnings[0] ?? sourceQualityWarnings[0] ?? null,
+    reason: manualReviewRequired
+      ? MANUAL_REVIEW_STATUS
+      : releaseGate.blocking_errors[0] ?? blocking[0] ?? sourceQualityBlocking[0] ?? warnings[0] ?? sourceQualityWarnings[0] ?? null,
     warnings: [...new Set([...warnings, ...sourceQualityWarnings, ...(releaseGate.warnings ?? [])])],
-    blocking_errors: [...new Set([...blocking, ...sourceQualityBlocking, ...(releaseGate.blocking_errors ?? [])])],
+    blocking_errors: manualReviewRequired
+      ? [...new Set(releaseGate.blocking_errors ?? [])]
+      : [...new Set([...blocking, ...sourceQualityBlocking, ...(releaseGate.blocking_errors ?? [])])],
+    automated_review_findings: manualReviewRequired
+      ? [...new Set([
+          ...blocking,
+          ...sourceQualityBlocking,
+          ...(releaseGate.automated_review_findings ?? []),
+        ])]
+      : [],
     release_gate: releaseGate,
     release_ready: releaseGate.release_ready,
+    manual_review_required: manualReviewRequired,
+    human_decision_status: releaseGate.human_decision_status ?? null,
     metrics: {
       halo_score: haloScore,
       duplicate_groups: duplicateGroups,
@@ -278,7 +393,18 @@ function measureQualityCharacterSpec(image, { visiblePixelCount = null } = {}) {
 
 function selectionReport({ mode, candidateCount, selected, releaseSelected, candidates, generationOptions }) {
   const hasProcessedCandidate = candidates.some((candidate) => candidate.result || candidate.finished)
-  const artifactDisposition = releaseSelected ? 'release' : hasProcessedCandidate ? 'diagnostic_only' : 'none'
+  const manualReviewRequired = Boolean(
+    !releaseSelected &&
+    candidates.some((candidate) => (
+      (candidate.result || candidate.finished) &&
+      candidate.manual_review_required === true
+    )),
+  )
+  const artifactDisposition = releaseSelected
+    ? 'release'
+    : manualReviewRequired
+      ? MANUAL_REVIEW_ARTIFACT_DISPOSITION
+      : hasProcessedCandidate ? 'diagnostic_only' : 'none'
   return {
     mode,
     candidate_count: candidateCount,
@@ -288,6 +414,9 @@ function selectionReport({ mode, candidateCount, selected, releaseSelected, cand
     release_selected_score: releaseSelected?.score ?? null,
     release_ready: Boolean(releaseSelected),
     artifact_disposition: artifactDisposition,
+    manual_review_required: manualReviewRequired,
+    human_decision_status: manualReviewRequired ? 'pending' : null,
+    review_status: manualReviewRequired ? MANUAL_REVIEW_STATUS : null,
     generation_options: generationOptions,
     candidates: candidates.map((candidate) => ({
       index: candidate.index,
@@ -306,7 +435,10 @@ function selectionReport({ mode, candidateCount, selected, releaseSelected, cand
       generation_options: candidate.generated?.generationOptions ?? null,
       warnings: candidate.warnings ?? [],
       blocking_errors: candidate.blocking_errors ?? [],
+      automated_review_findings: candidate.automated_review_findings ?? [],
       release_ready: candidate.release_ready === true,
+      manual_review_required: candidate.manual_review_required === true,
+      human_decision_status: candidate.human_decision_status ?? null,
       release_gate: candidate.release_gate ?? null,
       metrics: candidate.metrics ?? {},
     })),
@@ -358,6 +490,8 @@ function generationMetadata({
   generationOptions,
   candidateSelection,
   mode,
+  rawProviderOutput = null,
+  backgroundRemovedProviderOutput = null,
 }) {
   return {
     mode,
@@ -365,6 +499,7 @@ function generationMetadata({
     provider_preset_id: generated.providerPresetId,
     provider_label: generated.providerLabel,
     model: generated.model,
+    route_kind: generated.routeKind ?? null,
     image_config: imageConfig,
     generation_options: generationOptions,
     input_images: generated.inputImages,
@@ -372,16 +507,35 @@ function generationMetadata({
     reference_file: generated.referenceName,
     palette_file: generated.paletteName,
     provider_attempts: generated.providerAttempts ?? [],
+    generation_profile_id: generated.generationProfileId ?? null,
+    generation_review: generated.generationReview ?? null,
     prompt_contract: generated.promptContract,
+    fixed_region_calibration: generated.fixedRegionCalibration ?? null,
+    ...(rawProviderOutput ? { raw_provider_output: rawProviderOutput } : {}),
+    ...(backgroundRemovedProviderOutput
+      ? { background_removed_provider_output: backgroundRemovedProviderOutput }
+      : {}),
+    ...(generated.backgroundMatteV2Metadata
+      ? { background_matte_v2: generated.backgroundMatteV2Metadata }
+      : {}),
     prompt_file: 'prompt.txt',
     candidate_selection: candidateSelection,
   }
 }
 
-async function attachProductionGenerationEvidence(result, { generation, releaseGate, releaseReady, artifactDisposition }) {
+async function attachProductionGenerationEvidence(result, {
+  generation,
+  releaseGate,
+  releaseReady,
+  artifactDisposition,
+  manualReviewRequired = false,
+  humanDecisionStatus = null,
+}) {
   result.generationReleaseGate = releaseGate
   result.releaseReady = releaseReady
   result.artifactDisposition = artifactDisposition
+  result.manualReviewRequired = manualReviewRequired
+  result.humanDecisionStatus = humanDecisionStatus
   result.metadataJson = {
     ...result.metadataJson,
     generation,
@@ -397,8 +551,127 @@ async function attachProductionGenerationEvidence(result, { generation, releaseG
   }
 }
 
-function processOptionsForGeneratedProductionSheet(processOptions = {}, { sourceLayout }) {
+async function calibrateGeneratedProductionSheet(buffer, sourceLayout, backgroundMode, {
+  rawProviderOutput,
+  onBackgroundRemovedProviderOutput = null,
+  candidateIndex = null,
+  backgroundMatteV2ArtifactUrlPrefix = null,
+} = {}) {
+  if (!isFixedRegionMotionLayoutId(sourceLayout)) {
+    return {
+      buffer,
+      report: null,
+      backgroundRemovedProviderOutput: null,
+      backgroundRemovedImage: null,
+      rawProviderImageDimensions: null,
+    }
+  }
+  const source = await loadRgba(buffer)
+  const backgroundContract = resolveBackgroundMode(backgroundMode, {
+    allowDeterministicV2: true,
+  })
+  const useBackgroundMatteV2 =
+    backgroundContract.canonical === BACKGROUND_MODES.DETERMINISTIC_PIXEL_MATTE_V2
+  let backgroundMatteV2Bundle = null
+  const background = useBackgroundMatteV2
+    ? applyDeterministicPixelMatteV2(source, { decode: source.decode ?? null })
+    : await removeBackground(source, {
+        backgroundMode: normalizeBackgroundForFinishing(backgroundMode),
+        inputAlphaProvenance: ALPHA_PROVENANCE.PROVIDER,
+      })
+  background.input_decode = source.decode ?? null
+  if (useBackgroundMatteV2) {
+    if (!backgroundMatteV2ArtifactUrlPrefix) {
+      throw new Error('Background Matte V2 Artifact URL prefix is required for strict fixed-region generation')
+    }
+    backgroundMatteV2Bundle = await buildBackgroundMatteV2ArtifactBundle(background, {
+      rawSource: source,
+      artifactUrlPrefix: backgroundMatteV2ArtifactUrlPrefix,
+    })
+  }
+  const backgroundRemovedProviderOutput = backgroundMatteV2Bundle
+    ? {
+        buffer: backgroundMatteV2Bundle.files[BACKGROUND_MATTE_V2_ARTIFACT_FILES.OUTPUT],
+        fileName: BACKGROUND_MATTE_V2_ARTIFACT_FILES.OUTPUT,
+        metadata: {
+          ...backgroundMatteV2Bundle.artifacts[BACKGROUND_MATTE_V2_ARTIFACT_FILES.OUTPUT],
+          width: source.width,
+          height: source.height,
+          processing: 'background_removal_only',
+          source_file: rawProviderOutput.fileName,
+          source_sha256: rawProviderOutput.metadata.sha256,
+          background_removal: {
+            mode: background.mode,
+            recipe_id: BACKGROUND_MATTE_V2_ALGORITHM,
+            warnings: background.warnings ?? [],
+            alpha_provenance: background.alpha_provenance,
+          },
+        },
+      }
+    : await buildBackgroundRemovedProviderOutputArtifact(background, rawProviderOutput)
+  if (onBackgroundRemovedProviderOutput) {
+    await onBackgroundRemovedProviderOutput({
+      ...backgroundRemovedProviderOutput,
+      candidateIndex,
+    })
+  }
+  const stagingOptions = useBackgroundMatteV2
+    ? { removeConnectedMatte: false }
+    : undefined
+  const staged = stageTemplateCalibrationSource(background.image, stagingOptions)
+  const calibrated = calibrateFixedRegionTemplateImage(staged.image)
+  const processingReady = stageTemplateCalibrationSource(calibrated.image, stagingOptions)
+  const hardAlpha = useBackgroundMatteV2
+    ? hardenBackgroundAlpha(processingReady.image)
+    : null
+  return {
+    buffer: await encodeRgbaPng(hardAlpha?.image ?? processingReady.image),
+    backgroundRemovedProviderOutput,
+    backgroundRemovedImage: background.image,
+    backgroundMatteV2Metadata: backgroundMatteV2Bundle?.metadata ?? null,
+    backgroundMatteV2ArtifactBuffers: backgroundMatteV2Bundle
+      ? Object.fromEntries(BACKGROUND_MATTE_V2_AUXILIARY_ARTIFACT_FILES.map((file) => [
+          file,
+          backgroundMatteV2Bundle.files[file],
+        ]))
+      : null,
+    rawProviderImageDimensions: {
+      width: source.width,
+      height: source.height,
+    },
+    report: {
+      ...calibrated.report,
+      background_removal: {
+        mode: background.mode,
+        warnings: background.warnings ?? [],
+        ...(background.options ? { options: background.options } : {}),
+        ...(background.contract ? { contract: background.contract } : {}),
+        alpha_provenance: background.alpha_provenance ?? ALPHA_PROVENANCE.UNKNOWN,
+        input_decode: background.input_decode ?? null,
+        ...(hardAlpha
+          ? {
+              production_hard_alpha: {
+                threshold: hardAlpha.threshold,
+                alpha_threshold_byte: hardAlpha.alpha_threshold_byte,
+                alpha_provenance: hardAlpha.alpha_provenance,
+              },
+            }
+          : {}),
+      },
+      staging: staged.report,
+      processing_ready_staging: processingReady.report,
+    },
+  }
+}
+
+function processOptionsForGeneratedProductionSheet(processOptions = {}, { sourceLayout, calibrated = false }) {
   if (!isFixedRegionMotionLayoutId(sourceLayout)) return processOptions
+  if (calibrated) {
+    return {
+      ...processOptions,
+      fixedRegionSourceStaging: 'none',
+    }
+  }
   if (
     processOptions.fixedRegionSourceStaging !== undefined ||
     processOptions.fixed_region_source_staging !== undefined ||
@@ -426,16 +699,50 @@ export async function runProductionSheetTextToImage({
   generationOptions = {},
   promptFields = {},
   characterPreset,
-  backgroundMode = 'auto',
+  backgroundMode,
   templateImage = null,
   referenceImage = null,
   paletteImage = null,
+  reviewedRequest = null,
+  generationProfileId = null,
   providerBudget = null,
   processOptions = {},
   generateSource = generateCharacterSource,
   processSheet = processSheetBuffer,
+  onRawProviderOutput = null,
+  onBackgroundRemovedProviderOutput = null,
+  backgroundMatteV2ArtifactUrlPrefix = null,
   env = process.env,
 } = {}) {
+  const generationProfile = generationProfileId
+    ? resolveFullSheetGenerationProfile(generationProfileId, { required: true })
+    : null
+  const effectivePreset = generationProfile?.source_layout ?? preset
+  const effectiveBackgroundMode = backgroundMode ??
+    generationProfile?.background_recipe_id ??
+    BACKGROUND_MODES.AUTO
+  if (generationProfile) {
+    assertFullSheetGenerationProfileRequest(generationProfile, {
+      preset,
+      mode: TEXT_TO_IMAGE_MODE_PRODUCTION_SHEET,
+      imageConfig,
+      generationOptions,
+      backgroundMode: effectiveBackgroundMode,
+    })
+  }
+  const profileUsesBackgroundMatteV2 =
+    generationProfile?.background_recipe_id === BACKGROUND_MATTE_V2_ALGORITHM
+  const backgroundContract = resolveBackgroundMode(effectiveBackgroundMode, {
+    allowDeterministicV2: profileUsesBackgroundMatteV2,
+  })
+  if (generationProfile?.background_recipe_id != null) {
+    if (backgroundContract.recipe_id !== generationProfile.background_recipe_id) {
+      throw new Error('generation profile background mode cannot be overridden')
+    }
+  }
+  if (backgroundContract.recipe_id === BACKGROUND_MATTE_V2_ALGORITHM) {
+    assertBackgroundMatteV2ArtifactUrlPrefix(backgroundMatteV2ArtifactUrlPrefix)
+  }
   const resolvedGenerationOptions = normalizeGenerationOptions(generationOptions)
   const candidateCount = normalizeCandidateCount(resolvedGenerationOptions.candidateCount)
   const candidates = []
@@ -444,7 +751,7 @@ export async function runProductionSheetTextToImage({
     try {
       generated = await generateSource({
         description,
-        preset,
+        preset: effectivePreset,
         providerPresetId,
         imageConfig,
         generationOptions: resolvedGenerationOptions,
@@ -452,10 +759,12 @@ export async function runProductionSheetTextToImage({
         t2iMode: TEXT_TO_IMAGE_MODE_PRODUCTION_SHEET,
         characterPreset,
         promptFields,
-        backgroundMode,
+        backgroundMode: effectiveBackgroundMode,
         templateImage,
         referenceImage,
         paletteImage,
+        reviewedRequest,
+        generationProfileId,
         providerBudget,
         env,
       })
@@ -468,18 +777,101 @@ export async function runProductionSheetTextToImage({
       continue
     }
     try {
-      const result = await processSheet(generated.buffer, {
+      const rawProviderOutput = buildRawProviderOutputArtifact(generated)
+      if (onRawProviderOutput) {
+        await onRawProviderOutput({
+          ...rawProviderOutput,
+          candidateIndex: index,
+        })
+      }
+      if (generationProfile && (
+        generated.promptContract?.layout_id !== generationProfile.source_layout ||
+        generated.promptContract?.t2i_mode !== generationProfile.generation_mode ||
+        generated.promptContract?.background_mode !== effectiveBackgroundMode
+      )) {
+        throw new Error('generated prompt contract does not match generation profile')
+      }
+      const generatedWithRawProviderOutput = {
+        ...generated,
+        rawProviderOutput,
+      }
+      const sourceLayout = generationProfile?.source_layout ??
+        generated.promptContract?.layout_id ??
+        effectivePreset
+      const calibrated = await calibrateGeneratedProductionSheet(
+        generated.buffer,
+        sourceLayout,
+        effectiveBackgroundMode,
+        {
+          rawProviderOutput,
+          onBackgroundRemovedProviderOutput,
+          candidateIndex: index,
+          backgroundMatteV2ArtifactUrlPrefix,
+        },
+      )
+      let preCalibrationSubjectCountReport = null
+      let rawProviderImageDimensions = calibrated.rawProviderImageDimensions
+      if (generationProfileId) {
+        const rawGenerated = rawProviderImageDimensions
+          ? null
+          : await loadRgba(generated.buffer)
+        rawProviderImageDimensions ??= {
+          width: rawGenerated.width,
+          height: rawGenerated.height,
+        }
+        rawProviderOutput.metadata = {
+          ...rawProviderOutput.metadata,
+          ...rawProviderImageDimensions,
+        }
+        const transparentGenerated = calibrated.backgroundRemovedImage
+          ? { image: calibrated.backgroundRemovedImage }
+          : await removeBackground(rawGenerated, {
+              backgroundMode: normalizeBackgroundForFinishing(effectiveBackgroundMode),
+            })
+        preCalibrationSubjectCountReport = evaluateSourceSubjectCount(
+          transparentGenerated.image,
+          sourceLayout,
+          { stage: 'pre_calibration_source' },
+        ).report
+      }
+      const generatedWithDimensions = rawProviderImageDimensions
+        ? { ...generatedWithRawProviderOutput, rawProviderImageDimensions }
+        : generatedWithRawProviderOutput
+      const generatedWithCalibration = calibrated.report
+        ? {
+            ...generatedWithDimensions,
+            fixedRegionCalibration: calibrated.report,
+            backgroundRemovedProviderOutput: calibrated.backgroundRemovedProviderOutput,
+            ...(calibrated.backgroundMatteV2Metadata
+              ? {
+                  backgroundMatteV2Metadata: calibrated.backgroundMatteV2Metadata,
+                  backgroundMatteV2ArtifactBuffers: calibrated.backgroundMatteV2ArtifactBuffers,
+                }
+              : {}),
+          }
+        : generatedWithDimensions
+      const result = await processSheet(calibrated.buffer, {
         ...processOptionsForGeneratedProductionSheet(processOptions, {
-          sourceLayout: generated.promptContract?.layout_id ?? preset,
+          sourceLayout,
+          calibrated: calibrated.report !== null,
         }),
         name,
         description,
-        backgroundMode,
-        sourceLayout: generated.promptContract?.layout_id ?? preset,
+        backgroundMode: generationProfileId && calibrated.report
+          ? BACKGROUND_MODES.ALREADY_PROCESSED
+          : effectiveBackgroundMode,
+        backgroundRequestMode: effectiveBackgroundMode,
+        inputAlphaProvenance: calibrated.report
+          ? ALPHA_PROVENANCE.CALIBRATED
+          : ALPHA_PROVENANCE.PROVIDER,
+        sourceLayout,
         sourceType: 't2i_production_sheet',
         sourceFileName: `candidate_${index}.png`,
+        subjectCountGate: Boolean(generationProfileId),
+        subjectCountPreCalibrationReport: preCalibrationSubjectCountReport,
+        generationProfile: generationProfileId ? { id: generationProfileId } : null,
         generation: generationMetadata({
-          generated,
+          generated: generatedWithCalibration,
           imageConfig,
           generationOptions: resolvedGenerationOptions,
           candidateSelection: null,
@@ -489,7 +881,7 @@ export async function runProductionSheetTextToImage({
       })
       candidates.push({
         index,
-        generated,
+        generated: generatedWithCalibration,
         result,
         ...scoreProductionSheetCandidate({ result }),
       })
@@ -521,19 +913,44 @@ export async function runProductionSheetTextToImage({
     })
   }
   const published = releaseSelected ?? selected
+  const rawProviderOutput = published.generated.rawProviderOutput
+  if (!rawProviderOutput) throw postProcessingCandidateError(new Error('selected raw Provider output artifact is missing'))
+  const backgroundRemovedProviderOutput = published.generated.backgroundRemovedProviderOutput ?? null
+  if (
+    isFixedRegionMotionLayoutId(
+      generationProfile?.source_layout ?? published.generated.promptContract?.layout_id ?? effectivePreset,
+    ) &&
+    !backgroundRemovedProviderOutput
+  ) {
+    throw postProcessingCandidateError(new Error('selected background-removed Provider output artifact is missing'))
+  }
   const selectedGeneration = generationMetadata({
     generated: published.generated,
     imageConfig,
     generationOptions: resolvedGenerationOptions,
     candidateSelection,
     mode: TEXT_TO_IMAGE_MODE_PRODUCTION_SHEET,
+    rawProviderOutput: rawProviderOutput.metadata,
+    backgroundRemovedProviderOutput: backgroundRemovedProviderOutput?.metadata ?? null,
   })
+  published.result.files.rawProviderOutputBuffer = rawProviderOutput.buffer
+  published.result.files.rawProviderOutputFileName = rawProviderOutput.fileName
+  if (backgroundRemovedProviderOutput) {
+    published.result.files.backgroundRemovedProviderOutputBuffer = backgroundRemovedProviderOutput.buffer
+    published.result.files.backgroundRemovedProviderOutputFileName = backgroundRemovedProviderOutput.fileName
+  }
+  if (published.generated.backgroundMatteV2ArtifactBuffers) {
+    published.result.files.backgroundMatteV2ArtifactBuffers =
+      published.generated.backgroundMatteV2ArtifactBuffers
+  }
   try {
     await attachProductionGenerationEvidence(published.result, {
       generation: selectedGeneration,
       releaseGate: published.release_gate,
       releaseReady: published.release_ready === true,
       artifactDisposition: candidateSelection.artifact_disposition,
+      manualReviewRequired: candidateSelection.manual_review_required === true,
+      humanDecisionStatus: candidateSelection.human_decision_status,
     })
   } catch (error) {
     throw postProcessingCandidateError(error, { candidateSelection })
@@ -546,6 +963,8 @@ export async function runProductionSheetTextToImage({
     releaseGate: published.release_gate,
     releaseReady: published.release_ready === true,
     artifactDisposition: candidateSelection.artifact_disposition,
+    manualReviewRequired: candidateSelection.manual_review_required === true,
+    humanDecisionStatus: candidateSelection.human_decision_status,
   }
 }
 

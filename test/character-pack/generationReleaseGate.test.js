@@ -5,6 +5,7 @@ import { DEFAULT_T2I_GOLDEN_REVIEW_THRESHOLDS } from '../../src/character-pack/b
 import {
   evaluateProductionSheetReleaseGate,
   evaluateQualityCharacterReleaseGate,
+  FULL_SHEET_MANUAL_ACCEPTANCE_PROTOCOL,
   GENERATION_RELEASE_GATE_MODE,
   QUALITY_CHARACTER_RELEASE_THRESHOLDS,
   resolveGenerationArtifactDisposition,
@@ -34,6 +35,24 @@ function passingProductionDebugReport(overrides = {}) {
     validation: passingValidation(),
     quality_closure: passingClosure(),
     ...overrides,
+  }
+}
+
+function passingSubjectCount() {
+  return {
+    required: true,
+    status: 'pass',
+    source: {
+      status: 'pass',
+      stages: [
+        { stage: 'pre_calibration_source', status: 'pass' },
+        { stage: 'calibrated_source', status: 'pass' },
+      ],
+    },
+    normalized: { stage: 'normalized_frames', status: 'pass' },
+    suggested_region_keys: [],
+    needs_review_region_keys: [],
+    advisory_region_keys: [],
   }
 }
 
@@ -95,6 +114,202 @@ test('artifact disposition releases only when every canonical gate field agrees'
     assert.equal(resolveGenerationArtifactDisposition({ ...passing, ...conflict }), 'diagnostic_only')
   }
   assert.equal(resolveGenerationArtifactDisposition({}), null)
+
+  const manualReview = {
+    generationReleaseGate: {
+      ...passing.generationReleaseGate,
+      generation_mode: 'production_sheet_v0',
+      policy: 'strict_live_generation_v1',
+      status: 'needs_review',
+      release_ready: false,
+      manual_review_required: true,
+      human_decision_status: 'pending',
+      automated_review_findings: ['subject_count.multiple_subjects_blocked'],
+    },
+    releaseReady: false,
+    manualReviewRequired: true,
+    artifactDisposition: 'review_required',
+  }
+  assert.equal(resolveGenerationArtifactDisposition(manualReview), 'review_required')
+  assert.equal(resolveGenerationArtifactDisposition({
+    ...manualReview,
+    generationReleaseGate: {
+      ...manualReview.generationReleaseGate,
+      blocking_errors: ['subject_count.evidence_missing'],
+    },
+  }), 'diagnostic_only')
+
+  const manualAcceptance = {
+    schema_version: 1,
+    protocol: FULL_SHEET_MANUAL_ACCEPTANCE_PROTOCOL,
+    acceptance_id: 'accepted_job_1',
+    source_job_id: 'job_1',
+    published_job_id: 'accepted_job_1',
+    decision: 'accepted',
+    decision_authority: 'human',
+    generation_profile_id: 'full_sheet_fixed_region_v1',
+    prompt_contract_version: 'character_prompt_contract_v1_18',
+    accepted_at: '2026-08-09T08:00:00.000Z',
+    human_reviewed_issue_count: 0,
+    provider_calls_used: 0,
+    generation_review: {
+      reviewed_run_id: 'generation_review_1',
+      plan_hash: 'a'.repeat(64),
+      reference_manifest_sha256: 'b'.repeat(64),
+      prompt_text_sha256: '1'.repeat(64),
+    },
+    source_artifacts: {
+      raw_provider_output_file: 'raw_provider_output.png',
+      raw_provider_output_sha256: 'c'.repeat(64),
+      raw_provider_output_byte_length: 3,
+      source_sha256: 'd'.repeat(64),
+      source_byte_length: 4,
+      normalized_sheet_sha256: 'e'.repeat(64),
+      normalized_sheet_byte_length: 5,
+      prompt_sha256: '1'.repeat(64),
+      prompt_byte_length: 6,
+      generation_release_gate_sha256: 'f'.repeat(64),
+    },
+    publication_artifacts: {
+      release_files: [
+        { file: 'godot_npc_pack.zip', sha256: '2'.repeat(64), byte_length: 7 },
+        { file: 'ocad_pack.zip', sha256: '4'.repeat(64), byte_length: 9 },
+        { file: 'rpgmaker_pack.zip', sha256: '3'.repeat(64), byte_length: 8 },
+      ],
+      character_pack_entries: [
+        { file: 'animations.json', sha256: '5'.repeat(64), byte_length: 10 },
+      ],
+      metadata_without_generation_sha256: '6'.repeat(64),
+      engine_zips: {
+        godot_npc: { file: 'godot_npc_pack.zip', sha256: '2'.repeat(64), byte_length: 7 },
+        rpgmaker: { file: 'rpgmaker_pack.zip', sha256: '3'.repeat(64), byte_length: 8 },
+        ocad: { file: 'ocad_pack.zip', sha256: '4'.repeat(64), byte_length: 9 },
+      },
+    },
+  }
+  const humanAccepted = {
+    generationReleaseGate: {
+      ...manualReview.generationReleaseGate,
+      status: 'accepted',
+      release_ready: true,
+      manual_review_required: false,
+      human_decision_status: 'accepted',
+      generation_profile_id: 'full_sheet_fixed_region_v1',
+      prompt_contract_version: 'character_prompt_contract_v1_18',
+      manual_acceptance: manualAcceptance,
+    },
+    releaseReady: true,
+    manualReviewRequired: false,
+    humanDecisionStatus: 'accepted',
+    generationProfileId: 'full_sheet_fixed_region_v1',
+    promptContractVersion: 'character_prompt_contract_v1_18',
+    artifactDisposition: 'release',
+  }
+  assert.equal(resolveGenerationArtifactDisposition(humanAccepted), 'release')
+  assert.equal(resolveGenerationArtifactDisposition({
+    ...humanAccepted,
+    humanDecisionStatus: 'pending',
+  }), 'diagnostic_only')
+  assert.equal(resolveGenerationArtifactDisposition({
+    ...humanAccepted,
+    generationReleaseGate: {
+      ...humanAccepted.generationReleaseGate,
+      manual_acceptance: {
+        ...manualAcceptance,
+        generation_review: {
+          ...manualAcceptance.generation_review,
+          reviewed_run_id: '',
+        },
+      },
+    },
+  }), 'diagnostic_only')
+  assert.equal(resolveGenerationArtifactDisposition({
+    ...humanAccepted,
+    generationProfileId: undefined,
+  }), 'diagnostic_only')
+  assert.equal(resolveGenerationArtifactDisposition({
+    ...humanAccepted,
+    generationReleaseGate: {
+      ...humanAccepted.generationReleaseGate,
+      manual_acceptance: { ...manualAcceptance, provider_calls_used: 1 },
+    },
+  }), 'diagnostic_only')
+  assert.equal(resolveGenerationArtifactDisposition({
+    ...humanAccepted,
+    generationReleaseGate: {
+      ...humanAccepted.generationReleaseGate,
+      manual_acceptance: {
+        ...manualAcceptance,
+        publication_artifacts: {
+          ...manualAcceptance.publication_artifacts,
+          release_files: [],
+        },
+      },
+    },
+  }), 'diagnostic_only')
+  assert.equal(resolveGenerationArtifactDisposition({
+    ...humanAccepted,
+    generationReleaseGate: {
+      ...humanAccepted.generationReleaseGate,
+      manual_acceptance: {
+        ...manualAcceptance,
+        publication_artifacts: {
+          ...manualAcceptance.publication_artifacts,
+          release_files: [
+            ...manualAcceptance.publication_artifacts.release_files.slice(0, 1),
+            {
+              ...manualAcceptance.publication_artifacts.release_files[1],
+              sha256: '7'.repeat(64),
+            },
+            ...manualAcceptance.publication_artifacts.release_files.slice(2),
+          ],
+        },
+      },
+    },
+  }), 'diagnostic_only')
+  assert.equal(resolveGenerationArtifactDisposition({
+    ...humanAccepted,
+    generationReleaseGate: {
+      ...humanAccepted.generationReleaseGate,
+      manual_acceptance: {
+        ...manualAcceptance,
+        publication_artifacts: {
+          ...manualAcceptance.publication_artifacts,
+          release_files: [
+            ...manualAcceptance.publication_artifacts.release_files,
+          ].reverse(),
+        },
+      },
+    },
+  }), 'diagnostic_only')
+  assert.equal(resolveGenerationArtifactDisposition({
+    ...humanAccepted,
+    generationReleaseGate: {
+      ...humanAccepted.generationReleaseGate,
+      manual_acceptance: {
+        ...manualAcceptance,
+        publication_artifacts: {
+          ...manualAcceptance.publication_artifacts,
+          character_pack_entries: [
+            { file: 'generation.json', sha256: '5'.repeat(64), byte_length: 10 },
+          ],
+        },
+      },
+    },
+  }), 'diagnostic_only')
+  assert.equal(resolveGenerationArtifactDisposition({
+    ...humanAccepted,
+    generationReleaseGate: {
+      ...humanAccepted.generationReleaseGate,
+      manual_acceptance: {
+        ...manualAcceptance,
+        source_artifacts: {
+          ...manualAcceptance.source_artifacts,
+          prompt_sha256: '9'.repeat(64),
+        },
+      },
+    },
+  }), 'diagnostic_only')
 })
 
 test('production release gate passes strict evidence and treats source quality as not applicable for non-fixed layouts', () => {
@@ -126,6 +341,255 @@ test('production release gate requires clean source quality evidence for fixed-r
   assert.equal(pass.evidence.source_quality.applicable, true)
   assert.equal(missing.release_ready, false)
   assert.ok(missing.blocking_errors.includes('source_quality.evidence_missing'))
+})
+
+test('new full-sheet profiles reserve visual decisions for explicit human review', () => {
+  const passing = passingProductionDebugReport({
+    generation_profile: { id: 'full_sheet_topdown_v1' },
+    subject_count: passingSubjectCount(),
+  })
+  const pending = evaluateProductionSheetReleaseGate({ debugReport: passing })
+  assert.equal(pending.status, 'needs_review')
+  assert.equal(pending.release_ready, false)
+  assert.equal(pending.manual_review_required, true)
+  assert.equal(pending.human_decision_status, 'pending')
+  assert.deepEqual(pending.blocking_errors, [])
+  assert.deepEqual(pending.automated_review_findings, [])
+
+  const missing = evaluateProductionSheetReleaseGate({
+    debugReport: { ...passing, subject_count: null },
+  })
+  assert.ok(missing.blocking_errors.includes('subject_count.evidence_missing'))
+
+  const blocked = evaluateProductionSheetReleaseGate({
+    debugReport: {
+      ...passing,
+      subject_count: {
+        ...passingSubjectCount(),
+        status: 'blocked',
+        source: { ...passingSubjectCount().source, status: 'blocked' },
+        suggested_region_keys: ['attractL4'],
+      },
+    },
+  })
+  assert.equal(blocked.status, 'needs_review')
+  assert.equal(blocked.manual_review_required, true)
+  assert.deepEqual(blocked.blocking_errors, [])
+  assert.ok(blocked.automated_review_findings.includes('subject_count.multiple_subjects_blocked'))
+  assert.ok(blocked.automated_review_findings.includes('subject_count.source_not_pass'))
+
+  const needsReview = evaluateProductionSheetReleaseGate({
+    debugReport: {
+      ...passing,
+      subject_count: {
+        ...passingSubjectCount(),
+        status: 'needs_review',
+        normalized: { ...passingSubjectCount().normalized, status: 'needs_review' },
+        needs_review_region_keys: ['attractL6'],
+      },
+    },
+  })
+  assert.equal(needsReview.status, 'needs_review')
+  assert.equal(needsReview.manual_review_required, true)
+  assert.deepEqual(needsReview.blocking_errors, [])
+  assert.ok(needsReview.automated_review_findings.includes('subject_count.needs_review'))
+  assert.ok(needsReview.automated_review_findings.includes('subject_count.normalized_not_pass'))
+})
+
+test('new full-sheet profiles fail closed unless all three subject-count stages are present exactly once', () => {
+  const passing = passingSubjectCount()
+  const missingCases = [
+    {
+      id: 'pre_calibration_source',
+      subjectCount: {
+        ...passing,
+        source: { ...passing.source, stages: passing.source.stages.slice(1) },
+      },
+    },
+    {
+      id: 'calibrated_source',
+      subjectCount: {
+        ...passing,
+        source: { ...passing.source, stages: passing.source.stages.slice(0, 1) },
+      },
+    },
+    {
+      id: 'normalized_frames',
+      subjectCount: { ...passing, normalized: { status: 'pass' } },
+    },
+  ]
+
+  for (const { id, subjectCount } of missingCases) {
+    const result = evaluateProductionSheetReleaseGate({
+      debugReport: passingProductionDebugReport({
+        generation_profile: { id: 'full_sheet_topdown_v1' },
+        subject_count: subjectCount,
+      }),
+    })
+    assert.equal(result.release_ready, false)
+    assert.ok(result.blocking_errors.includes(`subject_count.${id}_missing`))
+  }
+
+  const duplicate = passingSubjectCount()
+  duplicate.source.stages.push({ stage: 'pre_calibration_source', status: 'pass' })
+  const duplicateResult = evaluateProductionSheetReleaseGate({
+    debugReport: passingProductionDebugReport({
+      generation_profile: { id: 'full_sheet_topdown_v1' },
+      subject_count: duplicate,
+    }),
+  })
+  assert.ok(duplicateResult.blocking_errors.includes('subject_count.pre_calibration_source_duplicate'))
+})
+
+test('subject-count accessory edge advisories remain non-blocking', () => {
+  const result = evaluateProductionSheetReleaseGate({
+    debugReport: passingProductionDebugReport({
+      generation_profile: { id: 'full_sheet_topdown_v1' },
+      subject_count: {
+        ...passingSubjectCount(),
+        advisory_region_keys: ['attack_left_0'],
+      },
+    }),
+  })
+
+  assert.equal(result.status, 'needs_review')
+  assert.equal(result.release_ready, false)
+  assert.equal(result.manual_review_required, true)
+  assert.ok(result.warnings.includes('subject_count:accessory_edge_advisory:attack_left_0'))
+})
+
+test('strict full-sheet quality warnings become automated review findings instead of candidate failures', () => {
+  const result = evaluateProductionSheetReleaseGate({
+    debugReport: passingProductionDebugReport({
+      generation_profile: { id: 'full_sheet_fixed_region_v1' },
+      source_layout: { id: FIXED_REGION_MOTION_LAYOUT_ID },
+      validation: {
+        status: 'warning',
+        warnings: ['frame_17_baseline_drift'],
+        blocking_errors: [],
+      },
+      source_quality: {
+        status: 'warning',
+        warnings: ['source_action_scale_inconsistent:climb'],
+        blocking_errors: [],
+      },
+      subject_count: {
+        ...passingSubjectCount(),
+        status: 'blocked',
+        source: {
+          ...passingSubjectCount().source,
+          status: 'blocked',
+          stages: passingSubjectCount().source.stages.map((stage) => ({
+            ...stage,
+            status: stage.stage === 'calibrated_source' ? 'blocked' : 'pass',
+          })),
+        },
+      },
+      quality_closure: {
+        ...passingClosure(),
+        status: 'warning',
+        release_ready: false,
+        gates: passingClosure().gates.map((gate, index) => ({
+          ...gate,
+          status: index === 0 ? 'warning' : 'pass',
+        })),
+      },
+    }),
+  })
+
+  assert.equal(result.status, 'needs_review')
+  assert.equal(result.release_ready, false)
+  assert.equal(result.manual_review_required, true)
+  assert.deepEqual(result.blocking_errors, [])
+  assert.ok(result.automated_review_findings.includes('validation.status_not_pass'))
+  assert.ok(result.automated_review_findings.includes('source_quality.status_not_pass'))
+  assert.ok(result.automated_review_findings.includes('subject_count.multiple_subjects_blocked'))
+  assert.ok(result.automated_review_findings.includes('quality_closure.status_not_pass'))
+})
+
+test('strict full-sheet malformed review evidence remains an execution-integrity failure', () => {
+  const base = passingProductionDebugReport({
+    generation_profile: { id: 'full_sheet_topdown_v1' },
+    subject_count: passingSubjectCount(),
+  })
+  const cases = [
+    {
+      name: 'validation status invalid',
+      debugReport: { ...base, validation: { ...base.validation, status: 'unknown' } },
+      expected: 'validation.status_invalid',
+    },
+    {
+      name: 'subject-count stage status missing',
+      debugReport: {
+        ...base,
+        subject_count: {
+          ...base.subject_count,
+          source: {
+            ...base.subject_count.source,
+            stages: base.subject_count.source.stages.map((stage, index) => (
+              index === 0 ? { stage: stage.stage } : stage
+            )),
+          },
+        },
+      },
+      expected: 'subject_count.pre_calibration_source_status_missing',
+    },
+    {
+      name: 'subject-count summary status invalid',
+      debugReport: {
+        ...base,
+        subject_count: {
+          ...base.subject_count,
+          normalized: { ...base.subject_count.normalized, status: 'unknown' },
+        },
+      },
+      expected: 'subject_count.normalized_status_invalid',
+    },
+    {
+      name: 'quality-closure gate status missing',
+      debugReport: {
+        ...base,
+        quality_closure: {
+          ...base.quality_closure,
+          gates: base.quality_closure.gates.map((gate, index) => (
+            index === 0 ? { id: gate.id } : gate
+          )),
+        },
+      },
+      expected: 'quality_closure.gate_status_missing',
+    },
+    {
+      name: 'quality-closure release-ready missing',
+      debugReport: {
+        ...base,
+        quality_closure: {
+          mode: base.quality_closure.mode,
+          status: base.quality_closure.status,
+          gates: base.quality_closure.gates,
+        },
+      },
+      expected: 'quality_closure.release_ready_missing',
+    },
+    {
+      name: 'quality-closure release-ready invalid',
+      debugReport: {
+        ...base,
+        quality_closure: {
+          ...base.quality_closure,
+          release_ready: 'false',
+        },
+      },
+      expected: 'quality_closure.release_ready_invalid',
+    },
+  ]
+
+  for (const item of cases) {
+    const result = evaluateProductionSheetReleaseGate({ debugReport: item.debugReport })
+    assert.equal(result.status, 'fail', item.name)
+    assert.equal(result.manual_review_required, false, item.name)
+    assert.equal(result.human_decision_status, 'unavailable', item.name)
+    assert.ok(result.blocking_errors.includes(item.expected), item.name)
+  }
 })
 
 test('production release gate fails closed when required evidence is missing', () => {
@@ -211,7 +675,7 @@ test('production release gate fails closed when required evidence is missing', (
     {
       name: 'quality closure release readiness',
       debugReport: passingProductionDebugReport({ quality_closure: { status: 'pass', gates: [] } }),
-      expected: 'quality_closure.not_release_ready',
+      expected: 'quality_closure.release_ready_missing',
     },
     {
       name: 'quality closure gate evidence',

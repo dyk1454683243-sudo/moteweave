@@ -135,7 +135,7 @@ async function releaseFixture({ requiredAncestors = [] } = {}) {
   await add('AGENTS.md', `${brand} contributor rules\n`)
   await add('ATTRIBUTIONS.md', `${brand} attributions\n`)
   await add('LICENSE', `${brand} contributors\n`)
-  await add('index.html', `<title>${brand}</title>\n`)
+  await add('src/ui/studio/studio.html', `<title>${brand}</title>\n`)
   await add('src/character-pack/providers/openRouterAdapter.js', `export const appName = '${brand}'\n`)
   await add('src/character-pack/providers/providerConfig.js', `export const appName = '${brand}'\n`)
   await add('website/README.md', `# ${brand} website\n`)

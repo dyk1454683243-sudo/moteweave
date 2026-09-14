@@ -221,8 +221,7 @@ desktop/mobile layout, states, keyboard behavior, and every known deviation.
 - No automated test calls a live Provider. Live evidence requires a separate
   named preset, maximum call budget, and explicit approval.
 - Do not scan `output/`, `generated/`, or unrelated artifact directories.
-- Preserve the existing untracked `* 2.js`, `* 2.md`, and `.superpowers/`
-  paths. Do not write to the exclusive
+- Preserve unrelated untracked user files. Do not write to the exclusive
   `.worktrees/frame-repair-live-quality-gate-implementation` worktree.
 - Each protected pipeline, validator, prompt, API, or UI behavior change must
   stay within its approved block contract. Record deviations before

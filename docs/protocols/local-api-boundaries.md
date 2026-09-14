@@ -25,6 +25,13 @@ server source are not public paths. Provider keys remain server-side.
 
 ### Character Pack
 
+- `POST /api/generate-character/review`
+  - Provider-free strict Full-Sheet pre-call entry.
+  - Writes the immutable prompt, ordered derived references, Profile, exact
+    Provider Preset/model/image configuration, Plan Hash, Reference Manifest
+    Hash, and call budget without dispatching a Provider request.
+  - Returns `provider_calls_used: 0`; unavailable Structure, stale input, or
+    malformed Profile/Preset fails before any live call.
 - `POST /api/generate-character`
   - Live provider call.
   - Uses server-side provider credentials.
@@ -47,11 +54,16 @@ server source are not public paths. Provider keys remain server-side.
     `release_gate`, `release_ready`, and `artifact_disposition`;
     `candidate_selection.selected_index` is diagnostic and
     `candidate_selection.release_selected_index` is the publication choice.
-  - If processed candidates exist but none pass `generation_release_gate_v1`,
+  - For legacy generation and Quality Character, if processed candidates exist
+    but none pass `generation_release_gate_v1`,
     the job is terminal `failed_quality_gate` with `failure_status:
     "generation_release_gate_failed"`, `retry_hint:
     "inspect_generation_evidence"`, and diagnostic URLs only. Character/T2I
     ZIPs and engine export URLs are absent.
+  - A successfully processed strict `full_sheet_*` candidate instead returns
+    `done + review_required`, `release_ready: false`, and
+    `human_decision_status: pending`; automated visual findings remain review
+    evidence. Execution or evidence-integrity failures still fail closed.
   - If every candidate fails in the Provider stage before any candidate enters
     local processing, the job status remains terminal as `failed_model_error`
     for existing pollers, with `failure_status: "failed_all_candidates"`,
@@ -65,6 +77,38 @@ server source are not public paths. Provider keys remain server-side.
     blocked provider call instead of spending the remaining candidate budget.
   - The release gate does not increase candidate count, change fallback, retry a
     Provider, or spend additional quota.
+- `POST /api/generate-character/:jobId/accept`
+  - Provider-free human acceptance for an existing strict `full_sheet_*`
+    `review_required` Job; it never calls a Provider and returns
+    `provider_call_budget` with planned/max/used all equal to zero.
+  - Requires `confirmManualAcceptance: true`, the sealed Plan and Reference
+    Manifest hashes, exact raw/source/normalized image hashes, and a
+    non-negative `humanReviewedIssueCount`. Unknown fields are rejected, and
+    the JSON body is stream-limited to 32 KiB before buffering.
+  - Reopens the sealed Review package and revalidates its Plan, Reference
+    Manifest, Profile, Provider, Prompt V1.18 text/hash, original one-call
+    ledger, canonical pending gate, mandatory evidence, and all submitted
+    bindings. A Profile whose sealed Recipe is Background Matte V2 requires the
+    exact eleven-file evidence whitelist; missing self-declared metadata cannot
+    downgrade that requirement. Accept then validates decoded RGBA bindings and
+    every Artifact hash and deterministically replays V2 from the bound Raw,
+    without adding an Accept request field.
+  - Leaves the source Job immutable. A successful decision writes a new
+    atomically published, single-assignment `accepted_v1_<jobId>` directory
+    containing
+    `manual_acceptance.json`, the accepted release gate, unchanged reviewed
+    image bytes, reviewed `prompt.txt`, Character Pack ZIP, and engine ZIPs.
+    `manual_acceptance.json` records the Prompt hash and exact SHA-256/length of
+    each engine ZIP. Required V2 evidence is copied byte-for-byte both standalone
+    and into the Character Pack ZIP.
+  - A deterministic local rebuild must reproduce the reviewed source and
+    normalized hashes exactly. Stale, malformed, changed, or conflicting
+    evidence fails before publication and consumes zero Provider calls.
+  - Repeating the same request returns the already-accepted publication only
+    after revalidating the original Review, standalone/ZIP Prompt copies, every
+    engine ZIP hash/length, its identity hashes, and any V2 standalone/ZIP
+    copies. This route has no UI and does not create
+    a rejection, retry, fallback, repair, or generation path.
 - `POST /api/process-sheet`
   - Provider-free upload processing.
   - Routes uploaded source through `processSheetBuffer()`.
@@ -310,74 +354,47 @@ boundary errors include `decode_budget_exceeded`, `external_tool_timeout`,
     "blocked"`; warning and unknown assets default to `review_required`.
   - Does not scan all generated jobs and does not mutate the source generated
     job directory.
-  - Rejects process-recorded `editor_character_reprocess` and
-    `editor_character_frame_repair` jobs with
-    `specialized_accept_required`, even when a generated context file is
-    missing or modified. The two fixed context markers remain a second defense
-    for imports whose process job record is no longer available.
+  - Rejects recorded `fixed_region_source_provider_repair` jobs and persistent
+    three-atlas Review markers with `specialized_accept_required`; the
+    persistent retired `editor_reprocess_context.json` marker remains a
+    read-only defense so historical local-reprocess output cannot enter through
+    the general importer.
+
+- `POST /api/repair-character-action`
+  - This is the sole action-correction Plan and Live route for managed
+    `topdown_rpg_v0` and `fixed_region_motion_v0` Character Packs.
+  - `dryRunPlan: true` builds the provider-free, hash-bound three-atlas Review
+    and consumes zero provider calls.
+  - A live request must repeat the reviewed run, Plan, and reference-manifest
+    hashes, explicitly confirm live generation, and set exactly one provider
+    call. There is no retry, provider/model fallback, or generic strip-repair
+    route.
+- `POST /api/editor/projects/:projectId/assets/:assetId/action-repair/:jobId/accept`
+  - The sole action-repair acceptance route. It revalidates the sealed
+    three-atlas candidate, exact parent revision, one-call ledger, artifact
+    hashes, equipment result, and zero out-of-scope pixel changes before
+    importing one immutable child revision.
+  - General `import-job` cannot accept this job type.
+
+#### Retired single-frame repair route descriptions
+
+The route descriptions below are retained only as historical contract context.
+As of 2026-08-08 none of these single-frame or eight-case Quality Gate routes
+is registered by the production server; requests return the normal `404`
+boundary. They must not be called or reintroduced as a fallback. Use the
+three-atlas routes above and
+`docs/protocols/fixed-region-action-repair-atlas-v1.md`.
+
+The former provider-free Character Workbench routes are retired by the same
+product decision and are also unregistered:
+
 - `POST /api/editor/projects/:projectId/assets/:assetId/reprocess`
-  - Builds one provider-free Character Workbench Preview from an existing
-    managed `character_pack` revision.
-  - Accepts exactly `expectedRevision`, `expectedAssetRevisionId`, and a full
-    `processing_recipe_v0` candidate. Aliases, extra keys, client filesystem
-    paths, embedded images, provider keys, prompts, scripts, modules, arbitrary
-    options, and a client-owned implementation revision are rejected before a
-    job is created.
-  - The server reloads the formal project, checks both revision identities,
-    and captures the managed input once. It prefers the active revision's
-    dedicated `source` artifact. Only when `source` is absent does it use the
-    required `sheet` artifact as the explicit `normalized_sheet_fallback`,
-    whose authoritative source layout is always `topdown_rpg_v0`.
-  - For managed source input, source-layout authority is the first compatible
-    registered value from: the active revision's valid exact Workbench Recipe,
-    `debug_report.source_layout.id`, then
-    `animations.source_layout.id`. Malformed or missing optional evidence is
-    diagnosed and skipped; unsafe recorded paths always block. `asset.profile`
-    is never substituted for source-layout evidence.
-  - Asset name, description, registered profile, derived-revision source,
-    creation time, and allowlisted generation provenance are server-owned. A
-    managed asset name must be a non-empty string before the job is enqueued.
-    Prompt text, provider configuration, raw paths, raw responses, tokens, and
-    candidate payloads are neither accepted nor copied.
-  - A `dual_matte` Recipe is valid only when the active revision has a
-    dedicated `artifacts.black_matte` record. The resolver captures a real
-    `Buffer`; arbitrary artifact-value matches and reference strings are not
-    processing inputs.
-  - The server stamps one startup-resolved `implementation_revision`, computes
-    the full `recipe_hash` and revision-neutral `draft_settings_hash`, and
-    enqueues the captured bytes on the process-wide Character Pack queue.
-    Success is `202` with the standard job summary, both hashes, the canonical
-    Recipe echo, and authority diagnostics.
 - `POST /api/editor/projects/:projectId/assets/:assetId/reprocess/:jobId/accept`
-  - Accepts exactly `expectedRevision`, `expectedAssetRevisionId`, the full
-    `expectedRecipeHash`, and `warningConfirmed`. A
-    `draft_settings_hash` cannot authorize acceptance.
-  - Runs entirely inside the shared project-id mutation lock. After acquiring
-    the lock it reloads the project and rechecks project, asset, parent,
-    process-recorded job type/status, exact Recipe/context identities, current
-    managed input and black-matte digests, source layout, metadata timestamp,
-    quality, and every sealed generated artifact. Captured metadata must be a
-    plain JSON object whose `created_at` exactly equals both the job timestamp
-    and context submission timestamp.
-  - Required generated evidence is resolved only under the reprocess service's
-    real generated root. Every file is compared with its sealed size and
-    SHA-256, captured once, then copied with exclusive/no-overwrite semantics.
-    Later replacement of a generated path cannot change the captured bytes.
-  - Strict `pass` evidence has no warnings or blocking errors and imports a
-    normal `ready` child revision. Strict `warning` has no blocking errors and
-    requires explicit confirmation bound to this job and full Recipe hash,
-    then imports as `review_required`. Contradictory quality evidence, `fail`,
-    `unknown`, incomplete evidence, and any non-`done` job never modify the
-    project.
-  - The accepted revision is the exact Preview job; processing is not rerun.
-    It retains `processing_recipe_ref` and managed `reprocess_context`
-    provenance and becomes active only after a revision-checked formal save.
-    A failed copy or save leaves project JSON unchanged. Any exclusively
-    reserved orphan directory is preserved for explicit recovery and is never
-    reused or automatically deleted.
-  - Two Accept requests at the same formal revision serialize: one may return
-    `200`; the other returns a revision conflict without mixing source-job
-    bytes.
+
+Their service, coordinator, browser client, Recipe/Preview UI, and acceptance
+runtime have been removed. Existing `editor_reprocess_context.json` files are
+historical evidence only and are deliberately rejected by the general importer.
+
 - `POST /api/editor/projects/:projectId/assets/:assetId/frame-repair/plan`
   - Provider-free planning route; returns `200` and spends zero provider calls.
   - Accepts exactly `expectedRevision`, `expectedAssetRevisionId`, `clipId`,
@@ -482,6 +499,9 @@ boundary errors include `decode_budget_exceeded`, `external_tool_timeout`,
     identity. They contain no instruction, prompt, mask, image, provider key,
     runtime preset, raw request, project JSON, or generated filesystem path and
     are never exposed through the artifact endpoint or static file service.
+
+#### Active Editor routes
+
 - `POST /api/editor/projects/:projectId/export-pack`
   - Exports the current formal `editor_project_v0` save as
     `editor_project_pack_v1`.
@@ -498,24 +518,12 @@ boundary errors include `decode_budget_exceeded`, `external_tool_timeout`,
   - Does not call providers, mutate asset revisions, or replace existing
     `/api/project-pack` behavior.
 
-Character Workbench route errors use controlled JSON codes. Invalid envelopes,
-Recipes, identities, paths, managed metadata/source, profiles, and source-layout
-authority return `400`; missing project/asset/revision/job/artifact returns
-`404`; project/asset/stale conflicts return `409`; quality, warning-confirmation,
-and sealed-integrity failures return `422`; an unwired local coordinator returns
-stable `503 reprocess_unavailable`. Existing endpoint response shapes and
-statuses remain unchanged.
-
-Frame Repair uses the same controlled JSON envelope. Invalid request/Plan/mask,
-frame-position, and managed-input values return `400`; missing operation/
-project/asset/revision/artifact returns `404`; stale Plan, project/asset
-revision, job, operation, and other exact identity conflicts return `409`;
-quality, warning-confirmation, and sealed-integrity failures return `422`;
-provider unavailability/configuration and an unwired coordinator return `503`
-(`frame_repair_unavailable` for the latter).
-Provider-free Plan preflight is the exception to the error form: an unavailable
-preset may return `200` with `can_run: false` and a `provider_unavailable`
-diagnostic. A thrown `provider_unavailable` from live execution remains `503`.
+The retired local-reprocess and single-frame routes use the normal controlled
+`404` boundary. The active three-atlas route returns controlled `400` for an
+invalid or stale pre-call contract, `409` for project/asset identity conflicts,
+`422` for failed sealed candidate evidence, and `503` for unavailable provider
+configuration. Provider-free Review is the pre-call exception: an unavailable
+preset is reported without dispatching a provider request.
 
 ### Shared
 

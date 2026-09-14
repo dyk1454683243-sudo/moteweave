@@ -120,7 +120,7 @@ Do not use center-crop as the main alignment strategy for playable output. Cente
 Reviewed locally on 2026-06-18 from a user-supplied ZIP at:
 
 ```text
-<npc-plugin-zip>
+$HOME/Downloads/NPC插件青春rmversion.zip
 ```
 
 Read-only findings:

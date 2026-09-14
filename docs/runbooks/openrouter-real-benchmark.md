@@ -13,7 +13,7 @@ OpenRouter -> source.png -> post-processing -> validation -> GIF previews -> God
 The current AI generation default is `fixed_region_motion_v0`, using:
 
 ```text
-templates/fixed_region_motion_template_v1.png
+templates/motion_template_ocad_primary.png
 ```
 
 Generated fixed-region sources are normalized into the runtime `topdown_rpg_v0` profile after slicing, so exports remain compatible with the existing runtime sheet contract.

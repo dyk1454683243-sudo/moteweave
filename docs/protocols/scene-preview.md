@@ -15,7 +15,8 @@ same scene and LDtk export contracts as the artifact pipeline.
 
 ```text
 src/scene-pack/scenePreview.js
-src/ui/scenePackPreview.js
+src/ui/studio/studio.html
+src/ui/studio/sceneView.js
 ```
 
 Public scene-pack entry points:

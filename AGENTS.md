@@ -14,6 +14,169 @@ This file defines mandatory rules for AI agents and human contributors working i
 
 Do not scan `output/`, `generated/`, or other artifact directories unless the task explicitly requires it.
 
+## Repository-Native Workflow
+
+- Do not require, invoke, install, or generate local `superpowers` skills or
+  `.superpowers/` workflow state for this repository.
+- Execute checked-in implementation plans directly under `AGENTS.md` and the
+  applicable guardrails. Use standard Git and worktree commands only when the
+  user or an approved plan authorizes them.
+- `docs/superpowers/` is retained only as the historical location of tracked
+  project plans and specifications. Its directory name does not authorize or
+  require any external skill.
+
+## Plan-Bound Execution
+
+When the human user approves or names an implementation plan, that plan is the
+scope boundary and completion contract.
+
+- Execute only the approved phases and deliverables. Do not add a new contract,
+  protocol version, experiment, research track, refactor, or product surface
+  unless the plan explicitly requires it or the human user separately approves
+  it.
+- If an unexpected defect blocks the approved plan, make only the smallest
+  necessary repair, verify it, and continue the approved plan. Do not turn the
+  defect into a broader redesign.
+- Do not perform self-directed competitive research, technology surveys, or
+  speculative optimization while implementing a plan. Record non-blocking ideas
+  as deferred and continue the approved work.
+- Every phase must have an explicit completion gate. Once the gate passes, move
+  to the next approved phase or finish the task. Do not stop while an approved
+  phase remains, and do not keep extending a passing phase with additional
+  hardening.
+- Continue through bounded, minimal repair-and-verification work while evidence
+  shows a safe in-scope path to completion. If the same blocker persists and no
+  meaningful safe progress remains, report it as a genuine blocker instead of
+  expanding the workflow indefinitely.
+
+## Approved Workflow Fidelity And Evidence
+
+These rules apply to every task type, including implementation, asset work,
+generation, testing, migration, documentation, release, and operations. Once
+the human user approves a workflow, method, protocol, or plan, its material
+parts become the execution contract.
+
+1. Treat the approved method as binding. Preserve the confirmed inputs,
+   authorized scope, step order, tools, providers, models, parameters, external
+   resource budget, expected outputs, and acceptance gates.
+2. Do not substitute an allegedly equivalent method without approval. A
+   similar, improved, simplified, manually recreated, synthetic, or newly
+   invented approach is still a different method, even when it aims for the
+   same result.
+3. Obtain explicit approval before adding, removing, or replacing any contract
+   element, including an input, reference, target, output, tool step,
+   validation, or acceptance criterion. Describe the proposed change before
+   performing it; do not treat silence as approval.
+4. Recover routine, in-scope prerequisites such as declared dependencies,
+   ordinary configuration, and repository-native runtime setup, then continue
+   the approved method. If exact execution requires an unavailable capability,
+   credential, authoritative artifact, external-state change, or compatible
+   constraint and no safe authorized recovery path exists, stop after the
+   smallest useful diagnosis and report the precise blocker. Do not approximate
+   the method, expand scope, or consume unapproved external resources while
+   trying alternatives.
+5. Recover uncertain workflow details from authoritative evidence: maintained
+   repository code, checked-in protocols, accepted records, and artifact
+   metadata. Clearly separate verified facts from inference, and do not rely on
+   memory or a chat summary when primary evidence is available.
+6. Call a method productized only when it exists in maintained, tracked
+   implementation; is reachable through the intended product workflow; has
+   proportionate verification; and is documented well enough for another
+   operator to use correctly. Chat instructions, temporary or ignored scripts,
+   generated artifacts, and successful one-off outputs do not by themselves
+   count as productization.
+7. Before claiming work is complete, implemented, productized, verified, or
+   accepted, map every user requirement and acceptance criterion to concrete,
+   current evidence. State any skipped, partial, or unverified item explicitly.
+   Only the human user may satisfy a gate that requires user acceptance.
+8. Treat approved external-resource limits as immutable execution constraints.
+   Do not add calls or attempts, retry, switch providers or models, use a
+   fallback, or extend a budget without explicit approval. Provider-free local
+   checks do not consume an approved external-call allowance.
+9. Isolate failed, rejected, and unaccepted outputs. Do not reuse them as an
+   input, reference, baseline, training material, or provenance source unless
+   the human user explicitly promotes that exact output. Keep accepted sources
+   and authorized-input provenance traceable throughout the task.
+
+## Default Command Execution And Completion
+
+Every clear user instruction establishes a goal that must be completed. No
+special phrase such as "finish the goal," "keep going," or "do not stop" is
+required. Determine the goal from the instruction's actual meaning, scope,
+constraints, and acceptance criteria.
+
+- Treat the instruction as continuing authorization for all routine, safe,
+  in-scope work needed to complete it. This includes inspection, diagnosis,
+  repository-native dependency or environment recovery, formal workflow
+  execution, minimal repairs, guarded tests, artifact generation, verification,
+  documentation, and delivery evidence when those steps are necessary.
+- Do not ask the user to repeat approval for routine steps already implied by
+  the requested outcome. Make ordinary technical choices autonomously and
+  continue after recoverable errors.
+- Progress updates, diagnoses, and intermediate failures are not completion.
+  Do not hand an unfinished next step back to the user or end with a partial
+  result while a safe in-scope path remains.
+- The instruction type defines the authorization boundary. A request to build,
+  change, generate, or complete authorizes the required in-scope mutations. A
+  request only to explain, diagnose, review, or report authorizes read-only work
+  and the requested response, not implementation. A request for a draft, prior
+  review, or no writes establishes an explicit approval gate and prohibits
+  mutation until that gate is cleared.
+- Explicit user constraints, step ordering, review gates, stop instructions,
+  provider or call budgets, and safety rules remain binding. Continuing
+  authorization does not permit changing the goal, substituting an approved
+  workflow, adding external calls, using prohibited tools, or performing
+  out-of-scope destructive actions.
+- Stop before completion only for a genuine blocker: missing required authority,
+  credentials, or authoritative input; a mandatory unavailable external system;
+  a platform-enforced approval; a material product, scope, security, legal, or
+  destructive decision reserved for the user; an unavoidable resource or
+  safety limit; or verified absence of the required formal capability. First
+  exhaust safe, authorized, in-scope recovery paths, then report the blocker
+  once with exact evidence and the condition needed to continue.
+- Missing declared dependencies, ordinary configuration errors, test failures,
+  diagnosable defects, and recoverable formal-workflow errors are not by
+  themselves genuine blockers. Resolve them through the smallest approved
+  repository-native path and continue.
+- Deliver a final response only when the goal and its acceptance criteria are
+  proven complete, a genuine blocker remains after safe recovery paths are
+  exhausted, or the user explicitly requests a stop or review checkpoint.
+
+## Execution Truth And Artifact Provenance
+
+Preserve strict truth about whether the requested workflow actually ran and
+where every presented artifact came from.
+
+- Inspection is not execution. Reading code, confirming an implementation,
+  locating inputs, reviewing historical successes, or preparing a request does
+  not count as applying or running the requested technique.
+- Do not claim or imply that a technique was applied, a workflow succeeded, or
+  an artifact was generated until the formal entry actually ran and current-run
+  evidence verifies the claim.
+- Classify every displayed artifact as a current-run output, pre-existing input,
+  repository template, or historical evidence. Current-run outputs must be
+  traceable through their path and run identifier or manifest, with a hash when
+  applicable.
+- Never place an input, template, historical artifact, failed or rejected
+  candidate, example, placeholder, or unrelated file where a reasonable user
+  could mistake it for a current-run result.
+- If an expected output does not exist, state `not generated`. Do not fill a
+  requested result list or gallery with substitutes merely to make the response
+  appear complete.
+- If execution failed before the requested technique ran, lead with `not
+  executed` or `failed before execution`. Do not use success-style wording,
+  completion checklists, or media presentation that implies otherwise.
+- Before reporting completion, verify that the formal entry ran, the requested
+  stage executed, every claimed output exists and belongs to the current run,
+  no input or historical artifact is represented as new output, and all call
+  counts and execution statuses are accurate.
+- Misleading result presentation is a correctness failure regardless of intent.
+  Correct any wording, ordering, labels, or media that could make an unexecuted
+  or failed workflow appear successful before delivery.
+- When the user says stop, terminate active work immediately. Report any state
+  change that completed before termination, and do not inspect, undo, delete,
+  or continue modifying that state without separate authorization.
+
 ## Test And Build Resource Limits
 
 These limits are mandatory for MoteWeave work after the 2026-07-11 runaway Node test incident.
@@ -26,6 +189,55 @@ These limits are mandatory for MoteWeave work after the 2026-07-11 runaway Node 
 - After any hang or resource breach, do not rerun the combined suite. First remove the faulty lifecycle, fixture, recursion, or assertion and prove that the smallest isolated test exits within its limits.
 - Do not leave development servers or browser processes detached in the background. Track their session or PID and stop the exact process at the end of verification.
 - If a legitimate MoteWeave workload needs a higher ceiling, stop and ask the human user before increasing it. Never weaken the guard merely to make a failing test complete.
+
+## Session Output And Context Resource Safety
+
+Keep repository inspection bounded at the command source so Git output, tool
+buffers, and agent context cannot grow without a predictable limit.
+
+- Never run `git log --all`, `git rev-list --all`,
+  `git rev-list --objects --all`, repository-wide `--find-object`, or any
+  equivalent unbounded history or object enumeration.
+- Do not run potentially high-output Git or file-history queries in parallel.
+  Every such command must limit paths, commit count, and output volume at the
+  source. Tool-layer truncation is not a safety control.
+- If a command unexpectedly runs longer than 15 seconds, its output grows
+  abnormally, or Codex session-file or memory usage grows abnormally, terminate
+  it immediately. Do not retry it. Record only the smallest useful handoff.
+- If output buffering or context growth makes the current task unsafe, stop all
+  project work in that task. Create a clean new task, hand off the exact
+  uncommitted state, and archive the old task. Do not continue working in the
+  swollen task or reload its large output.
+- Never scan all Git history to trace an untracked copy. Use only current-file
+  hashes, single-file diffs, and explicitly path-limited, commit-limited
+  history queries.
+
+## Native Execution And Delivery Checklist
+
+Use this checklist instead of an external workflow skill.
+
+1. Confirm the exact repository, branch, worktree, and `git status --short`
+   before editing. Do not switch branches or repurpose another task's worktree
+   without authorization.
+2. Read the applicable guardrails, protocol or design, and named plan before
+   changing files. Keep protected contracts unchanged unless explicitly
+   approved.
+3. Make the smallest coherent change that satisfies the current completion
+   gate. Preserve real data and capability truth; do not substitute mocks for
+   working product behavior.
+4. Run only the smallest relevant guarded verification with one designated
+   test owner. Use the checked-in resource supervisor and never overlap test,
+   build, server, or browser processes.
+5. Before committing, review `git status --short`, a path-limited diff, and
+   `git diff --check`. Stage only files owned by the task.
+6. Report changed or deleted files, verification results, skipped checks,
+   residual risks, commit identity, and any exact uncommitted state.
+
+Use standard Git worktree commands only when the user or an approved plan
+authorizes an isolated worktree. Require an independent, read-only review for
+high-risk UI, security, data-integrity, or protected-contract work. Keep
+documentation-only and other low-risk changes proportional; do not add a heavy
+review workflow without a concrete risk.
 
 ## File Deletion Safety
 

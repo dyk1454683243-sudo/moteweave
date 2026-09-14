@@ -1,6 +1,7 @@
 # Character Pack Compatibility Phase 2 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** Execute this plan task-by-task under `AGENTS.md`.
+> Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add RPGMaker export, repeatable compatibility benchmarking, stronger Godot-visible validation metrics, and OCAD export while preserving the phase 1 JSON-grid Godot NPC flow.
 
@@ -361,7 +362,7 @@ In `test/character-pack/processSheet.test.js`, extend the Godot export test or a
 test('processSheetBuffer includes RPGMaker import pack in the zip', async () => {
   const source = await readFile('test/fixtures/character-pack/topdown_rpg_v0_sample_hero.png')
   const result = await processSheetBuffer(source, {
-    name: 'Sample Hero',
+    name: 'sample_hero',
     description: 'silver hair sword fighter',
     backgroundMode: 'flood',
     createdAt: '2026-05-24T01:02:03+08:00',
@@ -587,8 +588,8 @@ import { spawn } from 'node:child_process'
 
 import JSZip from 'jszip'
 
-export const DEFAULT_GODOT_BIN = '<godot-bin>'
-export const DEFAULT_NPC_PLUGIN_ZIP = '<npc-plugin-zip>'
+export const DEFAULT_GODOT_BIN = '$HOME/Library/Application Support/Steam/steamapps/common/Godot Engine/Godot.app/Contents/MacOS/Godot'
+export const DEFAULT_NPC_PLUGIN_ZIP = '$HOME/Downloads/NPC插件青春rmversion.zip'
 
 async function executableExists(filePath) {
   try {
@@ -864,7 +865,7 @@ import { runCharacterPackBenchmark } from '../src/character-pack/benchmark/bench
 
 const defaultInputs = [
   { path: 'test/fixtures/character-pack/topdown_rpg_v0_sample_hero.png', name: 'fixture_sample_hero', backgroundMode: 'flood' },
-  { path: '<input-file>', name: 'desktop_image', backgroundMode: 'flood' },
+  { path: '$HOME/Desktop/image.png', name: 'desktop_image', backgroundMode: 'flood' },
 ]
 
 async function fileExists(filePath) {
@@ -1350,7 +1351,7 @@ In `test/character-pack/processSheet.test.js`, add:
 test('processSheetBuffer includes OCAD import pack in the zip', async () => {
   const source = await readFile('test/fixtures/character-pack/topdown_rpg_v0_sample_hero.png')
   const result = await processSheetBuffer(source, {
-    name: 'Sample Hero',
+    name: 'sample_hero',
     description: 'silver hair sword fighter',
     backgroundMode: 'flood',
     createdAt: '2026-05-24T01:02:03+08:00',
@@ -1753,7 +1754,7 @@ Run:
 npm run benchmark:character-pack
 ```
 
-Expected: report contains at least two inputs when `<input-file>` exists; if the desktop image is missing, the script should report only the fixture and not fail.
+Expected: report contains at least two inputs when `$HOME/Desktop/image.png` exists; if the desktop image is missing, the script should report only the fixture and not fail.
 
 - [ ] **Step 3: Process real desktop image through local API**
 
@@ -1768,7 +1769,7 @@ In another command:
 ```bash
 node --input-type=module - <<'NODE'
 import { readFile } from 'node:fs/promises'
-const source = await readFile('<input-file>')
+const source = await readFile('$HOME/Desktop/image.png')
 const response = await fetch('http://localhost:4173/api/process-sheet', {
   method: 'POST',
   headers: { 'content-type': 'application/json' },

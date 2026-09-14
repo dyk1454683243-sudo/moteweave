@@ -540,8 +540,6 @@
   min-width: 120px;
 }
 
-.editor-repair-controls,
-.editor-repair-comparison,
 .editor-repair-status,
 .editor-playtest-controls,
 .editor-playtest-status {
@@ -737,36 +735,6 @@
 .editor-export-layer-head {
   color: #bac4c8;
   background: #101114;
-}
-
-.editor-repair-grid {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(120px, 1fr));
-  gap: 10px;
-}
-
-.editor-repair-card {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 10px;
-  background: #21252b;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-}
-
-.editor-repair-card strong {
-  color: #eef2f3;
-  font-size: 12px;
-}
-
-.editor-repair-card img {
-  width: 100%;
-  height: 136px;
-  object-fit: contain;
-  image-rendering: pixelated;
-  background: #101114;
-  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .editor-repair-links {
@@ -1308,585 +1276,124 @@
   padding: 0;
 }
 
-.editor-repair-workbench {
+.editor-repair-action-only {
   width: 100%;
-  height: 100%;
-  min-width: 0;
-  min-height: 0;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
-  grid-template-rows: auto minmax(280px, 1fr) minmax(116px, auto) auto;
-  grid-template-areas:
-    "header header"
-    "canvas recipe"
-    "filmstrip recipe"
-    "quality quality";
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow: auto;
+  padding: 18px;
   color: #eef2f3;
   background: #101114;
 }
 
-.editor-repair-canvas-region,
-.editor-repair-recipe,
-.editor-repair-filmstrip,
-.editor-repair-quality {
-  min-width: 0;
-  min-height: 0;
-}
-
-.editor-repair-header {
-  grid-area: header;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-  padding: 10px 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-  background: #181b20;
-}
-
-.editor-repair-header-value {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.editor-repair-header-value span,
-.editor-repair-origin,
-.editor-repair-control-reason,
-.editor-repair-filmstrip-meta,
-.editor-repair-difference-sidecar {
-  color: #98a5aa;
-  font-size: 11px;
-}
-
-.editor-repair-header-value strong {
-  display: block;
-  overflow: hidden;
-  color: #eef2f3;
-  text-overflow: ellipsis;
-}
-
-.editor-repair-canvas-region {
-  grid-area: canvas;
-  display: grid;
-  grid-template-rows: auto auto auto auto auto minmax(0, 1fr);
-  overflow: hidden;
-  background: #11151a;
-}
-
-.editor-repair-state-banner {
-  padding: 7px 10px;
-  color: #bac4c8;
-  background: rgba(139, 185, 255, 0.08);
-  border-bottom: 1px solid rgba(139, 185, 255, 0.18);
-  font-size: 12px;
-}
-
-.editor-repair-state-banner[data-tone="warning"] {
-  color: #ffcf88;
-  background: rgba(216, 169, 75, 0.14);
-  border-bottom-color: rgba(216, 169, 75, 0.28);
-}
-
-.editor-repair-state-banner[data-tone="blocking"] {
-  color: #ffaaa4;
-  background: rgba(230, 90, 90, 0.12);
-  border-bottom-color: rgba(230, 90, 90, 0.28);
-}
-
-.editor-repair-modes,
-.editor-repair-overlays,
-.editor-repair-zoom-controls,
-.editor-repair-filmstrip-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-}
-
-.editor-repair-modes button,
-.editor-repair-overlays button,
-.editor-repair-zoom-controls button,
-.editor-repair-filmstrip-toolbar button {
-  height: 32px;
-}
-
-.editor-repair-modes button,
-.editor-repair-overlays button,
-.editor-repair-zoom-controls button,
-.editor-repair-filmstrip-toolbar button,
-.editor-repair-quality button,
-.editor-repair-recipe-trigger,
-.editor-repair-recipe-close {
-  min-height: 32px;
-  padding: 4px 9px;
-}
-
-.editor-repair-modes button[aria-pressed="true"],
-.editor-repair-overlays button[aria-pressed="true"] {
-  border-color: #75f0d3;
-  color: #dffdf7;
-  background: rgba(117, 240, 211, 0.13);
-}
-
-.editor-repair-difference-sidecar {
-  min-height: 18px;
-  margin: 0;
-  padding: 0 10px 5px;
-  overflow-wrap: anywhere;
-}
-
-.editor-repair-canvas {
-  display: block;
-  width: 100%;
-  height: auto;
-  align-self: stretch;
-  min-width: 0;
-  min-height: 280px;
-  image-rendering: pixelated;
-  background: #0c0d10;
-}
-
-.editor-repair-recipe {
-  grid-area: recipe;
-  overflow-y: auto;
-  padding: 12px;
-  border-left: 1px solid rgba(255, 255, 255, 0.12);
-  background: #181b20;
-}
-
-.editor-repair-recipe-body,
-.editor-repair-recipe-section,
-.editor-repair-ai-action-body {
-  min-width: 0;
-  max-width: 100%;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 8px;
-}
-
-.editor-repair-recipe-section {
-  padding: 10px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.editor-repair-recipe-section h3 {
-  margin: 0;
-  color: #d9e2e5;
-  font-size: 12px;
-  text-transform: uppercase;
-}
-
-.editor-repair-field {
-  min-width: 0;
-  max-width: 100%;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(88px, 120px);
-  gap: 4px 8px;
-  align-items: center;
-}
-
-.editor-repair-field input,
-.editor-repair-field select,
-.editor-repair-filmstrip-clip {
-  min-width: 0;
-}
-
-.editor-repair-origin {
-  justify-self: end;
-  border-radius: 999px;
-  padding: 1px 6px;
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.editor-repair-control-reason {
-  grid-column: 1 / -1;
-  overflow-wrap: anywhere;
-}
-
-.editor-repair-grid-boundaries {
-  min-width: 0;
-  max-width: 100%;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 6px;
-}
-
-.editor-repair-provenance-value {
-  display: block;
-  min-width: 0;
-  padding: 7px 8px;
-  white-space: normal;
-  overflow-wrap: anywhere;
-  color: #bac4c8;
-  background: rgba(255, 255, 255, 0.05);
-}
-
-.editor-repair-recipe-section output {
-  display: block;
-  min-width: 0;
-  max-width: 100%;
-  white-space: normal;
-  overflow-wrap: anywhere;
-}
-
-.editor-repair-ai-action {
-  margin-top: 12px;
-  padding-top: 10px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.editor-repair-ai-action summary {
-  cursor: pointer;
-  color: #75f0d3;
-}
-
-.editor-repair-ai-action-body {
-  padding-top: 10px;
-}
-
-.editor-repair-filmstrip {
-  grid-area: filmstrip;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  overflow: hidden;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.editor-repair-filmstrip-clip-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.editor-repair-filmstrip-frames {
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 6px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding: 6px 10px 10px;
-}
-
-.editor-repair-frame-option {
-  flex: 0 0 auto;
-  display: grid;
-  gap: 3px;
-  border: 1px solid transparent;
-  padding: 4px;
-  color: #bac4c8;
-  background: #181b20;
-}
-
-.editor-repair-frame-option[aria-selected="true"] {
-  border-color: #75f0d3;
-  color: #eef2f3;
-  background: rgba(117, 240, 211, 0.12);
-}
-
-.editor-repair-frame-thumbnail {
-  display: block;
-  width: 48px;
-  height: 48px;
-  image-rendering: pixelated;
-  background: #0c0d10;
-}
-
-.editor-frame-repair-rail {
-  height: 100%;
-  min-width: 0;
-  min-height: 0;
-  max-width: 100%;
-  display: grid;
-  grid-template-rows: auto auto auto minmax(0, 1fr);
-  gap: 8px;
-  overflow: hidden;
-  color: #eef2f3;
-}
-
-.editor-frame-repair-rail[hidden],
-.editor-repair-quality[hidden] {
-  display: none;
-}
-
-.editor-frame-repair-header {
-  min-width: 0;
+.editor-repair-action-header,
+.editor-repair-action-controls {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 14px;
 }
 
-.editor-frame-repair-header h2 {
-  min-width: 0;
+.editor-repair-action-header h2,
+.editor-repair-ai-action h3 {
   margin: 0;
-  color: #eef2f3;
-  font-size: 14px;
 }
 
-.editor-frame-repair-live {
-  min-width: 0;
-  margin: 0;
-  color: #bac4c8;
+.editor-repair-action-header p,
+.editor-repair-action-guidance {
+  margin: 4px 0 0;
+  color: #98a5aa;
   font-size: 12px;
+}
+
+.editor-repair-action-identity,
+.editor-repair-action-selection {
+  min-width: 0;
+  color: #bac4c8;
   overflow-wrap: anywhere;
 }
 
-.editor-frame-repair-steps {
+.editor-repair-action-clip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.editor-repair-action-filmstrip {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  gap: 10px;
+}
+
+.editor-repair-action-frame {
+  position: relative;
   min-width: 0;
   display: grid;
-  gap: 5px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.editor-frame-repair-step {
-  min-width: 0;
+  grid-template-columns: auto 64px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
-  padding: 7px 9px;
-  background: rgba(255, 255, 255, 0.03);
-  transition: border-color 120ms ease, background 120ms ease, opacity 120ms ease;
+  background: #181b20;
 }
 
-.editor-frame-repair-step[aria-current="step"] {
+.editor-repair-action-frame:has(input:checked) {
   border-color: #75f0d3;
   background: rgba(117, 240, 211, 0.1);
 }
 
-.editor-frame-repair-step[data-status="future"] {
-  opacity: 0.58;
+.editor-repair-action-frame[data-unmapped="true"] {
+  opacity: 0.55;
 }
 
-.editor-frame-repair-step-title {
+.editor-repair-action-frame input {
+  width: 18px;
+  height: 18px;
   margin: 0;
-  color: #d9e2e5;
-  font-size: 12px;
-  text-transform: uppercase;
+  accent-color: #75f0d3;
 }
 
-.editor-frame-repair-stage-content {
+.editor-repair-action-frame-preview {
+  width: 64px;
+  height: 64px;
+  display: block;
+  image-rendering: pixelated;
+  background-color: #0c0d10;
+  background-repeat: no-repeat;
+}
+
+.editor-repair-action-frame-caption {
   min-width: 0;
-  min-height: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding-right: 4px;
-  scrollbar-gutter: stable;
-}
-
-.editor-frame-repair-step-body,
-.editor-frame-repair-edit-actions,
-.editor-frame-repair-result-actions {
-  min-width: 0;
-  display: grid;
-  gap: 8px;
-}
-
-.editor-frame-repair-step-body[hidden] {
-  display: none;
-}
-
-.editor-frame-repair-mask-tools,
-.editor-frame-repair-edit-actions,
-.editor-frame-repair-result-actions {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.editor-frame-repair-mask-tools {
-  display: grid;
-  gap: 6px;
-}
-
-.editor-frame-repair-mask-tools button[aria-pressed="true"] {
-  border-color: #75f0d3;
-  color: #dffdf7;
-  background: rgba(117, 240, 211, 0.13);
-}
-
-.editor-frame-repair-field {
-  min-width: 0;
-  display: grid;
-  gap: 5px;
+  overflow-wrap: anywhere;
   color: #bac4c8;
   font-size: 11px;
 }
 
-.editor-frame-repair-field input,
-.editor-frame-repair-field select,
-.editor-frame-repair-field textarea {
-  width: 100%;
-  min-width: 0;
-  max-width: 100%;
-}
-
-.editor-frame-repair-field textarea {
-  resize: vertical;
-}
-
-.editor-frame-repair-rectangle-grid {
-  min-width: 0;
+.editor-repair-ai-action {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
-}
-
-.editor-frame-repair-target,
-.editor-frame-repair-mask-summary,
-.editor-frame-repair-call-summary,
-.editor-frame-repair-processing,
-.editor-frame-repair-quality,
-.editor-frame-repair-note {
-  min-width: 0;
-  margin: 0;
-  color: #bac4c8;
-  font-size: 11px;
-  line-height: 1.45;
-  overflow-wrap: anywhere;
-}
-
-.editor-frame-repair-diagnostic {
-  min-width: 0;
-  display: grid;
-  gap: 4px;
-  padding: 8px;
-  border: 1px solid rgba(255, 207, 136, 0.42);
-  border-radius: 6px;
-  background: rgba(255, 207, 136, 0.08);
-  overflow-wrap: anywhere;
-}
-
-.editor-frame-repair-diagnostic[hidden] {
-  display: none;
-}
-
-.editor-frame-repair-diagnostic[data-tone="unknown"] {
-  border-color: rgba(255, 139, 139, 0.48);
-  background: rgba(255, 139, 139, 0.09);
-}
-
-.editor-frame-repair-diagnostic-title,
-.editor-frame-repair-diagnostic-state,
-.editor-frame-repair-diagnostic-detail,
-.editor-frame-repair-diagnostic-next {
-  min-width: 0;
-  margin: 0;
-  color: #d9e2e5;
-  font-size: 11px;
-  line-height: 1.45;
-  overflow-wrap: anywhere;
-}
-
-.editor-frame-repair-diagnostic-title {
-  color: #eef2f3;
-  font-weight: 700;
-}
-
-.editor-frame-repair-diagnostic-state,
-.editor-frame-repair-diagnostic-next {
-  color: #ffcf88;
-}
-
-.editor-frame-repair-diagnostic[data-tone="unknown"] .editor-frame-repair-diagnostic-state {
-  color: #ffaaaa;
-}
-
-.editor-frame-repair-call-summary,
-.editor-frame-repair-quality {
-  display: grid;
-  gap: 6px;
-  padding: 8px;
-  border-radius: 6px;
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.editor-frame-repair-warning {
-  display: flex;
-  align-items: flex-start;
-  gap: 7px;
-  color: #ffcf88;
-  font-size: 11px;
-}
-
-.editor-repair-frame-option[data-repaired="true"] {
-  position: relative;
-}
-
-.editor-repair-frame-option[data-repaired="true"]::after {
-  content: "R";
-  position: absolute;
-  inset: 3px 3px auto auto;
-  min-width: 16px;
-  border-radius: 999px;
-  color: #101114;
-  background: #75f0d3;
-  font-size: 10px;
-  font-weight: 700;
-  line-height: 16px;
-  text-align: center;
-  transition: transform 120ms ease;
-}
-
-.editor-repair-quality {
-  grid-area: quality;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid rgba(117, 240, 211, 0.24);
   background: #181b20;
 }
 
-.editor-repair-quality-metrics {
+.editor-repair-ai-action-body {
+  min-width: 0;
   display: grid;
-  grid-template-columns: repeat(2, auto minmax(0, 1fr));
-  gap: 2px 8px;
-  flex: 1 1 520px;
-  min-width: 0;
-  margin: 0;
+  gap: 10px;
 }
 
-.editor-repair-quality-metrics dt,
-.editor-repair-quality-metrics dd {
-  min-width: 0;
-  margin: 0;
-  overflow-wrap: anywhere;
-  font-size: 11px;
-}
-
-.editor-repair-quality-metrics dt {
-  color: #98a5aa;
-}
-
-.editor-repair-diagnostics,
-.editor-repair-warning-confirmation {
-  flex: 1 1 100%;
-  overflow-wrap: anywhere;
-  font-size: 12px;
-}
-
-.editor-repair-warning-confirmation {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #ffcf88;
-}
-
-.editor-repair-workbench :disabled {
+.editor-repair-action-only :disabled {
   cursor: not-allowed;
   opacity: 0.56;
 }
 
-.editor-repair-canvas:focus-visible,
-.editor-repair-filmstrip-frames:focus-visible,
-.editor-repair-frame-option:focus-visible,
-.editor-repair-workbench button:focus-visible,
-.editor-repair-workbench input:focus-visible,
-.editor-repair-workbench select:focus-visible,
-.editor-repair-workbench summary:focus-visible {
+.editor-repair-action-only button:focus-visible,
+.editor-repair-action-only input:focus-visible,
+.editor-repair-action-only select:focus-visible,
+.editor-repair-action-only textarea:focus-visible {
   outline: 2px solid #75f0d3;
   outline-offset: 2px;
 }
@@ -1903,219 +1410,6 @@
   color: #bac4c8;
 }
 
-.editor-repair-workbench[data-quality-gate-workspace="true"] {
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: minmax(0, 1fr);
-  grid-template-areas: "quality-gate";
-  overflow: hidden;
-}
-
-.editor-repair-workbench[data-quality-gate-workspace="true"] > .editor-repair-header,
-.editor-repair-workbench[data-quality-gate-workspace="true"] > .editor-repair-recipe,
-.editor-repair-workbench[data-quality-gate-workspace="true"] > .editor-repair-filmstrip,
-.editor-repair-workbench[data-quality-gate-workspace="true"] > .editor-repair-quality {
-  display: none;
-}
-
-.editor-frame-repair-quality-gate {
-  grid-area: quality-gate;
-  inline-size: 100%;
-  block-size: 100%;
-  max-block-size: 100%;
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-  color: #eef2f3;
-  background: #101114;
-}
-
-.editor-frame-repair-quality-gate[data-view="review"] {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(18rem, 24rem);
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  grid-template-areas:
-    "session session"
-    "canvas evidence"
-    "progress progress";
-}
-
-.editor-frame-repair-quality-gate[data-view="setup"],
-.editor-frame-repair-quality-gate[data-view="summary"] {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-}
-
-.editor-quality-gate-session {
-  grid-area: session;
-  min-width: 0;
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 8px;
-  padding: 10px 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-  background: #181b20;
-}
-
-.editor-quality-gate-session > * {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
-
-.editor-quality-gate-canvas {
-  grid-area: canvas;
-  min-width: 0;
-  min-height: 0;
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
-  overflow: hidden;
-  background: #11151a;
-}
-
-.editor-quality-gate-canvas-slot {
-  min-width: 0;
-  min-height: 0;
-  block-size: 100%;
-  overflow: hidden;
-}
-
-.editor-quality-gate-canvas-slot > .editor-repair-canvas-region {
-  inline-size: 100%;
-  block-size: 100%;
-  min-height: 0;
-}
-
-.editor-quality-gate-canvas-slot .editor-repair-canvas {
-  height: 100%;
-  min-height: 0;
-}
-
-.editor-quality-gate-evidence {
-  grid-area: evidence;
-  min-width: 0;
-  min-height: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-gutter: stable;
-  border-left: 1px solid rgba(255, 255, 255, 0.12);
-  padding: 12px;
-  background: #181b20;
-}
-
-.editor-quality-gate-evidence dl,
-.editor-quality-gate-summary dl {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: minmax(8rem, auto) minmax(0, 1fr);
-  gap: 6px 10px;
-  margin: 0;
-}
-
-.editor-quality-gate-evidence dd,
-.editor-quality-gate-summary dd {
-  min-width: 0;
-  margin: 0;
-  overflow-wrap: anywhere;
-}
-
-.editor-quality-gate-actions {
-  position: sticky;
-  bottom: -12px;
-  z-index: 1;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  margin: 14px -12px -12px;
-  padding: 12px;
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
-  background: #181b20;
-}
-
-.editor-quality-gate-disabled-reason {
-  grid-column: 1 / -1;
-  margin: 0;
-  color: #ffcf88;
-  font-size: 12px;
-  overflow-wrap: anywhere;
-}
-
-.editor-quality-gate-progress {
-  grid-area: progress;
-  min-width: 0;
-  display: flex;
-  flex-wrap: nowrap;
-  gap: 8px;
-  overflow-x: auto;
-  overflow-y: hidden;
-  padding: 9px 12px;
-  border-top: 1px solid rgba(255, 255, 255, 0.12);
-  scrollbar-gutter: stable;
-}
-
-.editor-quality-gate-progress button {
-  flex: 0 0 min(11rem, 42vw);
-  min-width: 0;
-  text-align: left;
-}
-
-.editor-quality-gate-progress button[aria-current="step"] {
-  border-color: #75f0d3;
-  color: #dffdf7;
-  background: rgba(117, 240, 211, 0.13);
-}
-
-.editor-quality-gate-progress button[aria-disabled="true"] {
-  cursor: not-allowed;
-  opacity: 0.56;
-}
-
-.editor-quality-gate-setup,
-.editor-quality-gate-summary {
-  min-width: 0;
-  min-height: 0;
-  overflow: auto;
-  padding: 16px;
-}
-
-.editor-quality-gate-asset-list,
-.editor-quality-gate-case-list,
-.editor-quality-gate-form {
-  min-width: 0;
-  display: grid;
-  gap: 8px;
-}
-
-.editor-quality-gate-asset-list,
-.editor-quality-gate-case-list {
-  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
-}
-
-.editor-quality-gate-artifacts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 12px;
-}
-
-.editor-frame-repair-quality-gate :disabled {
-  cursor: not-allowed;
-  opacity: 0.56;
-}
-
-.editor-frame-repair-quality-gate button:focus-visible,
-.editor-frame-repair-quality-gate input:focus-visible,
-.editor-frame-repair-quality-gate select:focus-visible,
-.editor-frame-repair-quality-gate textarea:focus-visible,
-.editor-quality-gate-progress:focus-visible {
-  outline: 2px solid #75f0d3;
-  outline-offset: 2px;
-}
-
-.editor-repair-recipe-trigger,
-.editor-repair-recipe-close,
-.editor-repair-recipe-backdrop {
-  display: none;
-}
-
 @media (max-width: 1080px) {
   .editor-header {
     grid-template-columns: 1fr;
@@ -2129,16 +1423,6 @@
     display: none;
   }
 
-  .editor-frame-repair-quality-gate[data-view="review"] {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr) minmax(11rem, 0.55fr) auto;
-    grid-template-areas: "session" "canvas" "evidence" "progress";
-  }
-
-  .editor-quality-gate-evidence {
-    border-top: 1px solid rgba(255, 255, 255, 0.12);
-    border-left: 0;
-  }
 }
 
 @media (max-width: 760px) {
@@ -2230,15 +1514,12 @@
 
   .editor-layer-row,
   .editor-timeline-row,
-  .editor-repair-controls,
-  .editor-repair-comparison,
   .editor-repair-status,
   .editor-playtest-controls,
   .editor-playtest-status,
   .editor-flow-toolbar,
   .editor-flow-card-layout,
   .editor-flow-stats,
-  .editor-repair-grid,
   .editor-inspector-form {
     grid-template-columns: 1fr;
   }
@@ -2300,116 +1581,13 @@
     grid-template-rows: minmax(0, 1fr);
   }
 
-  .editor-repair-workbench {
+  .editor-repair-action-header,
+  .editor-repair-action-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .editor-repair-action-filmstrip {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(280px, 1fr) minmax(116px, auto) auto;
-    grid-template-areas: "header" "canvas" "filmstrip" "quality";
-  }
-
-  .editor-repair-workbench[data-quality-gate-workspace="true"] {
-    grid-template-rows: minmax(0, 1fr);
-    grid-template-areas: "quality-gate";
-  }
-
-  .editor-frame-repair-quality-gate[data-view="review"] {
-    grid-template-rows: auto minmax(9rem, 0.7fr) minmax(12rem, 1fr) auto;
-  }
-
-  .editor-quality-gate-session {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .editor-quality-gate-actions {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .editor-quality-gate-progress button {
-    flex-basis: min(12rem, 76vw);
-  }
-
-  .editor-repair-header {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .editor-repair-recipe-trigger,
-  .editor-repair-recipe-close {
-    display: inline-flex;
-  }
-
-  .editor-repair-recipe-backdrop:not([hidden]) {
-    display: block;
-    position: fixed;
-    inset: 0;
-    z-index: 49;
-    width: auto;
-    height: auto;
-    min-height: 0;
-    padding: 0;
-    border: 0;
-    border-radius: 0;
-    background: rgba(0, 0, 0, 0.56);
-    color: transparent;
-  }
-
-  .editor-repair-recipe {
-    position: fixed;
-    inset: 0 0 0 auto;
-    z-index: 50;
-    width: min(92vw, 360px);
-    max-width: 100%;
-    border-left: 1px solid rgba(255, 255, 255, 0.18);
-    transform: translateX(100%);
-    transition: transform 160ms ease;
-  }
-
-  .editor-frame-repair-rail,
-  .editor-frame-repair-steps,
-  .editor-frame-repair-step,
-  .editor-frame-repair-stage-content,
-  .editor-frame-repair-step-body {
-    width: 100%;
-    max-width: 100%;
-    min-width: 0;
-  }
-
-  .editor-frame-repair-header {
-    position: sticky;
-    top: -12px;
-    z-index: 1;
-    padding: 12px 0 8px;
-    background: #181b20;
-  }
-
-  .editor-repair-filmstrip-toolbar {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-  }
-
-  .editor-repair-filmstrip-meta {
-    flex: 0 0 auto;
-  }
-
-  .editor-repair-workbench[data-recipe-open="true"] .editor-repair-recipe {
-    transform: translateX(0);
-  }
-
-  .editor-repair-quality-metrics {
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-
-  .editor-repair-quality button {
-    flex: 1 1 140px;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .editor-repair-recipe,
-  .editor-frame-repair-step,
-  .editor-repair-frame-option[data-repaired="true"]::after,
-  .editor-frame-repair-quality-gate *,
-  .editor-frame-repair-quality-gate *::before,
-  .editor-frame-repair-quality-gate *::after {
-    transition: none;
-    animation: none;
   }
 }

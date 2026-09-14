@@ -34,6 +34,7 @@ export function buildOpenRouterCharacterPrompt({ description = '', preset = DEFA
 
 function generationResult({
   buffer,
+  mimeType = null,
   providerPreset,
   prompt,
   promptContract,
@@ -46,13 +47,17 @@ function generationResult({
   generationOptions,
   candidateIndex,
   providerAttempts = [],
+  generationProfileId = null,
+  generationReview = null,
 }) {
   return {
     buffer,
+    mimeType,
     provider: providerPreset.provider,
     providerPresetId: providerPreset.id,
     providerLabel: providerPreset.label,
     model: providerPreset.model,
+    routeKind: providerPreset.routeKind,
     prompt,
     promptContract,
     t2iMode,
@@ -69,6 +74,8 @@ function generationResult({
     referenceName: referenceImage?.name ?? null,
     paletteName: paletteImage?.name ?? null,
     providerAttempts,
+    generationProfileId,
+    generationReview,
   }
 }
 
@@ -108,9 +115,11 @@ function providerPresetCandidates(env, providerPresetId) {
   ]
 }
 
-function providerAttempt(providerPreset, { status, error } = {}) {
+function providerAttempt(providerPreset, { status, error, attemptNumber, budgetBefore, budgetAfter } = {}) {
   return {
+    attempt_number: attemptNumber ?? null,
     provider: providerPreset?.provider ?? null,
+    route_kind: providerPreset?.routeKind ?? null,
     provider_preset_id: providerPreset?.id ?? null,
     provider_label: providerPreset?.label ?? null,
     model: providerPreset?.model ?? null,
@@ -118,7 +127,17 @@ function providerAttempt(providerPreset, { status, error } = {}) {
     error: error ? String(error.message || error) : null,
     retry_hint: error?.retry_hint ?? null,
     failure_status: providerErrorFailureStatus(error),
+    provider_call_budget_before: budgetBefore ?? null,
+    provider_call_budget_after: budgetAfter ?? null,
   }
+}
+
+function providerBudgetSnapshot(providerBudget) {
+  if (!providerBudget) return null
+  const max = Number(providerBudget.max ?? providerBudget.maxProviderCalls ?? 0)
+  const used = Number(providerBudget.used ?? providerBudget.providerCallsUsed ?? 0)
+  if (!Number.isInteger(max) || max < 1 || !Number.isInteger(used) || used < 0) return null
+  return { used_provider_calls: used, max_provider_calls: max }
 }
 
 function consumeProviderBudget(providerBudget) {
@@ -154,6 +173,8 @@ export async function generateCharacterSource({
   templateImage = null,
   referenceImage = null,
   paletteImage = null,
+  reviewedRequest = null,
+  generationProfileId = null,
   providerBudget = null,
   env = process.env,
   fetchImpl = globalThis.fetch,
@@ -167,7 +188,9 @@ export async function generateCharacterSource({
   const attempts = []
   let lastError = null
 
-  for (const providerPreset of providerPresets) {
+  for (let attemptIndex = 0; attemptIndex < providerPresets.length; attemptIndex += 1) {
+    const providerPreset = providerPresets[attemptIndex]
+    const budgetBefore = providerBudgetSnapshot(providerBudget)
     try {
       const apiKey = requireProviderRuntime(providerPreset, fetchImpl)
       const resolvedImageConfig = {
@@ -177,7 +200,29 @@ export async function generateCharacterSource({
       let generated
       let promptContract
       let providerTemplateImage = templateImage
-      if (resolvedMode === TEXT_TO_IMAGE_MODE_QUALITY_CHARACTER) {
+      if (reviewedRequest) {
+        if (resolvedMode !== TEXT_TO_IMAGE_MODE_PRODUCTION_SHEET || providerPreset.provider !== 'gemini') {
+          throw new Error('reviewed full-sheet generation requires Gemini Native production-sheet mode')
+        }
+        if (reviewedRequest.provider_preset_id !== providerPreset.id || reviewedRequest.model !== providerPreset.model) {
+          throw new Error('reviewed generation provider binding changed')
+        }
+        promptContract = reviewedRequest.prompt_contract
+        const request = {
+          providerPreset,
+          apiKey,
+          contract: null,
+          imageConfig: resolvedImageConfig,
+          generationOptions: resolvedProviderGenerationOptions,
+          templateImage: providerTemplateImage,
+          referenceImage,
+          paletteImage,
+          promptSections: reviewedRequest.prompt_sections,
+          fetchImpl,
+        }
+        consumeProviderBudget(providerBudget)
+        generated = await requestGeminiImage(request)
+      } else if (resolvedMode === TEXT_TO_IMAGE_MODE_QUALITY_CHARACTER) {
         const prompt = buildQualityCharacterPrompt({
           description,
           promptFields: resolvedPromptFields,
@@ -234,7 +279,12 @@ export async function generateCharacterSource({
           : await requestOpenRouterImage(request)
       }
 
-      attempts.push(providerAttempt(providerPreset, { status: 'success' }))
+      attempts.push(providerAttempt(providerPreset, {
+        status: 'success',
+        attemptNumber: attemptIndex + 1,
+        budgetBefore,
+        budgetAfter: providerBudgetSnapshot(providerBudget),
+      }))
       return generationResult({
         ...generated,
         providerPreset,
@@ -251,10 +301,18 @@ export async function generateCharacterSource({
         },
         candidateIndex,
         providerAttempts: attempts,
+        generationProfileId,
+        generationReview: reviewedRequest?.review_binding ?? null,
       })
     } catch (error) {
       lastError = error
-      attempts.push(providerAttempt(providerPreset, { status: 'failed', error }))
+      attempts.push(providerAttempt(providerPreset, {
+        status: 'failed',
+        error,
+        attemptNumber: attemptIndex + 1,
+        budgetBefore,
+        budgetAfter: providerBudgetSnapshot(providerBudget),
+      }))
     }
   }
 

@@ -2,15 +2,17 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import crypto from 'node:crypto'
 import { execFile } from 'node:child_process'
-import { access, chmod, mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
+import { access, chmod, mkdir, mkdtemp, readFile, stat, truncate, writeFile } from 'node:fs/promises'
 import http from 'node:http'
 import os from 'node:os'
 import path from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
 
 import JSZip from 'jszip'
 import sharp from 'sharp'
 
+import { encodeGifFromRgbaFrames } from '../../src/character-pack/gifExport.js'
 import { encodeRgbaPng } from '../../src/character-pack/imageCodec.js'
 import { TOPDOWN_RPG_V0 } from '../../src/character-pack/profile.js'
 import { CHARACTER_QUALITY_CLOSURE_MODE } from '../../src/character-pack/qualityClosureGate.js'
@@ -106,6 +108,12 @@ function paintRect(image, rect, color = [60, 120, 200, 255]) {
       image.data[offset + 3] = color[3]
     }
   }
+}
+
+function solidRgba(width, height, color) {
+  const image = { width, height, data: new Uint8ClampedArray(width * height * 4) }
+  paintRect(image, { x: 0, y: 0, w: width, h: height }, color)
+  return image
 }
 
 function makeRepairTestCell(rect) {
@@ -337,6 +345,268 @@ test('character pack CLI process writes pack artifacts', async () => {
   assert.equal(await exists(path.join(outputDir, 'cli_process', 'normalized_sheet_64.png')), true)
   assert.equal(await exists(path.join(outputDir, 'cli_process', 'debug_report.json')), true)
   assert.equal(await exists(path.join(outputDir, 'cli_process', 'character_pack.zip')), true)
+})
+
+test('character pack CLI background-remove-preview preserves provider dimensions without a provider call', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'character-pack-cli-background-preview-'))
+  const inputPath = path.join(root, 'provider-output.jpg')
+  const outputDir = path.join(root, 'out')
+  const source = {
+    width: 64,
+    height: 64,
+    data: new Uint8ClampedArray(64 * 64 * 4),
+  }
+  paintRect(source, { x: 0, y: 0, w: 64, h: 64 }, [255, 255, 255, 255])
+  paintRect(source, { x: 20, y: 12, w: 24, h: 44 }, [40, 90, 170, 255])
+  const input = await encodeRgbaJpeg(source)
+  await writeFile(inputPath, input)
+  const sourceBefore = await readFile(inputPath)
+
+  const result = await runCli([
+    'background-remove-preview',
+    '--input',
+    inputPath,
+    '--output-dir',
+    outputDir,
+    '--job-id',
+    'background_preview',
+  ])
+
+  const artifactPath = path.join(outputDir, 'background_preview', 'background_removed_provider_output.png')
+  const report = JSON.parse(await readFile(
+    path.join(outputDir, 'background_preview', 'background_removal_preview.json'),
+    'utf8',
+  ))
+  const { data, info } = await sharp(artifactPath).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
+
+  assert.equal(result.command, 'background-remove-preview')
+  assert.equal(result.status, 'preview_ready')
+  assert.equal(result.provider_calls, 0)
+  assert.equal(result.estimated_provider_calls, 0)
+  assert.equal(result.max_provider_calls, 0)
+  assert.equal(result.provider_calls_used, 0)
+  assert.equal(result.network_requests_allowed, false)
+  assert.equal(result.network_requests_used, 0)
+  assert.equal(result.model_downloads_allowed, false)
+  assert.equal(result.external_matte_engines_allowed, false)
+  assert.equal(result.artifact, artifactPath)
+  assert.equal(info.width, 64)
+  assert.equal(info.height, 64)
+  assert.equal(data[3], 0)
+  assert.equal(data[((32 * 64 + 32) * 4) + 3], 255)
+  assert.equal(report.mode, 'background_removal_preview_v2')
+  assert.equal(report.status, 'preview_ready')
+  assert.equal(report.processing, 'background_removal_only')
+  assert.equal(report.provider_calls, 0)
+  assert.equal(report.provider_calls_used, 0)
+  assert.equal(report.max_provider_calls, 0)
+  assert.equal(report.estimated_provider_calls, 0)
+  assert.equal(report.network_requests_allowed, false)
+  assert.equal(report.network_requests_used, 0)
+  assert.equal(report.model_downloads_allowed, false)
+  assert.equal(report.external_matte_engines_allowed, false)
+  assert.equal(report.background_recipe_id, 'deterministic_pixel_matte_v2')
+  assert.equal(report.width, 64)
+  assert.equal(report.height, 64)
+  assert.equal(report.source_sha256, sha256(input))
+  assert.equal(report.sha256, sha256(await readFile(artifactPath)))
+  for (const file of [
+    'background_quality.json',
+    'background_review.json',
+    'background_contract_masks.json',
+    'background_preview.png',
+    'background_spill_overlay.png',
+    'background_sure_background_mask.png',
+    'background_unknown_band_mask.png',
+    'background_sure_foreground_mask.png',
+    'background_alpha_estimate.png',
+    'background_foreground_reconstruction.png',
+  ]) {
+    assert.equal((await stat(path.join(outputDir, 'background_preview', file))).isFile(), true)
+  }
+  const review = JSON.parse(await readFile(
+    path.join(outputDir, 'background_preview', 'background_review.json'),
+    'utf8',
+  ))
+  assert.equal(review.review_recommendation.startsWith('inspect_'), true)
+  assert.equal('human_decision_status' in review, false)
+  assert.deepEqual(Object.keys(review).sort(), [
+    'affected_regions',
+    'algorithm',
+    'artifacts',
+    'confidence',
+    'hashes',
+    'reasons',
+    'review_recommendation',
+    'schema_version',
+    'spill_overlay_legend',
+    'urls',
+  ])
+  const artifactUrlPrefix = pathToFileURL(path.join(outputDir, 'background_preview')).href
+  assert.equal(
+    review.urls.background_preview_url,
+    `${artifactUrlPrefix}/background_preview.png`,
+  )
+  assert.equal(result.urls.background_preview_url, review.urls.background_preview_url)
+  assert.deepEqual(await readFile(inputPath), sourceBefore)
+})
+
+test('character pack CLI background-remove-preview runs legacy removal only when explicitly selected', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'character-pack-cli-background-legacy-'))
+  const inputPath = path.join(root, 'source.png')
+  const outputDir = path.join(root, 'out')
+  const source = {
+    width: 32,
+    height: 32,
+    data: new Uint8ClampedArray(32 * 32 * 4),
+  }
+  paintRect(source, { x: 0, y: 0, w: 32, h: 32 }, [255, 255, 255, 255])
+  paintRect(source, { x: 10, y: 6, w: 12, h: 20 }, [40, 90, 170, 255])
+  await writeFile(inputPath, await encodeRgbaPng(source))
+
+  const result = await runCli([
+    'background-remove-preview',
+    '--input', inputPath,
+    '--output-dir', outputDir,
+    '--job-id', 'legacy_background_preview',
+    '--background-mode', 'legacy_flood',
+  ])
+  const report = JSON.parse(await readFile(result.report, 'utf8'))
+
+  assert.equal(report.mode, 'background_removal_preview_v1')
+  assert.equal(report.canonical_background_mode, 'legacy_flood')
+  assert.equal(report.background_recipe_id, 'legacy_flood_v1')
+  assert.equal(report.estimated_provider_calls, 0)
+  assert.equal(report.network_requests_allowed, false)
+  assert.equal(result.provider_calls_used, 0)
+})
+
+test('character pack CLI background-remove-preview rejects unsupported paired, unknown, and existing targets', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'character-pack-cli-background-reject-'))
+  const inputPath = path.join(root, 'source.png')
+  const outputDir = path.join(root, 'out')
+  await writeFile(inputPath, await encodeRgbaPng(solidRgba(8, 8, [255, 255, 255, 255])))
+
+  const dualError = await runCliError([
+    'background-remove-preview', '--input', inputPath, '--output-dir', outputDir,
+    '--job-id', 'dual_rejected', '--background-mode', 'dual_matte',
+  ])
+  assert.match(dualError.stderr, /does not support dual_matte without its required paired input/)
+
+  const unknownError = await runCliError([
+    'background-remove-preview', '--input', inputPath, '--output-dir', outputDir,
+    '--job-id', 'unknown_rejected', '--background-mode', 'made_up_mode',
+  ])
+  assert.match(unknownError.stderr, /unknown background mode/)
+
+  await mkdir(path.join(outputDir, 'existing_target'), { recursive: true })
+  const existingError = await runCliError([
+    'background-remove-preview', '--input', inputPath, '--output-dir', outputDir,
+    '--job-id', 'existing_target',
+  ])
+  assert.match(existingError.stderr, /background removal preview already exists/)
+})
+
+test('character pack CLI background-remove-preview rejects non-files and the byte limit before reading image data', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'character-pack-cli-background-byte-limit-'))
+  const outputDir = path.join(root, 'out')
+  const inputDir = path.join(root, 'input-directory')
+  await mkdir(inputDir)
+  const directoryError = await runCliError([
+    'background-remove-preview', '--input', inputDir, '--output-dir', outputDir,
+    '--job-id', 'directory_rejected',
+  ])
+  assert.match(directoryError.stderr, /must be a non-empty file no larger than/)
+
+  const oversizedPath = path.join(root, 'oversized.bin')
+  await writeFile(oversizedPath, Buffer.from([0]))
+  await truncate(oversizedPath, (64 * 1024 * 1024) + 1)
+  const oversizedError = await runCliError([
+    'background-remove-preview', '--input', oversizedPath, '--output-dir', outputDir,
+    '--job-id', 'byte_limit_rejected',
+  ])
+  assert.match(oversizedError.stderr, /must be a non-empty file no larger than/)
+  assert.equal(await exists(path.join(outputDir, 'byte_limit_rejected')), false)
+})
+
+test('character pack CLI background-remove-preview rejects animated input before creating artifacts', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'character-pack-cli-background-animated-'))
+  const outputDir = path.join(root, 'out')
+  const animatedPath = path.join(root, 'animated.gif')
+  await writeFile(animatedPath, encodeGifFromRgbaFrames([
+    solidRgba(4, 4, [255, 255, 255, 255]),
+    solidRgba(4, 4, [40, 90, 170, 255]),
+  ]))
+
+  const animatedError = await runCliError([
+    'background-remove-preview', '--input', animatedPath, '--output-dir', outputDir,
+    '--job-id', 'animated_rejected',
+  ])
+
+  assert.match(animatedError.stderr, /only supports a single image frame/)
+  assert.equal(await exists(path.join(outputDir, 'animated_rejected')), false)
+})
+
+test('character pack CLI background-remove-preview rejects images above the V2 pixel budget before decode', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'character-pack-cli-background-pixel-limit-'))
+  const inputPath = path.join(root, 'too-many-pixels.png')
+  const outputDir = path.join(root, 'out')
+  await writeFile(inputPath, await sharp({
+    create: {
+      width: 2049,
+      height: 2049,
+      channels: 3,
+      background: { r: 255, g: 255, b: 255 },
+    },
+  }).png().toBuffer())
+
+  const error = await runCliError([
+    'background-remove-preview', '--input', inputPath, '--output-dir', outputDir,
+    '--job-id', 'pixel_limit_rejected',
+  ])
+  assert.match(error.stderr, /pixel limit/i)
+  assert.equal(await exists(path.join(outputDir, 'pixel_limit_rejected')), false)
+})
+
+test('character pack CLI background-remove-preview keeps complex input pixels unchanged', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'character-pack-cli-background-passthrough-'))
+  const inputPath = path.join(root, 'complex.png')
+  const outputDir = path.join(root, 'out')
+  const source = solidRgba(24, 24, [245, 245, 245, 255])
+  for (let y = 0; y < source.height; y += 1) {
+    for (let x = 0; x < source.width; x += 1) {
+      if ((x + y) % 2) paintRect(source, { x, y, w: 1, h: 1 }, [190, 190, 190, 255])
+    }
+  }
+  const sourceBuffer = await encodeRgbaPng(source)
+  await writeFile(inputPath, sourceBuffer)
+
+  const result = await runCli([
+    'background-remove-preview', '--input', inputPath, '--output-dir', outputDir,
+    '--job-id', 'complex_passthrough',
+  ], {
+    env: {
+      GEMINI_API_KEY: 'must_not_be_used',
+      OPENROUTER_API_KEY: 'must_not_be_used',
+    },
+  })
+  const output = await sharp(result.artifact).ensureAlpha().raw().toBuffer()
+  const input = await sharp(inputPath).ensureAlpha().raw().toBuffer()
+  const quality = JSON.parse(await readFile(
+    path.join(outputDir, 'complex_passthrough', 'background_quality.json'),
+    'utf8',
+  ))
+  const review = JSON.parse(await readFile(
+    path.join(outputDir, 'complex_passthrough', 'background_review.json'),
+    'utf8',
+  ))
+
+  assert.deepEqual(output, input)
+  assert.deepEqual(await readFile(inputPath), sourceBuffer)
+  assert.equal(quality.status, 'passthrough_review')
+  assert.equal(review.review_recommendation, 'inspect_passthrough')
+  assert.equal(result.provider_calls_used, 0)
+  assert.equal(result.network_requests_used, 0)
 })
 
 test('character pack CLI motion-source build-strip writes strip artifacts from a ZIP', async () => {
@@ -660,7 +930,7 @@ test('character pack CLI generate dry-run writes prompt artifacts without provid
   assert.equal(result.command, 'generate')
   assert.equal(result.mode, 'dry_run_prompt')
   assert.equal(result.job_id, 'cli_prompt')
-  assert.equal(result.prompt_contract.contract_version, 'character_prompt_contract_v1_15')
+  assert.equal(result.prompt_contract.contract_version, 'character_prompt_contract_v1_17')
   assert.equal(await exists(path.join(outputDir, 'cli_prompt', 'prompt.txt')), true)
   assert.equal(await exists(path.join(outputDir, 'cli_prompt', 'generation.json')), true)
 })
@@ -2341,7 +2611,7 @@ test('character pack CLI benchmark openrouter-recompute-report rewrites summary 
       run_id: 'old_ocad_run',
       created_at: '2026-06-01T00:00:00.000Z',
       preset: LEGACY_OCAD_MOTION_LAYOUT_ID,
-      template_file: 'fixed_region_motion_template_v1.png',
+      template_file: 'motion_template_ocad_primary.png',
       image_config: { image_size: '1K', aspect_ratio: '1:1' },
       cases: [{ id: 'blue_wizard', description: 'blue wizard' }],
       variants_per_case: 1,

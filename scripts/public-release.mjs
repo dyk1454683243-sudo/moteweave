@@ -39,7 +39,7 @@ const ACTIVE_BRAND_FILES = Object.freeze([
   'AGENTS.md',
   'LICENSE',
   'README.md',
-  'index.html',
+  'src/ui/studio/studio.html',
   'src/character-pack/providers/openRouterAdapter.js',
   'src/character-pack/providers/providerConfig.js',
   'website/README.md',

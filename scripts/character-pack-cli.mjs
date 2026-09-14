@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 import { existsSync, readFileSync } from 'node:fs'
-import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises'
+import { mkdir, open, readdir, readFile, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+
+import sharp from 'sharp'
 
 import {
   recomputeOpenRouterBenchmarkReport,
@@ -67,12 +69,22 @@ import {
 } from '../src/character-pack/benchmark/localImageManifest.js'
 import { runProcessedSampleBenchmark } from '../src/character-pack/benchmark/processedSampleBenchmark.js'
 import { writeCharacterPackArtifacts } from '../src/character-pack/artifactWriter.js'
+import {
+  applyDeterministicPixelMatteV2,
+  assertBackgroundMatteV2Dimensions,
+  BACKGROUND_MATTE_V2_ALGORITHM,
+  BACKGROUND_MATTE_V2_ARTIFACT_FILES,
+  BACKGROUND_MATTE_V2_IMAGE_LIMITS,
+  buildBackgroundMatteV2ArtifactBundle,
+} from '../src/character-pack/backgroundMatteV2.js'
+import { BACKGROUND_MODES, resolveBackgroundMode } from '../src/character-pack/backgroundProcessingContract.js'
 import { DEFAULT_GENERATION_PRESET } from '../src/character-pack/generationDefaults.js'
 import { encodeRgbaPng, loadRgba } from '../src/character-pack/imageCodec.js'
 import { normalizePixelGridRefinementOptions } from '../src/character-pack/pixelGridRefinement.js'
 import { processSheetBuffer } from '../src/character-pack/processSheet.js'
 import { getGeminiProviderState } from '../src/character-pack/providers/providerConfig.js'
 import { buildCharacterPromptContract, compileProviderPrompt, summarizePromptContract } from '../src/character-pack/promptContracts.js'
+import { removeBackground } from '../src/character-pack/sourcePreparation.js'
 import { applyPixelStyleCorrection } from '../src/character-pack/stylePipeline.js'
 import { loadTemplateImage } from '../src/character-pack/templateStore.js'
 import { FIXED_REGION_MOTION_LAYOUT_ID } from '../src/character-pack/sourceLayouts.js'
@@ -88,6 +100,8 @@ import {
   TEXT_TO_IMAGE_MODE_QUALITY_CHARACTER,
 } from '../src/character-pack/textToImagePrompt.js'
 import {
+  buildBackgroundRemovedProviderOutputArtifact,
+  buildRawProviderOutputArtifact,
   buildT2iGoldenBenchmarkPlan,
   runProductionSheetTextToImage,
   runQualityCharacterTextToImage,
@@ -395,6 +409,247 @@ async function commandProcess(options) {
     reason: written.reason,
     retry_hint: written.retry_hint,
     urls: written.urls,
+  }
+}
+
+function imageMimeTypeForPath(filePath) {
+  const extension = path.extname(String(filePath)).toLowerCase()
+  if (extension === '.jpg' || extension === '.jpeg') return 'image/jpeg'
+  if (extension === '.png') return 'image/png'
+  if (extension === '.webp') return 'image/webp'
+  return 'application/octet-stream'
+}
+
+const BACKGROUND_PREVIEW_ZERO_RESOURCE_CONTRACT = Object.freeze({
+  estimated_provider_calls: 0,
+  max_provider_calls: 0,
+  provider_calls_used: 0,
+  network_requests_allowed: false,
+  network_requests_used: 0,
+  model_downloads_allowed: false,
+  external_matte_engines_allowed: false,
+})
+
+const BACKGROUND_PREVIEW_MAX_INPUT_BYTES = 64 * 1024 * 1024
+
+async function readBoundedRegularFile(filePath, maxBytes, label) {
+  const handle = await open(filePath, 'r')
+  try {
+    const details = await handle.stat()
+    if (!details.isFile() || details.size <= 0 || details.size > maxBytes) {
+      throw new Error(`${label} must be a non-empty file no larger than ${maxBytes} bytes`)
+    }
+    const buffer = Buffer.allocUnsafe(details.size)
+    let offset = 0
+    while (offset < buffer.byteLength) {
+      const { bytesRead } = await handle.read(
+        buffer,
+        offset,
+        buffer.byteLength - offset,
+        offset,
+      )
+      if (bytesRead === 0) break
+      offset += bytesRead
+    }
+    const probe = Buffer.allocUnsafe(1)
+    const { bytesRead: extraBytesRead } = await handle.read(probe, 0, 1, offset)
+    if (offset !== buffer.byteLength || extraBytesRead !== 0) {
+      throw new Error(`${label} changed while it was being read`)
+    }
+    return buffer
+  } finally {
+    await handle.close()
+  }
+}
+const SERVED_GENERATED_ROOT = path.join(rootDir, 'generated')
+
+const BACKGROUND_PREVIEW_LOCAL_MODES = new Set([
+  BACKGROUND_MODES.LEGACY_FLOOD,
+  BACKGROUND_MODES.LEGACY_EDGE_PALETTE,
+  BACKGROUND_MODES.ALPHA,
+  BACKGROUND_MODES.PASSTHROUGH,
+])
+
+function backgroundPreviewArtifactUrlPrefix(jobDir) {
+  const absoluteJobDir = path.resolve(jobDir)
+  const relativeToGenerated = path.relative(SERVED_GENERATED_ROOT, absoluteJobDir)
+  const safeGeneratedSegments = relativeToGenerated &&
+    relativeToGenerated !== '..' &&
+    !relativeToGenerated.startsWith(`..${path.sep}`) &&
+    !path.isAbsolute(relativeToGenerated) &&
+    relativeToGenerated.split(path.sep).every(
+      (segment) => /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(segment),
+    )
+  if (safeGeneratedSegments) {
+    return `/generated/${relativeToGenerated.split(path.sep).join('/')}`
+  }
+  return pathToFileURL(absoluteJobDir).href.replace(/\/$/, '')
+}
+
+function backgroundPreviewArtifactUrl(prefix, file) {
+  return `${prefix}/${file}`
+}
+
+async function commandBackgroundRemovePreview(options) {
+  const input = option(options, 'input')
+  if (!input) throw new Error('background-remove-preview requires --input')
+  const outputDir = option(options, 'output-dir', 'generated/cli')
+  const jobId = option(options, 'job-id', makeJobId('background_remove_preview'))
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(String(jobId))) {
+    throw new Error('background-remove-preview --job-id must be a safe identifier')
+  }
+  const jobDir = path.join(String(outputDir), String(jobId))
+  const artifactUrlPrefix = backgroundPreviewArtifactUrlPrefix(jobDir)
+  if (existsSync(jobDir)) throw new Error(`background removal preview already exists: ${jobDir}`)
+
+  const sourceBuffer = await readBoundedRegularFile(
+    String(input),
+    BACKGROUND_PREVIEW_MAX_INPUT_BYTES,
+    'background-remove-preview input',
+  )
+  const inputMetadata = await sharp(sourceBuffer, {
+    failOn: 'error',
+    limitInputPixels: BACKGROUND_MATTE_V2_IMAGE_LIMITS.max_pixels,
+  }).metadata()
+  if ((inputMetadata.pages ?? 1) !== 1) {
+    throw new Error('background-remove-preview only supports a single image frame')
+  }
+  assertBackgroundMatteV2Dimensions({
+    width: inputMetadata.width,
+    height: inputMetadata.height,
+  })
+  const source = await loadRgba(sourceBuffer, {
+    limitInputPixels: BACKGROUND_MATTE_V2_IMAGE_LIMITS.max_pixels,
+  })
+  const requestedMode = option(options, 'background-mode', BACKGROUND_MATTE_V2_ALGORITHM)
+  const mode = resolveBackgroundMode(requestedMode, { allowDeterministicV2: true })
+  const rawProviderOutput = buildRawProviderOutputArtifact({
+    buffer: sourceBuffer,
+    mimeType: imageMimeTypeForPath(input),
+    rawProviderImageDimensions: { width: source.width, height: source.height },
+  })
+  const useV2 = mode.canonical === BACKGROUND_MODES.AUTO ||
+    mode.canonical === BACKGROUND_MODES.DETERMINISTIC_PIXEL_MATTE_V2
+  if (!useV2 && !BACKGROUND_PREVIEW_LOCAL_MODES.has(mode.canonical)) {
+    throw new Error(`background-remove-preview does not support ${mode.canonical} without its required paired input`)
+  }
+  let artifact
+  let extraFiles = {}
+  let report
+  if (useV2) {
+    const matte = applyDeterministicPixelMatteV2(source, { decode: source.decode ?? null })
+    const bundle = await buildBackgroundMatteV2ArtifactBundle(matte, {
+      rawSource: source,
+      artifactUrlPrefix,
+    })
+    const outputBuffer = bundle.files[BACKGROUND_MATTE_V2_ARTIFACT_FILES.OUTPUT]
+    artifact = {
+      buffer: outputBuffer,
+      fileName: BACKGROUND_MATTE_V2_ARTIFACT_FILES.OUTPUT,
+      metadata: {
+        ...bundle.artifacts[BACKGROUND_MATTE_V2_ARTIFACT_FILES.OUTPUT],
+        width: source.width,
+        height: source.height,
+        processing: 'background_removal_only',
+        source_file: rawProviderOutput.fileName,
+        source_sha256: rawProviderOutput.metadata.sha256,
+        background_removal: {
+          mode: matte.mode,
+          recipe_id: BACKGROUND_MATTE_V2_ALGORITHM,
+          warnings: matte.warnings,
+          alpha_provenance: matte.alpha_provenance,
+        },
+      },
+    }
+    extraFiles = Object.fromEntries(
+      Object.entries(bundle.files).filter(([file]) => file !== artifact.fileName),
+    )
+    report = {
+      schema_version: 2,
+      mode: 'background_removal_preview_v2',
+      status: 'preview_ready',
+      provider_calls: 0,
+      ...BACKGROUND_PREVIEW_ZERO_RESOURCE_CONTRACT,
+      requested_background_mode: mode.requested,
+      canonical_background_mode: BACKGROUND_MATTE_V2_ALGORITHM,
+      background_recipe_id: BACKGROUND_MATTE_V2_ALGORITHM,
+      source_decode: source.decode ?? null,
+      ...artifact.metadata,
+      artifacts: bundle.artifacts,
+      quality_file: BACKGROUND_MATTE_V2_ARTIFACT_FILES.QUALITY,
+      review_file: BACKGROUND_MATTE_V2_ARTIFACT_FILES.REVIEW,
+      contract_masks_file: BACKGROUND_MATTE_V2_ARTIFACT_FILES.CONTRACT_MASKS,
+      preview_file: BACKGROUND_MATTE_V2_ARTIFACT_FILES.PREVIEW,
+      spill_overlay_file: BACKGROUND_MATTE_V2_ARTIFACT_FILES.SPILL_OVERLAY,
+    }
+  } else {
+    const background = await removeBackground(source, {
+      backgroundMode: mode.canonical,
+      backgroundTolerance: optionNumber(options, 'background-tolerance'),
+    })
+    artifact = await buildBackgroundRemovedProviderOutputArtifact(background, rawProviderOutput)
+    report = {
+      schema_version: 1,
+      mode: 'background_removal_preview_v1',
+      status: 'preview_ready',
+      provider_calls: 0,
+      ...BACKGROUND_PREVIEW_ZERO_RESOURCE_CONTRACT,
+      requested_background_mode: mode.requested,
+      canonical_background_mode: mode.canonical,
+      background_recipe_id: mode.recipe_id,
+      ...artifact.metadata,
+    }
+  }
+
+  await mkdir(String(outputDir), { recursive: true })
+  await mkdir(jobDir, { recursive: false })
+  const artifactPath = path.join(jobDir, artifact.fileName)
+  const reportPath = path.join(jobDir, 'background_removal_preview.json')
+  await writeFile(artifactPath, artifact.buffer, { flag: 'wx' })
+  for (const [file, content] of Object.entries(extraFiles)) {
+    await writeFile(path.join(jobDir, file), content, { flag: 'wx' })
+  }
+  await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`, { flag: 'wx' })
+
+  return {
+    command: 'background-remove-preview',
+    job_id: jobId,
+    output_dir: jobDir,
+    status: 'preview_ready',
+    provider_calls: 0,
+    ...BACKGROUND_PREVIEW_ZERO_RESOURCE_CONTRACT,
+    artifact: artifactPath,
+    report: reportPath,
+    urls: {
+      background_removed_provider_output_url:
+        backgroundPreviewArtifactUrl(artifactUrlPrefix, artifact.fileName),
+      background_removal_preview_url:
+        backgroundPreviewArtifactUrl(artifactUrlPrefix, 'background_removal_preview.json'),
+      ...(useV2
+        ? {
+            background_quality_url: backgroundPreviewArtifactUrl(
+              artifactUrlPrefix,
+              BACKGROUND_MATTE_V2_ARTIFACT_FILES.QUALITY,
+            ),
+            background_review_url: backgroundPreviewArtifactUrl(
+              artifactUrlPrefix,
+              BACKGROUND_MATTE_V2_ARTIFACT_FILES.REVIEW,
+            ),
+            background_contract_masks_url: backgroundPreviewArtifactUrl(
+              artifactUrlPrefix,
+              BACKGROUND_MATTE_V2_ARTIFACT_FILES.CONTRACT_MASKS,
+            ),
+            background_preview_url: backgroundPreviewArtifactUrl(
+              artifactUrlPrefix,
+              BACKGROUND_MATTE_V2_ARTIFACT_FILES.PREVIEW,
+            ),
+            background_spill_overlay_url: backgroundPreviewArtifactUrl(
+              artifactUrlPrefix,
+              BACKGROUND_MATTE_V2_ARTIFACT_FILES.SPILL_OVERLAY,
+            ),
+          }
+        : {}),
+    },
   }
 }
 
@@ -3623,6 +3878,7 @@ async function main() {
   const { positional, options } = parseArgs(process.argv.slice(2))
   const command = positional[0]
   if (command === 'process') return commandProcess(options)
+  if (command === 'background-remove-preview') return commandBackgroundRemovePreview(options)
   if (command === 'generate') return commandGenerate(options)
   if (command === 'project' && positional[1] === 'pack') return commandProjectPack(options)
   if (command === 'motion-source' && positional[1] === 'build-strip') return commandMotionSourceBuildStrip(positional, options)
@@ -3660,7 +3916,7 @@ async function main() {
   if (command === 'benchmark' && positional[1] === 'scene-tile-manual-prompts') return commandBenchmarkSceneTileManualPrompts(options)
   if (command === 'benchmark' && positional[1] === 'scene-tile-manual-retest') return commandBenchmarkSceneTileManualRetest(options)
   if (command === 'benchmark' && positional[1] === 'scene-tile-live-gate') return commandBenchmarkSceneTileLiveGate(options)
-  throw new Error('Usage: character-pack-cli.mjs <process|generate|project pack|motion-source build-strip|motion-source apply-strip|motion-source analyze-set|motion-source apply-set|scene tile-prompt|scene tile-ingest|scene tile-generate|tileset build-two-point-five-d|tileset material-source-evidence|tileset material-source-benchmark|tileset material-source-benchmark-review|benchmark t2i-golden|benchmark t2i-golden-review|benchmark openrouter|benchmark openrouter-recompute-report|benchmark topdown-quality-closure|benchmark topdown-repair-plan|benchmark topdown-repair-manifest|benchmark quality-closure-repair-manifest|benchmark quality-closure-repair-loop|benchmark quality-closure-provider-handoff|benchmark quality-closure-apply-provider-repair|benchmark quality-closure-provider-repair-loop|benchmark topdown-generate-repair-cell|benchmark topdown-repair-loop|benchmark topdown-apply-repair|benchmark processed|benchmark local-images|benchmark local-images-validate|benchmark local-images-add|benchmark scene-tile-report|benchmark scene-tile-correction-matrix|benchmark scene-tile-manual-prompts|benchmark scene-tile-manual-retest|benchmark scene-tile-live-gate> [options]')
+  throw new Error('Usage: character-pack-cli.mjs <process|background-remove-preview|generate|project pack|motion-source build-strip|motion-source apply-strip|motion-source analyze-set|motion-source apply-set|scene tile-prompt|scene tile-ingest|scene tile-generate|tileset build-two-point-five-d|tileset material-source-evidence|tileset material-source-benchmark|tileset material-source-benchmark-review|benchmark t2i-golden|benchmark t2i-golden-review|benchmark openrouter|benchmark openrouter-recompute-report|benchmark topdown-quality-closure|benchmark topdown-repair-plan|benchmark topdown-repair-manifest|benchmark quality-closure-repair-manifest|benchmark quality-closure-repair-loop|benchmark quality-closure-provider-handoff|benchmark quality-closure-apply-provider-repair|benchmark quality-closure-provider-repair-loop|benchmark topdown-generate-repair-cell|benchmark topdown-repair-loop|benchmark topdown-apply-repair|benchmark processed|benchmark local-images|benchmark local-images-validate|benchmark local-images-add|benchmark scene-tile-report|benchmark scene-tile-correction-matrix|benchmark scene-tile-manual-prompts|benchmark scene-tile-manual-retest|benchmark scene-tile-live-gate> [options]')
 }
 
 try {

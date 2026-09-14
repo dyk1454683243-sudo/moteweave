@@ -260,7 +260,7 @@ test('generate-character routes OpenRouter output through the character pack pip
   assert.equal(generation.template_file, 'motion_template_ocha_8x8.png')
   assert.equal(generation.reference_file, 'reference.png')
   assert.equal(generation.palette_file, 'endesga-32-32x.png')
-  assert.equal(generation.prompt_contract.contract_version, 'character_prompt_contract_v1_15')
+  assert.equal(generation.prompt_contract.contract_version, 'character_prompt_contract_v1_17')
   assert.equal(generation.prompt_contract.preset, 'topdown_rpg_v0')
   assert.equal(generation.prompt_contract.layout_id, 'topdown_rpg_v0')
   assert.equal(generation.candidate_selection.candidate_count, 1)
@@ -895,6 +895,7 @@ test('two-point-five-d material-source benchmark writes a dry-run plan without p
   const planArtifact = await fetchJson(baseUrl, plan.plan_url)
   assert.equal(planArtifact.run_id, 'server_source_benchmark_plan')
   assert.equal(typeof planArtifact.provider_config.available, 'boolean')
+  assert.equal(typeof planArtifact.provider_config.route_kind, 'string')
   assert.equal(planArtifact.provider_config.apiKey, undefined)
   assert.equal(planArtifact.provider_config.api_key, undefined)
   assert.match(planArtifact.claim_boundary, /local deterministic code/)
@@ -973,6 +974,30 @@ test('two-point-five-d material-source benchmark routes provider candidates thro
   await waitForServer(child)
 
   const baseUrl = `http://127.0.0.1:${appPort}`
+  const staleBindingResponse = await fetch(new URL('/api/two-point-five-d-material-source-benchmark', baseUrl), {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      confirm_live_generation: true,
+      description: 'mossy cliff grass blocks with cool stone side walls',
+      providerPresetId: 'source-provider',
+      candidateCount: 1,
+      maxProviderCalls: 1,
+      runId: 'server_source_benchmark_stale_provider',
+      expectedProviderConfig: {
+        selected_available: true,
+        selected_preset_id: 'source-provider',
+        provider: 'openrouter',
+        route_kind: 'openrouter',
+        model: 'drifted/model',
+      },
+    }),
+  })
+  const staleBinding = await staleBindingResponse.json()
+  assert.equal(staleBindingResponse.status, 409)
+  assert.equal(staleBinding.error, 'benchmark_provider_binding_stale')
+  assert.equal(mock.requests.length, 0)
+
   const initial = await fetchJson(baseUrl, '/api/two-point-five-d-material-source-benchmark', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -984,6 +1009,13 @@ test('two-point-five-d material-source benchmark routes provider candidates thro
       imageConfig: { image_size: '1K', aspect_ratio: '1:1' },
       generationOptions: { seed: 21, temperature: 0.25 },
       maxProviderCalls: 1,
+      expectedProviderConfig: {
+        selected_available: true,
+        selected_preset_id: 'source-provider',
+        provider: 'openrouter',
+        route_kind: 'openrouter',
+        model: 'mock/material-source',
+      },
       options: { mapWidth: 4, mapHeight: 4 },
       runId: 'server_source_benchmark_live',
     }),
@@ -994,6 +1026,9 @@ test('two-point-five-d material-source benchmark routes provider candidates thro
   assert.equal(job.status, 'done')
   assert.equal(job.material_source_benchmark_status, job.benchmark_status)
   assert.equal(job.run_id, 'server_source_benchmark_live')
+  assert.equal(job.provider_config.selected_preset_id, 'source-provider')
+  assert.equal(job.provider_config.route_kind, 'openrouter')
+  assert.equal(job.provider_config.model, 'mock/material-source')
   assert.deepEqual(job.provider_call_budget, {
     planned_provider_calls: 1,
     max_provider_calls: 1,

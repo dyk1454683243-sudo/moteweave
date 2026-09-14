@@ -1,0 +1,56 @@
+name: Public Release Contract
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CHARACTER_IMAGE_API_KEY: ""
+  CHARACTER_PROVIDER_PRESETS: ""
+  GEMINI_API_KEY: ""
+  GOOGLE_API_KEY: ""
+  OPENROUTER_API_KEY: ""
+  OPENROUTER_PROVIDER_PRESETS: ""
+
+jobs:
+  verify:
+    name: Node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        node:
+          - 22
+          - 24
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Verify public release contract
+        run: npm run release:check
+
+      - name: Run public release unit tests
+        run: npm run test:focused -- test/release/publicRelease.test.js
+
+      - name: Verify public website
+        run: npm run site:check

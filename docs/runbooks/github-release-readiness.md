@@ -1,183 +1,72 @@
 # GitHub Release Readiness
 
-Use this runbook before exporting a public snapshot, changing repository
-visibility, creating a release tag, or adding a public website CTA.
+Use this checklist before publishing the repository or preparing a release tag.
 
-Normative plans:
+## Required Checks
 
-- `docs/superpowers/plans/2026-07-17-public-preview-release-readiness.md` for
-  the initial public snapshot;
-- `docs/superpowers/plans/2026-07-17-public-preview-2-release-readiness.md` for
-  the accepted Preview 2 update;
-- `docs/superpowers/plans/2026-07-18-public-preview-3-release-readiness.md` for
-  the current private readiness candidate.
+- Run `git status --short` and stage only coherent, reviewed files.
+- Keep `.env`, `generated/`, `output/`, `node_modules/`, and `.npm-cache/` untracked. These are covered by `.gitignore`.
+- Do not commit local prototype or temporary automation files unless the release explicitly needs them.
+- Run `npm test` and record the result in the release note or PR.
+- Confirm `README.md`, `CHANGELOG.md`, `package.json`, and `package-lock.json` agree on the current release state.
+- Confirm `ATTRIBUTIONS.md` covers any dependency, public format, or bundled asset added since the previous release.
 
-## 1. Human Approval Gates
+## Local Scratch Files
 
-Stop unless all applicable approvals are recorded:
+Local worktrees may contain ignored or untracked scratch data such as `.claude/`,
+temporary prototypes, backups, or one-off patch scripts. Treat the current
+`git status --short` output as authoritative instead of assuming a historical
+scratch-file list is still present.
 
-- final display name and package/repository/Pages slug
-  (`MoteWeave` / `moteweave` is recorded in
-  `docs/decisions/2026-07-17-public-brand-selection.md`);
-- creation of a new GitHub repository, when applicable;
-- changing a validated repository from private to public, when applicable;
-- creating the final prerelease;
-- deploying the final-brand website or changing its Release CTA;
-- transitioning the old site, when applicable.
+Do not bulk-delete these files. Before release, either:
 
-The implementation agent must not select the final brand or make a repository
-public on the user's behalf without explicit approval.
+- leave them untracked,
+- move them manually outside the repository, or
+- promote specific files through a reviewed task that explains why they belong
+  in source control.
 
-## 2. Private Baseline
+## Scene Quality Claim Boundary
 
-- Work only from the dedicated release worktree and branch.
-- Before starting a later Preview, use the latest completed release plan to
-  identify one exact private comparison baseline, then create a new dedicated
-  branch and worktree. Do not resume work in an earlier release worktree.
-- Treat completed release worktrees as read-only historical evidence: do not
-  develop, stage, export, rerun release verification, or publish from them.
-- Record the private publication baseline, private snapshot source, public tag
-  candidate, protected public main, and public tree as separate identities.
-  Never describe one of these commits as another.
-- Confirm the intended feature heads are ancestors of the release commit.
-- Run `git status --short`.
-- Do not stage unrelated untracked files from another worktree.
-- Never rewrite or publish the private repository history.
-- Never write to the independent Frame Repair implementation worktree.
+v0.4 includes scene tile ingestion, guarded live generation, quality gates,
+LDtk-compatible export, and project pack export. The recorded live scene gate is
+a one-case release smoke. Do not describe scene generation as broadly
+production-ready until a larger scene benchmark has been run and recorded.
 
-## 3. Release Exclusions
+## Character Calibration Claim Boundary
 
-The public snapshot must not contain:
+The fixed-region calibration path has one recorded single-call `1K` acceptance
+on 2026-07-31. Treat it as a one-run acceptance result, not a sampled
+provider-quality or broad production-readiness claim. See
+`docs/decisions/2026-07-31-fixed-region-calibration-single-1k-acceptance.md`;
+the recovered provider, run-directory identity, artifact paths, automatic gate,
+and manual review are recorded there. The live run predates final `d458369`
+edge-case hardening; that hardening is covered by the subsequent `131 / 131`
+focused test gate, not by a second provider call.
 
-- `.env`, Provider keys, tokens, private responses, or local credentials;
-- `generated/`, `output/`, `workspace/`, `node_modules/`, `.npm-cache/`, or
-  `.worktrees/`;
-- root-worktree `.superpowers/` or untracked duplicate `* 2.*` files;
-- local input media, user projects, benchmark outputs, model weights, FFmpeg,
-  rembg, plugins, installers, or dependency bundles;
-- real usernames, home-directory paths, downloads, desktop paths, or private
-  worktree paths;
-- a binary template, fixture, website image, or bundled asset without recorded
-  provenance and redistribution status;
-- the private `.git` directory or any private-history object.
+## Public Source Snapshot
 
-Do not bulk-delete local files to satisfy this list. The deterministic exporter
-must copy only approved tracked files into a new empty destination.
+The mechanical public export lives in `scripts/public-release.mjs`.
 
-## 4. Metadata And Documentation
+```bash
+npm run release:check
+npm run release:export -- /absolute/empty/dir/outside/this-repo
+```
 
-Confirm these agree:
+`release:check` must pass on a clean worktree with Provider credentials
+unset. The export copies only manifest-included tracked files from `HEAD`
+and writes `PUBLIC_SNAPSHOT.json`. Do not copy `.env`, `generated/`,
+`output/`, or `node_modules/` into the public tree.
 
-- approved display name and slug;
-- `package.json` and `package-lock.json`;
-- the version declared by `configs/public-release.json`;
-- README install instructions and supported Node range;
-- CHANGELOG and release notes;
-- `LICENSE` and `ATTRIBUTIONS.md`;
-- website title, canonical URL, OG metadata, repository URL, and Release CTA.
+The current public brand is MoteWeave. Private GitHub hosting may remain
+`Game-tool`; the exported package name, website, and canonical URL use
+`moteweave`.
 
-Keep `package.json` private. Do not add npm publishing or an application bundle
-to this release.
+After export, open or update the public `moteweave` pull request from the
+exported tree. A later export may overwrite snapshot ledger files cleanly.
+The current v0.5.0 export record is `docs/releases/public-v0.5.0-snapshot.md`.
 
-## 5. Provider-Free Verification
+## Secret Handling
 
-Only the designated test owner runs commands. Use the checked-in resource
-guard, serial execution, and finite limits.
-
-Run in order:
-
-1. affected focused tests;
-2. `npm run release:check`;
-3. `npm run site:check`;
-4. `npm test`;
-5. `npm run smoke:local`.
-
-For Preview 3 and later first-user-path releases, also run
-`npm run first-user:local` after local smoke. Run it again from the fresh
-exported snapshot and on the primary Node 24 CI job. It must report Provider
-availability false, zero calls, local-only requests, and parsed release
-packages.
-
-No Provider secret may be configured for these checks. Do not run live
-generation.
-
-In a fresh exported snapshot, run `npm run release:check` before installing
-dependencies so the ledger verifies the exact export. Then run `npm ci`,
-`npm test`, and `npm run smoke:local`. `node_modules/` remains excluded from the
-ledger and public commit. Record pass counts, duration, peak process-tree RSS,
-and peak process count.
-
-## 6. Snapshot Export
-
-- Use `npm run release:export -- <new-empty-directory>`.
-- The destination must not be the private repository, any registered worktree,
-  or an existing non-empty directory.
-- The exporter must fail rather than delete or overwrite.
-- Compare the exported file ledger with the versioned snapshot manifest.
-- Run the release checker inside the export.
-- Initialize a new Git repository in the export. Do not copy `.git`.
-
-## 7. GitHub Review
-
-- Restore authorized GitHub access.
-- For an initial release, create the new repository as private and push only
-  the clean snapshot history.
-- For an update to the existing public mirror, copy only the deterministic
-  exported snapshot delta onto a dedicated public branch and open a pull
-  request. Never merge private history into the public repository.
-- Before pushing that public branch or opening its pull request, obtain
-  project-lead approval bound to the exact private release commit and tree.
-- Enable read-only-default CI with Node 22/24 serial jobs.
-- Verify branch protection and CI.
-- Clone the candidate public branch into a separate clean directory and repeat
-  the install/release/full/smoke checks.
-- Inspect GitHub's source archives before public visibility.
-
-Any failure leaves initial repository visibility or the existing public
-`main` unchanged.
-
-## 8. Public Visibility And Prerelease
-
-After explicit approval:
-
-1. for an initial release, change repository visibility to public;
-2. verify anonymous access to the accepted public candidate commit;
-3. create tag `v<release_version>` from that exact candidate commit;
-4. create and verify the GitHub prerelease using source archives only;
-5. for an update, merge the pull request only after the new Release URL resolves,
-   and verify that protected `main` has the same tree as the tagged candidate;
-6. verify the repository, issues URL, tag, release notes, and checksums/ledger.
-
-Do not upload an installer, packaged `node_modules`, Sharp/libvips bundle,
-FFmpeg, rembg, model, plugin, or generated sample pack.
-
-## 9. Website Cutover
-
-- Keep a new Release CTA out of production until that public prerelease exists.
-- Create a new final-brand Git-integrated Cloudflare Pages project only for the
-  initial cutover; later updates reuse the existing Git-integrated project.
-- Deploy and verify repository/Release links, canonical URL, OG image, responsive
-  layout, and capability boundaries.
-- Treat a branch-preview deployment as pre-merge evidence only. Close the
-  cutover only after production is deployed from protected `main`.
-- Because production deploys from `main`, create and verify an approved update's
-  tag/prerelease before merging the exact tagged tree; never expose a production
-  CTA whose Release URL does not yet resolve.
-- Record the final production deployment id and source commit in the normative
-  release plan.
-- After explicit approval, update the old site to a temporary notice or `302`
-  transition.
-- Verify that `/` and at least one nested legacy path return HTTP `302` with the
-  expected path-preserving `Location`, and that the new site does not redirect
-  back.
-- Do not delete the old Pages project in this release.
-
-## 10. Claim Boundaries
-
-- The Preview is local source software, not hosted SaaS.
-- Provider use is optional, user-configured, and potentially billable.
-- FFmpeg and rembg are optional user-installed tools.
-- Windows external-tool execution remains fail-closed until separately
-  implemented and verified.
-- Recorded scene and live-generation evidence remains limited to its documented
-  sample size. Do not claim broad production readiness.
+Provider keys must stay in `.env` or the shell environment. Browser UI provider
+selection must receive only non-secret provider ids, labels, models, and
+availability flags.

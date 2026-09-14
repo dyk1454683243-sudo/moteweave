@@ -1,6 +1,7 @@
 # Frame Repair Safe Provider Diagnostics Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** Execute this plan task-by-task under `AGENTS.md`.
+> Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Preserve safe structured Frame Repair provider-failure categories and show them as read-only Processing diagnostics without exposing remote text or authorizing another provider call.
 
@@ -12,7 +13,7 @@
 
 ## Preconditions And Safety Boundary
 
-- Work only in `<workspace>/.worktrees/frame-repair-safe-diagnostics` on branch `codex/frame-repair-safe-diagnostics`.
+- Work only in `$HOME/Documents/Game tools/.worktrees/frame-repair-safe-diagnostics` on branch `codex/frame-repair-safe-diagnostics`.
 - Read and follow `AGENTS.md`, `docs/guardrails/ui-implementation-guardrails.md`, and `docs/guardrails/editor-workspace-guardrails.md` before implementation.
 - The approved design is `docs/superpowers/specs/2026-07-12-frame-repair-safe-provider-diagnostics-design.md`.
 - Do not modify `src/character-pack/providers/*`, `server.js`, project schemas, job status enums, package files, or `ATTRIBUTIONS.md`.

@@ -9,8 +9,8 @@ working pipeline, NOT to build a static mockup. Backend behavior, the
 `processSheet` pipeline, validator, exporters, and generation providers must
 keep working after the change.
 
-This document is a soft guardrail. The hard guardrail is `npm test` plus
-parallel-not-replace structure. Both must hold.
+This document is a soft guardrail. The hard guardrail is `npm test` plus the
+phase-appropriate migration structure described below. Both must hold.
 
 ## Hard Rules
 
@@ -28,7 +28,8 @@ parallel-not-replace structure. Both must hold.
    - `src/character-pack/providers/*`
    - existing `server.js` API endpoint behavior and the job-state enum
    - `src/character-pack/profile.js`, `generationDefaults.js`
-   Existing application UI work lives in `src/ui/*` and `index.html`.
+   The maintained application UI lives in `src/ui/studio/studio.html` and
+   `src/ui/studio/*`.
    Editor Workspace UI may additionally use `editor.html`,
    `src/editor-app.js`, and `src/ui/editor/*` under
    `docs/guardrails/editor-workspace-guardrails.md`.
@@ -38,8 +39,8 @@ parallel-not-replace structure. Both must hold.
    STOP and ask the human.
 
 3. Before changing code, trace the real data flow and write it down:
-   - `index.html` entry and which `src/ui/*` module mounts each tab
-   - `src/ui/characterPack/api.js` (the fetch calls)
+   - `src/ui/studio/studio.html`, `src/ui/studio/app.js`, and the Studio view
+     and API module that own the affected rail section
    - `server.js` endpoints: `/api/generate-character`, `/api/process-sheet`,
      `/api/jobs/:id`, `/api/gemini-state`
    - `processSheetBuffer(buffer, options)` — the options it accepts
@@ -72,10 +73,12 @@ parallel-not-replace structure. Both must hold.
    missing fields after implementation; never invent a fake data structure.
    Reshape data via a mapper in `src/ui/`, never by changing a contract file.
 
-8. PARALLEL, NOT REPLACE. Build the new layout alongside the old UI (new
-   module/route). Keep the old UI reachable until the new one is fully wired
-   and verified. Do NOT delete the old UI in the same change that introduces
-   the new one.
+8. PARALLEL UNTIL VERIFIED. Build a replacement layout alongside the active UI
+   and keep the prior route reachable until the replacement is fully wired and
+   accepted. A later, explicitly approved retirement phase may replace the old
+   entry with a fixed server redirect and delete files proven exclusive to the
+   retired shell. Do NOT introduce a replacement and delete its fallback in
+   the same change.
 
 9. `npm test` MUST pass after every section. The test suite is the contract
    guard. If a UI change makes a pipeline / validator / exporter test fail,
@@ -94,7 +97,8 @@ parallel-not-replace structure. Both must hold.
 - [ ] one REAL upload + process runs end-to-end through the new UI
 - [ ] parameter binding table produced; missing-field list produced
 - [ ] `npm test` green
-- [ ] old UI still reachable (not deleted)
+- [ ] prior UI remains reachable during migration; an approved retirement
+      phase instead proves fixed redirects and the exact exclusive-file boundary
 - [ ] summary provided: files changed, whether any contract file was touched,
       which sections use real data, which use fallback, how to verify the
       live API is still connected
@@ -106,8 +110,9 @@ enforceable layers, in order of reliability, are:
 
 1. The complete `npm test` suite — report the actual pass/fail count; it fails
    regardless of what any AI intends.
-2. Parallel-not-replace — the old UI keeps working even if the new one is
-   half-wired, so there is never a broken-only state.
+2. Parallel-until-verified — the prior UI keeps working while a replacement is
+   incomplete; retirement happens only in a later approved phase with fixed
+   redirects and an independently reviewed deletion boundary.
 3. Human `git diff` review before merge.
 4. This document — the soft layer that explains intent.
 

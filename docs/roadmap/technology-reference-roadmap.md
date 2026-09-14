@@ -319,19 +319,26 @@ inspection previews are emitted as artifacts, the workspace preview prefers the
 transparent inspection sheet over the raw upload, the action gallery uses a
 fixed-zoom inspection view for easier human review, local fixed-region uploads
 share the same staged crop/matte cleanup as generation, and local-only prompt
-fields are hidden from the upload flow. The remaining Pixel Finishing direction
-is a deterministic character-pack output path: palette snap, alpha/edge cleanup,
-small-component cleanup, optional outline, nearest-neighbor scale/export, and
-before/after metrics. Public references support these neutral technical
-patterns, but implementation must remain project-owned and must not copy
-competitor code, private templates, assets, naming, or product claims.
+fields are hidden from the upload flow. Pixel Finishing v1 was completed in
+implementation commit `1452387` as the opt-in deterministic
+`pixel_finishing_v1` character-pack output path. It applies palette snap,
+alpha/edge cleanup, small-component cleanup, optional outline, and
+nearest-neighbor scale/export while recording before/after color and palette
+metrics, mutation ratio, halo/residue, cleanup, outline, grid, and scale
+evidence. Default non-finishing outputs remain unmutated. Public references
+support these neutral technical patterns, but implementation remains
+project-owned and does not copy competitor code, private templates, assets,
+naming, or product claims.
 
-The next small cross-cutting UI polish item is a language surface for the
-browser app, starting with Chinese and English labels. This should be a neutral
-dictionary-backed UI layer with a top-right language switcher and persisted
-local preference. It should start with the Character Pack workflow and should
-not change provider prompts, generated metadata, export formats, or quality
-claims until those strings have their own explicit contract.
+The first Chinese/English browser language surface is implemented.
+`ae37d64` added the dictionary-backed Character Pack labels, top-right
+switcher, and persisted `gameToolLanguage` preference; `f4de1b6` localized
+Character Pack runtime messages, and `3c3463f` localized source-layout
+guidance. Shared navigation and selected Motion Source labels also use the same
+UI dictionary. These changes remain in UI, HTML, and test layers and do not
+change provider prompts, generated metadata, export formats, or quality claims.
+The 2026-07-31 status reconciliation was static and did not add a new live
+browser-QA claim.
 
 Editor Workspace is selected as the v0.5 direction, recorded in
 `docs/decisions/2026-06-22-editor-workspace-direction.md` and planned in
@@ -444,7 +451,7 @@ For v0.3, prioritize diagnostics and validation ahead of broad feature expansion
 4. Aseprite-compatible frame tag export. `Data layer done`
 5. Aseprite-compatible slices for attachment points. `Data layer done`
 6. CLI access once the pipeline behavior is stable. `Done`
-7. Palette/style enforcement as report-only or opt-in at first. `Moved to v0.4 Phase 0; first report-only local metrics implemented, automatic correction deferred`
+7. Palette/style enforcement as report-only or opt-in at first. `Moved to v0.4 Phase 0; report-only metrics and opt-in deterministic pixel_finishing_v1 are implemented, while default outputs remain unmutated`
 8. Multi-resolution output and preview polish after the above. `Multi-resolution output done; preview transition polish remains`
 
 ## Mode Boundary
@@ -460,7 +467,7 @@ This boundary lets the project learn from broad game-asset ideation tools withou
 
 | # | Source | Pattern / Format | Classification | Target | Effort | Needs SD? | Notes |
 |---|---|---|---|---|---:|---|---|
-| 1 | Retro Diffusion | Pixel-art post-process pipeline: palette extraction, palette snap, nearest-neighbor downsample, outline strengthening, upscale | Core | v0.4 Phase 0 | 2-3 days | No | First provider-free report-only unit implemented; outline strengthening and automatic correction remain deferred. |
+| 1 | Retro Diffusion | Pixel-art post-process pipeline: palette extraction, palette snap, nearest-neighbor downsample, outline strengthening, upscale | Core | v0.4 Phase 0 | Done | No | Provider-free report-only metrics and opt-in `pixel_finishing_v1` are implemented; finishing records palette, alpha/halo, small-component, outline, grid, and nearest-neighbor export evidence while default outputs remain unmutated. |
 | 2 | Aseprite | Frame tag JSON export in hash-style spritesheet metadata | Core | v0.3 | 1-2 days | No | Data layer shipped in `editor_metadata.json`; importer/editor UI polish remains optional follow-up. Interoperability format only; do not copy editor code. |
 | 3 | Aseprite | Slice metadata for attachment points | Core | v0.3 | 1-2 days | No | Data layer shipped in `editor_metadata.json`; visual overlay/importer polish remains optional follow-up. |
 | 4 | Aseprite / TexturePacker | CLI command exposure for generate, process, export, and benchmark flows | Core | v0.3 | 1 day | No | Best after pipeline outputs are stable. |
@@ -526,7 +533,7 @@ Recommended sequence:
 5. Add Aseprite-compatible frame tag export. `Data layer done`
 6. Add Aseprite-compatible slice metadata for attachment points. `Data layer done`
 7. Add CLI commands for generate, process, export, and benchmark. `Done`
-8. Add optional/report-only style enforcement. `Moved to v0.4 Phase 0; first provider-free report-only metrics implemented`
+8. Add optional/report-only style enforcement. `Moved to v0.4 Phase 0; provider-free report-only metrics and opt-in deterministic pixel_finishing_v1 implemented`
 9. Add multi-resolution output options. `Done for generated artifacts and download links`
 10. Polish preview animation transitions.
 11. Publish a benchmark note and release notes. `Done`
@@ -571,6 +578,8 @@ Deferred unless the priority becomes sharing the tool with more users.
 
 | Date | Change |
 |---|---|
+| 2026-07-31 (Language surface reconciliation) | Reconciled the dictionary-backed Chinese/English browser surface as implemented through `ae37d64`, `f4de1b6`, and `3c3463f`: Character Pack labels and runtime messages use the shared dictionary, the header switcher persists `gameToolLanguage`, and UI structure tests cover the entry and key parity. Provider prompts, generated metadata, and export formats remain outside this UI-only contract; no new live browser run was claimed. |
+| 2026-07-31 (Pixel Finishing reconciliation) | Reconciled Pixel Finishing v1 as implemented in `1452387`: the opt-in path records before/after color and palette metrics, mutation ratio, alpha cleanup, halo/residue, small-component cleanup, outline ratio, grid notes, and nearest-neighbor export notes. This is deterministic local implementation evidence, not live Provider repair-quality evidence. |
 | 2026-07-16 (C/D/E closure) | Completed Pixel Grid v2 (`0a6353a`), Motion Selection v2 (`f6a6a03`), and Guided Motion Source UI/HUD (`493f609`) under separate contracts. Final provider-free verification passed `1431 / 1431`, the guarded Chrome fault matrix covered responsive and stale/missing/unreadable evidence states, and two read-only reviews found no remaining Blocker/High. |
 | 2026-07-16 | Implemented and guarded-verified the Motion Source Correctness and Safety v1 baseline: explicit Auto/Manual authority, raw upload limits, explicit/deferred and pre-descriptor release, bounded session ledgers, exact replay after release, truthful poll/cancel/Resume semantics, client-path rejection, central-directory plus actual-inflation ZIP budgets, cooperative in-process cancellation, POSIX process-group supervision with Windows fail-closed behavior, and bounded FFmpeg normalization/output evidence; final full suite and self-hosted smoke passed provider-free. |
 | 2026-07-13 | Recorded item 33's eight-case Quality Gate infrastructure, deterministic controls, and browser/provider-free zero-call coverage as implemented; kept real first-call quality, the 70% live threshold, and production readiness explicitly unverified pending a separately authorized live report. |

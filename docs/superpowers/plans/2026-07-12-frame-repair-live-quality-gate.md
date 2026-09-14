@@ -1,6 +1,7 @@
 # Frame Repair Live Quality Gate v1 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** Execute this plan task-by-task under `AGENTS.md`.
+> Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add a provider-budgeted, eight-case live quality gate around the shipped single-frame repair flow, with an isolated benchmark project, blind human review, immutable evidence, and an honest three-state final result.
 
@@ -23,7 +24,9 @@
 
 ## Resource, Git, And Data Safety
 
-- Start implementation from the commit containing this plan in a clean worktree created with `superpowers:using-git-worktrees`; suggested branch: `codex/frame-repair-live-quality-gate-implementation`.
+- Start implementation from the commit containing this plan in a clean
+  worktree created with standard Git worktree commands under `AGENTS.md`;
+  suggested branch: `codex/frame-repair-live-quality-gate-implementation`.
 - Before implementation, reread `AGENTS.md`, `docs/guardrails/ui-implementation-guardrails.md`, `docs/guardrails/editor-workspace-guardrails.md`, `docs/roadmap/technology-reference-roadmap.md`, and the approved design.
 - Never scan `output/`, `generated/`, or workspace project directories to discover inputs. Tests create exact temporary fixtures and address only paths they created.
 - Never delete directories or batches of files. Setup failure intentionally leaves an unpublished orphan directory for manual inspection.

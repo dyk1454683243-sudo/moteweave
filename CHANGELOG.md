@@ -1,52 +1,22 @@
 # Changelog
 
-## [0.5.0-preview.3] - 2026-07-18
+## Unreleased
+
+- Restored the provider-free public snapshot export path (`release:check` /
+  `release:export`) on the current Studio-era baseline so a new MoteWeave
+  public snapshot can be cut from v0.5.0.
+
+## [0.5.0] - 2026-08-13
 
 ### Added
 
-- Added an explicit Motion Apply reprocess/re-export action that exposes real
-  Character, Godot, RPG Maker, and OCAD packages only after current, bound,
-  unblocked local evidence passes.
-- Added a guarded provider-free first-user acceptance command covering import,
-  Character processing, Motion Selection v2, Pixel Grid v2, Apply, and all four
-  package families.
-
-### Fixed
-
-- Character UI requests now use the implemented background modes, canonical
-  cleanup and stabilization fields, the supported motion-shift range, and the
-  fixed `96/64/48/32/16` package sizes.
-- Motion single-strip and set-apply contexts are mutually exclusive, and stale,
-  malformed, or cross-job Apply and package evidence fails closed.
-
-Motion package generation reprocesses the applied sheet and may re-encode
-pixels; this release does not claim exact repacking. The source-only update adds
-no Provider calls, semantic release gate, npm package, installer, bundled
-external tool, or hosted processing.
-
-## [0.5.0-preview.2] - 2026-07-17
-
-### Fixed
-
-- Quality Character candidate evidence now preserves missing and non-finite hard
-  metrics so release eligibility fails closed instead of treating absent values
-  as numeric zero.
-- Production-sheet release evidence now requires the canonical closure mode and
-  exactly one of each required background, alignment, motion, and prop-side
-  gate before an artifact can be published.
-
-This source-only update adds no Provider calls, semantic judgment, npm package,
-installer, bundled external tool, or hosted processing.
-
-## [0.5.0-preview.1] - 2026-07-17
-
-### Added
-
-- Added the MoteWeave public Preview brand decision, source-only release
-  metadata, deterministic snapshot export, provider-free release checks, and
-  Node 22/24 CI contract.
-- Added deterministic repository-owned fixed-region templates, neutral sample
-  fixtures, and website social artwork provenance for public redistribution.
+- Added the Figma-backed Studio rail as the sole maintained browser surface for
+  Character, Action, Sequence, Tiles, Scene, Project, QA, and Settings.
+- Added Character advanced local processing, strict reviewed generation,
+  direct compatibility generation, deterministic prompt helpers, and advanced
+  session-only Provider configuration with fail-closed release gates.
+- Added fixed server redirects for root and legacy paths, including seven
+  explicit tab mappings and a safe Character fallback for invalid inputs.
 - Added the Editor Workspace v0 surface with project persistence, scene
   authoring, animation timeline, asset library, interaction/playtest support,
   scene flow, and editor project pack export.
@@ -71,18 +41,37 @@ installer, bundled external tool, or hosted processing.
 - Added fixed-region source quality reports with per-region occupancy,
   visible-bounds, halo, edge-pressure, layout-alignment, and source-action
   motion checks.
+- Added local fixed-region template calibration preview and activation for
+  reviewed uploaded sheets.
 
 ### Changed
 
+- Retired the former root browser shell and its exclusive DOM controllers after
+  every maintained capability had an accepted Studio destination. Existing
+  Process Sheet, Character generation, Provider, Job, benchmark, Editor, and
+  engine-export protocols remain unchanged.
+- Kept Scene live-generation claims bounded to the recorded one-case release
+  smoke; upload/ingest remains the provider-free path.
 - Renamed the default fixed-region character source layout to
   `fixed_region_motion_v0`; `ocad_motion_v0` remains readable as a legacy alias
   for historical reports, fixtures, and old metadata.
-- Bumped the character prompt contract to `character_prompt_contract_v1_6` so
-  new provider prompts and metadata use the neutral fixed-region layout id.
+- Bumped the character prompt contract to `character_prompt_contract_v1_16`.
+  Fixed-region climb poses now require character-only motion against invisible
+  supports and explicitly exclude ladders, rails, rope, walls, platforms, and
+  surrounding scenery.
 - Changed normal character text-to-image generation to default to one provider
   call; multi-candidate sweeps remain opt-in for quality review and benchmarks.
 - Production-sheet candidate scoring now penalizes weak fixed-region source
   quality before choosing the selected provider image.
+- Generated fixed-region candidates now pass through deterministic background
+  cleanup and template-safe calibration before production-sheet processing,
+  with calibration evidence recorded in generation metadata.
+
+### Fixed
+
+- Hardened fixed-region calibration for nonuniform opaque backgrounds, edge
+  pressure, and explicit staging overrides so calibrated sources are not
+  transformed a second time downstream.
 
 ## 0.4.0 - 2026-06-11
 

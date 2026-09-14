@@ -1,11 +1,16 @@
 # Targeted Frame Repair v1 Closeout
 
 **Date:** 2026-07-11
-**Status:** Deterministic MVP implemented and verified; live first-call quality remains Experimental/opt-in
+**Status:** Retired on 2026-08-08; historical closeout only
 **Branch:** codex/targeted-frame-repair-v1
 **Implementation base:** 427d056 (the implementation plan on main; the approved design was 1bb606e)
 **Implementation range:** fa5e987 through 4b85c97
-**Worktree used for verification:** <workspace>/.worktrees/targeted-frame-repair-v1
+**Worktree used for verification:** $HOME/Documents/Game tools/.worktrees/targeted-frame-repair-v1
+
+> The single-frame runtime described below is no longer shipped. This runbook
+> remains only as historical evidence and must not be used as an operational
+> entry or fallback. Current managed action correction is defined by
+> `docs/protocols/fixed-region-action-repair-atlas-v1.md`.
 
 This runbook is the operational and release boundary for the first targeted
 single-frame repair workflow. It records what was actually implemented and
@@ -42,9 +47,9 @@ required before any broad quality or production-readiness claim.
 ## 2. Design Sources And Deviation Log
 
 The capability and UI source of truth was the accepted Editor Workspace and
-Character Finishing Workbench on main. The three approved local visual
-explorations under .superpowers/brainstorm/4735-1783751584 were used only to
-confirm layout direction and were not staged or shipped.
+Character Finishing Workbench on main. Three historical local visual
+explorations were used only to confirm layout direction; they were not staged
+or shipped and are no longer retained or required.
 
 | Approved decision | Implemented result | Deviation |
 | --- | --- | --- |

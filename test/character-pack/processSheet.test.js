@@ -6,7 +6,9 @@ import JSZip from 'jszip'
 import sharp from 'sharp'
 
 import { OCAD_REGIONS } from '../../src/character-pack/exporters/ocadExport.js'
+import { loadRgba } from '../../src/character-pack/imageCodec.js'
 import { processSheetBuffer } from '../../src/character-pack/processSheet.js'
+import { evaluateSourceSubjectCount } from '../../src/character-pack/subjectCountGate.js'
 import {
   FIXED_REGION_MOTION_LAYOUT_ID,
   LEGACY_OCAD_MOTION_LAYOUT_ID,
@@ -241,7 +243,7 @@ async function createOcadMotionSheetWithSourceQualityIssues() {
 test('processSheetBuffer turns fixture into a valid character pack', async () => {
   const source = await readFile('test/fixtures/character-pack/topdown_rpg_v0_sample_hero.png')
   const result = await processSheetBuffer(source, {
-    name: 'Sample Hero',
+    name: 'sample_hero',
     description: 'silver hair sword fighter',
     sourceFileName: 'topdown_rpg_v0_sample_hero.png',
     backgroundMode: 'flood',
@@ -321,7 +323,7 @@ test('processSheetBuffer turns fixture into a valid character pack', async () =>
 test('processSheetBuffer records tuning controls for background tolerance and anchor offset', async () => {
   const source = await readFile('test/fixtures/character-pack/topdown_rpg_v0_sample_hero.png')
   const result = await processSheetBuffer(source, {
-    name: 'Tuned Sample Hero',
+    name: 'Tuned sample_hero',
     sourceFileName: 'topdown_rpg_v0_sample_hero.png',
     backgroundMode: 'flood',
     backgroundTolerance: 36,
@@ -363,7 +365,7 @@ test('processSheetBuffer records pixel style report only when explicitly request
 test('processSheetBuffer applies pixel finishing before row previews and reports deterministic metrics', async () => {
   const source = await readFile('test/fixtures/character-pack/topdown_rpg_v0_sample_hero.png')
   const result = await processSheetBuffer(source, {
-    name: 'Pixel Finished Sample Hero',
+    name: 'Pixel Finished sample_hero',
     sourceFileName: 'topdown_rpg_v0_sample_hero.png',
     backgroundMode: 'flood',
     pixelFinishing: true,
@@ -587,6 +589,10 @@ test('processSheetBuffer downscales high-resolution fixed-region sheets before s
     output_size: { w: 252, h: 252 },
     source_layout: FIXED_REGION_MOTION_LAYOUT_ID,
   })
+  assert.equal(result.debugReport.background_processed_before_geometry, false)
+  assert.equal(result.debugReport.canonical_background_mode, 'passthrough')
+  assert.equal(result.debugReport.background_recipe_id, 'passthrough_v1')
+  assert.equal(result.debugReport.source_decode.format, 'png')
   assert.deepEqual(result.debugReport.frames[0].source_frame.rect, { x: 189, y: 126, w: 21, h: 42 })
   assert.equal(result.debugReport.grid.source_cell_size.w, 21)
   assert.equal(result.debugReport.grid.source_cell_size.h, 42)
@@ -620,6 +626,7 @@ test('processSheetBuffer stages generated fixed-region sheets through 256 matte 
   assert.ok(result.debugReport.source_staging.matte.removed_pixels > 10000)
   assert.equal(result.debugReport.source_preprocess.applied, false)
   assert.equal(result.debugReport.background_mode, 'alpha_cleanup')
+  assert.equal(result.debugReport.background_processed_before_geometry, false)
   const sourceMeta = await sharp(result.files.sourcePng).metadata()
   assert.equal(sourceMeta.width, 252)
   assert.equal(sourceMeta.height, 252)
@@ -677,7 +684,7 @@ test('processSheetBuffer wires dual matte and includes debug artifacts in zip', 
     })
 
   const result = await processSheetBuffer(source, {
-    name: 'Sample Hero',
+    name: 'sample_hero',
     description: 'silver hair sword fighter',
     sourceFileName: 'topdown_rpg_v0_sample_hero.png',
     backgroundMode: 'dual_matte',
@@ -696,7 +703,7 @@ test('processSheetBuffer wires dual matte and includes debug artifacts in zip', 
 test('processSheetBuffer includes Godot NPC plugin import pack in the zip', async () => {
   const source = await readFile('test/fixtures/character-pack/topdown_rpg_v0_sample_hero.png')
   const result = await processSheetBuffer(source, {
-    name: 'Sample Hero',
+    name: 'sample_hero',
     description: 'silver hair sword fighter',
     backgroundMode: 'flood',
     createdAt: '2026-05-24T01:02:03+08:00',
@@ -717,7 +724,7 @@ test('processSheetBuffer includes Godot NPC plugin import pack in the zip', asyn
 test('processSheetBuffer includes RPGMaker import pack in the zip', async () => {
   const source = await readFile('test/fixtures/character-pack/topdown_rpg_v0_sample_hero.png')
   const result = await processSheetBuffer(source, {
-    name: 'Sample Hero',
+    name: 'sample_hero',
     description: 'silver hair sword fighter',
     backgroundMode: 'flood',
     createdAt: '2026-05-24T01:02:03+08:00',
@@ -738,7 +745,7 @@ test('processSheetBuffer includes RPGMaker import pack in the zip', async () => 
 test('processSheetBuffer includes OCAD import pack in the zip', async () => {
   const source = await readFile('test/fixtures/character-pack/topdown_rpg_v0_sample_hero.png')
   const result = await processSheetBuffer(source, {
-    name: 'Sample Hero',
+    name: 'sample_hero',
     description: 'silver hair sword fighter',
     backgroundMode: 'flood',
     createdAt: '2026-05-24T01:02:03+08:00',
@@ -860,7 +867,7 @@ test('processSheetBuffer applies manual frame nudges and locks selected motion g
 test('processSheetBuffer records generation prompt artifacts when provided', async () => {
   const source = await readFile('test/fixtures/character-pack/topdown_rpg_v0_sample_hero.png')
   const result = await processSheetBuffer(source, {
-    name: 'Sample Hero',
+    name: 'sample_hero',
     description: 'silver hair sword fighter',
     backgroundMode: 'flood',
     promptText: 'Create a strict 8x8 sprite sheet.',
@@ -877,4 +884,46 @@ test('processSheetBuffer records generation prompt artifacts when provided', asy
   const zip = await JSZip.loadAsync(result.files.zipBuffer)
   assert.equal(await zip.file('prompt.txt').async('string'), 'Create a strict 8x8 sprite sheet.')
   assert.equal(JSON.parse(await zip.file('generation.json').async('string')).model, 'google/gemini-2.5-flash-image')
+})
+
+test('processSheetBuffer emits provider-free source and normalized subject-count evidence for full-sheet profiles', async () => {
+  const source = await readFile('test/fixtures/character-pack/topdown_rpg_v0_sample_hero.png')
+  const preCalibrationSubjectCountReport = evaluateSourceSubjectCount(
+    await loadRgba(source),
+    'topdown_rpg_v0',
+    { stage: 'pre_calibration_source' },
+  ).report
+  const result = await processSheetBuffer(source, {
+    name: 'Subject Count Evidence',
+    backgroundMode: 'flood',
+    subjectCountGate: true,
+    subjectCountPreCalibrationReport: preCalibrationSubjectCountReport,
+    generationProfile: { id: 'full_sheet_topdown_v1' },
+  })
+
+  assert.equal(result.debugReport.subject_count.required, true)
+  assert.equal(result.debugReport.generation_profile.id, 'full_sheet_topdown_v1')
+  assert.ok(['pass', 'needs_review', 'blocked', 'empty'].includes(result.debugReport.subject_count.status))
+  assert.ok(Buffer.isBuffer(result.files.sourceSubjectCountReportJson))
+  assert.ok(Buffer.isBuffer(result.files.sourceSubjectCountOverlayPng))
+  assert.ok(Buffer.isBuffer(result.files.normalizedSubjectCountReportJson))
+  assert.ok(Buffer.isBuffer(result.files.normalizedSubjectCountOverlayPng))
+
+  const sourceReport = JSON.parse(result.files.sourceSubjectCountReportJson.toString('utf8'))
+  const normalizedReport = JSON.parse(result.files.normalizedSubjectCountReportJson.toString('utf8'))
+  assert.equal(sourceReport.mode, 'subject_count_gate_v1')
+  assert.equal(sourceReport.output_mutation, 'none')
+  assert.deepEqual(sourceReport.stages.map((stage) => stage.stage), [
+    'pre_calibration_source',
+    'calibrated_source',
+  ])
+  assert.equal(normalizedReport.mode, 'subject_count_gate_v1')
+  assert.equal(normalizedReport.output_mutation, 'none')
+  assert.equal(normalizedReport.stage, 'normalized_frames')
+
+  const zip = await JSZip.loadAsync(result.files.zipBuffer)
+  assert.ok(zip.file('source_subject_count_report.json'))
+  assert.ok(zip.file('source_subject_count_overlay.png'))
+  assert.ok(zip.file('normalized_subject_count_report.json'))
+  assert.ok(zip.file('normalized_subject_count_overlay.png'))
 })

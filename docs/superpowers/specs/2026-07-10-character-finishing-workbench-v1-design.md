@@ -65,8 +65,8 @@ This layout is approved as an MVP baseline, not as final visual polish.
 Resizable splitters, a user-adjustable filmstrip height, and large-sequence
 virtualization remain later refinements after real-artifact browser review.
 
-The visual-companion files under `.superpowers/brainstorm/` are local design
-evidence only and must not be staged or shipped.
+Historical local visual companions informed this design but were never staged
+or shipped and are no longer retained or required.
 
 ### External reference boundary
 
@@ -928,7 +928,6 @@ for that separate protected-contract scope.
 
 ## Repository Hygiene Note
 
-At design time, the working tree contained unrelated untracked `* 2.js` /
-`* 2.md` duplicate files and local `.superpowers/` visual-companion evidence.
-They are not part of this design and must not be staged, edited, or deleted by
-the implementation task.
+At design time, the working tree contained unrelated untracked duplicate files
+and local visual-companion evidence. They were never part of this design or an
+execution input.

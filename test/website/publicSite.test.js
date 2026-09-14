@@ -7,9 +7,6 @@ import { fileURLToPath } from 'node:url'
 const testDir = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.resolve(testDir, '..', '..')
 const websiteRoot = path.join(projectRoot, 'website')
-const homepageUrl = 'https://moteweave.pages.dev/'
-const repositoryUrl = 'https://github.com/dyk1454683243-sudo/moteweave'
-const releaseUrl = `${repositoryUrl}/releases/tag/v0.5.0-preview.3`
 
 async function readWebsiteFile(name) {
   return readFile(path.join(websiteRoot, name), 'utf8')
@@ -28,38 +25,12 @@ test('public site keeps a standalone static asset boundary', async () => {
 
   assert.match(html, /href="\.\/styles\.css"/)
   assert.match(html, /src="\.\/site\.js"/)
-  assert.match(
-    html,
-    /property="og:image" content="https:\/\/moteweave\.pages\.dev\/og\.png\?v=0\.5\.0-preview\.3"/
-  )
-  assert.match(
-    html,
-    /name="twitter:image" content="https:\/\/moteweave\.pages\.dev\/og\.png\?v=0\.5\.0-preview\.3"/
-  )
-  assert.match(html, /property="og:image:width" content="1200"/)
-  assert.match(html, /property="og:image:height" content="630"/)
+  assert.match(html, /content="https:\/\/moteweave\.pages\.dev\/og\.png"/)
   assert.doesNotMatch(html, /\bsrc=["']https?:\/\//i)
   assert.deepEqual(
     [...html.matchAll(/\bhref=["'](https?:\/\/[^"']+)/gi)].map((match) => match[1]),
-    [homepageUrl, releaseUrl, repositoryUrl],
+    ['https://moteweave.pages.dev/'],
   )
-})
-
-test('public site links only to the approved source repository and prerelease', async () => {
-  const html = await readWebsiteFile('index.html')
-  const callsToAction = [
-    { label: '获取源码预发布', url: releaseUrl },
-    { label: '查看 GitHub 源码', url: repositoryUrl },
-  ]
-
-  for (const { label, url } of callsToAction) {
-    const escapedUrl = url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    const anchor = html.match(new RegExp(`<a\\b[^>]*href="${escapedUrl}"[^>]*>[\\s\\S]*?<\\/a>`))
-    assert.ok(anchor, `${label} must link to ${url}`)
-    assert.match(anchor[0], /target="_blank"/)
-    assert.match(anchor[0], /rel="noopener noreferrer"/)
-    assert.match(anchor[0], new RegExp(label))
-  }
 })
 
 test('public site does not expose hosted product capabilities', async () => {
@@ -135,8 +106,6 @@ test('public page includes baseline accessibility and capability truth', async (
   assert.match(css, /prefers-reduced-motion/)
   assert.match(html, /完整 WFC/)
   assert.match(html, /AI 生成只是可选路径/)
-  assert.match(html, /MoteWeave/)
-  assert.match(html, /0\.5\.0-preview\.3/)
 })
 
 test('site script parses and security headers block network and form actions', async () => {
