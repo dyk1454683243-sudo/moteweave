@@ -12,10 +12,12 @@ routes with the local MoteWeave application and must be deployed with
 - No uploads, API calls, authentication, billing, analytics, or cloud processing
 
 The complete MoteWeave application continues to run locally through the
-repository root:
+repository root. Node.js 22 or 24 is required; Node.js 24 LTS is recommended.
 
 ```bash
-npm install
+git clone https://github.com/dyk1454683243-sudo/moteweave.git
+cd moteweave
+npm ci
 npm start
 ```
 

@@ -462,9 +462,20 @@ updateHeader()
 
 const copyButton = document.querySelector('#copy-command')
 const copyStatus = document.querySelector('#copy-status')
+const localCommands = document.querySelector('#local-commands')
+
+function localInstallCommands() {
+  const displayed = localCommands?.innerText ?? ''
+  return displayed
+    .split('\n')
+    .map((line) => line.replace(/^\$\s*/, '').trim())
+    .filter(Boolean)
+    .join('\n')
+}
+
 copyButton?.addEventListener('click', async () => {
   try {
-    await navigator.clipboard.writeText('npm install\nnpm start')
+    await navigator.clipboard.writeText(localInstallCommands())
     if (copyStatus) copyStatus.textContent = '已复制本地启动命令'
     copyButton.textContent = '已复制'
   } catch {
