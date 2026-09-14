@@ -3793,8 +3793,8 @@
     },
     {
       "path": "test/website/publicSite.test.js",
-      "sha256": "ec4da9a64fd50875f211c1f524fcf75f88568d3f0d8bd0416f6475d3c364a354",
-      "size": 4056,
+      "sha256": "21e439cdcd6deb8c4650ef41b532e3834a6e1ff322ab79c8b32a26162b691b0e",
+      "size": 4853,
       "mode": "644"
     },
     {
@@ -3805,8 +3805,8 @@
     },
     {
       "path": "website/README.md",
-      "sha256": "283faf2af9c0f51683f057ff88c8bf3c6ccf25c696a5d34aff70a2687e99917e",
-      "size": 1083,
+      "sha256": "8db1749958b40f97940514831cbcb52a1a3dbac98add41ff10413b8238a00da0",
+      "size": 1214,
       "mode": "644"
     },
     {
@@ -3817,8 +3817,8 @@
     },
     {
       "path": "website/index.html",
-      "sha256": "58bb94dc041ba2c06464aabd6669d362a42d15a5b457dfcb6fd1de124735cd8e",
-      "size": 23571,
+      "sha256": "b70f13b42611ca2dcb7da60c881d8cfe5470df9578fd056c07b87db87b78882a",
+      "size": 23680,
       "mode": "644"
     },
     {
@@ -3829,8 +3829,8 @@
     },
     {
       "path": "website/site.js",
-      "sha256": "05db353beda0a8243c527071b25c69b91f509a7b7521fe25ed7529701e3ea5df",
-      "size": 17837,
+      "sha256": "62deb7bd0a96fc4cbf1d6460503c9fe18f7b0208d63f18aa6339a5f595166154",
+      "size": 18115,
       "mode": "644"
     },
     {
