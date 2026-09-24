@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Read AGENTS.md first
+    url: https://github.com/dyk1454683243-sudo/moteweave/blob/main/AGENTS.md
+    about: Required workflow before changing the repository.
+  - name: Public site
+    url: https://moteweave.pages.dev/
+    about: Static introduction and programmatic demo only. No uploads, accounts, or provider calls.

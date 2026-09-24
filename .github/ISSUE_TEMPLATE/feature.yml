@@ -1,0 +1,46 @@
+name: Feature
+description: Propose a small product or documentation change
+title: "feat: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not paste API keys, tokens, or `.env` contents. Do not request hosted uploads, accounts, or billing here.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+    validations:
+      required: true
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Proposed surface
+      options:
+        - Character
+        - Motion Source
+        - Scene
+        - Project
+        - Public site
+        - Docs only
+        - Other
+    validations:
+      required: true
+  - type: dropdown
+    id: provider_free
+    attributes:
+      label: Must this stay provider-free?
+      options:
+        - Yes, provider-free only
+        - Optional provider path is acceptable
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+    validations:
+      required: false
