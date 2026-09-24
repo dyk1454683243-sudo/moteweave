@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
   "release_version": "0.5.0",
-  "source_commit": "5691b7454180c7da3a7891500ea31f30f3206266",
+  "source_commit": "c1f140d19c4bc3a31f3f7b2f9306a329145f9c44",
   "release_config_sha256": "175ed93e20fd7944720d465a4a3c6fd793b99a936612a1a2de457733d4211235",
-  "manifest_sha256": "507125f4af19977962e75c9bab52d0f469c16b7547ccf011040e4739c995abb2",
+  "manifest_sha256": "144c5a49b585953ccff302c5f254ec9632c2f102f2970d690a93d89efeee9e88",
   "files": [
     {
       "path": ".agents/skills/generate-golden-image/SKILL.md",
@@ -21,6 +21,30 @@
       "path": ".env.example",
       "sha256": "cc61f374b165314d17778e884d9388ee66fb1110b983b995ff6a91832ce07861",
       "size": 1335,
+      "mode": "644"
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/bug.yml",
+      "sha256": "6ca420add59d7abdff1b588e24d32e62140527990151042c6a4581d9456998ce",
+      "size": 1271,
+      "mode": "644"
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/config.yml",
+      "sha256": "e5b5ca69de9db35ee6d4b580be9dd7bd90e7266f485003c1df0ce544a9440077",
+      "size": 372,
+      "mode": "644"
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/docs.yml",
+      "sha256": "a0a88dc3e0628919f7fdd49eba580de226adf683545dec15d38803653c7ce598",
+      "size": 699,
+      "mode": "644"
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/feature.yml",
+      "sha256": "9e10bf4d958ecc59735b5e339145be7ec5134499b4fba5df52c6446a1c39cc9c",
+      "size": 1041,
       "mode": "644"
     },
     {
@@ -49,8 +73,14 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "1e17b8529dc6697786baeb841bc46739170cb04945144762e9eaa46479867e48",
-      "size": 12259,
+      "sha256": "a710a47576ad641671716d4947f2b6025336ec58dc40361f25f57219e3fa631c",
+      "size": 12491,
+      "mode": "644"
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "sha256": "52b27173908eeb15f780d3fa1be1070c40d8cb87ae66f10bb4d29af8eed17ff9",
+      "size": 1412,
       "mode": "644"
     },
     {
@@ -61,8 +91,8 @@
     },
     {
       "path": "README.md",
-      "sha256": "c3e7bf133ddb6c2279c73bd35fa96ebbe7fbff4d47536d1999a32132fe34c1a3",
-      "size": 12010,
+      "sha256": "38ba54ae69caa3a186e177ff02c41bf079b7ceeef98c20419d2baa54fe71d861",
+      "size": 12677,
       "mode": "644"
     },
     {
@@ -79,8 +109,8 @@
     },
     {
       "path": "configs/public-snapshot-manifest.json",
-      "sha256": "507125f4af19977962e75c9bab52d0f469c16b7547ccf011040e4739c995abb2",
-      "size": 724,
+      "sha256": "144c5a49b585953ccff302c5f254ec9632c2f102f2970d690a93d89efeee9e88",
+      "size": 747,
       "mode": "644"
     },
     {

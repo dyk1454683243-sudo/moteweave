@@ -1,0 +1,30 @@
+name: Docs
+description: Report unclear or incorrect documentation
+title: "docs: "
+labels:
+  - documentation
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not paste API keys, tokens, or `.env` contents.
+  - type: input
+    id: path
+    attributes:
+      label: Page or path
+      description: README section, site URL, protocol, or file path.
+      placeholder: README.md or docs/protocols/...
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What is unclear or wrong
+    validations:
+      required: true
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested fix
+    validations:
+      required: false

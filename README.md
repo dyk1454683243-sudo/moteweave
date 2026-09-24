@@ -1,19 +1,28 @@
 # MoteWeave
 
-Local-first pixel-art character and sprite workflow. This public source
-preview is published from the private engineering line to
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+[![version 0.5.0](https://img.shields.io/badge/version-0.5.0-blue)](CHANGELOG.md)
+[![site](https://img.shields.io/badge/site-moteweave.pages.dev-111111)](https://moteweave.pages.dev/)
+
+Local-first pixel character and sprite workflow. The public site at
+[https://moteweave.pages.dev/](https://moteweave.pages.dev/) is a static
+introduction plus a programmatic demo only. Full processing runs locally.
+The website does not accept uploads, accounts, or provider calls.
+
+本地优先的像素角色与精灵工作流：网站只做静态介绍和程序演示，完整处理在本地运行。
+
+This public source preview is published from the private engineering line to
 https://github.com/dyk1454683243-sudo/moteweave.
 
 This project turns AI-generated or uploaded top-down sprite sheets into a standard character pack for browser preview and game-engine import.
 
 Current package version: `0.5.0`. Changes after this version are recorded under
 `Unreleased` in `CHANGELOG.md`. The release scope, evidence, and publication
-boundary are recorded in `docs/releases/v0.5.0.md`. The public site is
-https://moteweave.pages.dev/.
+boundary are recorded in `docs/releases/v0.5.0.md`.
 
 ## Contributing
 
-Contributors and AI agents must read `AGENTS.md` before making changes. Attribution and naming guardrails are tracked in `ATTRIBUTIONS.md`.
+Start with [`CONTRIBUTING.md`](CONTRIBUTING.md). Contributors and AI agents must read `AGENTS.md` before making changes. Attribution and naming guardrails are tracked in `ATTRIBUTIONS.md`.
 
 Current focus:
 
@@ -91,8 +100,10 @@ general production-readiness claim.
 
 ## Quick Start
 
+Node.js 22 or 24 is required. Node.js 24 LTS is recommended.
+
 ```bash
-npm install
+npm ci
 npm test
 npm start
 ```

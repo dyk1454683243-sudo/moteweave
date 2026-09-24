@@ -1,0 +1,48 @@
+name: Bug
+description: Report a defect in the local app, CLI, or public site
+title: "bug: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not paste API keys, tokens, or `.env` contents.
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened
+      description: Expected behavior, then what you actually saw.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Include the command (`npm start`, a CLI invocation, or the site page) and the inputs you used.
+      placeholder: |
+        1. npm ci
+        2. npm start
+        3. ...
+    validations:
+      required: true
+  - type: input
+    id: node
+    attributes:
+      label: Node.js version
+      description: Supported range is Node.js 22 or 24.
+      placeholder: v22.x or v24.x
+    validations:
+      required: true
+  - type: dropdown
+    id: provider
+    attributes:
+      label: Did this involve a provider call?
+      description: Say whether a provider was used. Do not include keys.
+      options:
+        - Provider-free (no API key used)
+        - Optional provider was configured
+        - Not sure
+        - Public site only
+    validations:
+      required: true

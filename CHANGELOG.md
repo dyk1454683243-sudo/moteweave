@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Documented the public contributor surface: repository homepage and topics,
+  a visitor-facing README intro with Quick Start aligned to `npm ci` / Node.js
+  22 or 24, `CONTRIBUTING.md`, and GitHub issue templates. No version bump.
 - Restored the provider-free public snapshot export path (`release:check` /
   `release:export`) on the current Studio-era baseline so a new MoteWeave
   public snapshot can be cut from v0.5.0.
