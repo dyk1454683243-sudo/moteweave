@@ -11,12 +11,12 @@ routes with the local MoteWeave application and must be deployed with
 - No uploads, API calls, authentication, billing, analytics, or cloud processing
 
 Images under `website/assets/` are local captures of the v0.6.0 Studio and
-VNext workspace, plus a byte copy of the repository character-pack fixture
-`test/fixtures/character-pack/topdown_rpg_v0_sample_hero.png`. The captures
-show a loaded character sheet, extracted walk frames, a generated map preview,
-and a multi-frame canvas. `website/og.png`
-is the deterministic social image from `scripts/create-website-og.mjs`. The
-page does not draw a sample animation.
+VNext workspace, plus original pixel art from
+`scripts/create-website-sample-art.mjs`: a character sheet, a walk preview,
+and a small tile set. The captures show that sheet in Character Studio,
+extracted walk frames, a rules map preview, and the walk on the VNext canvas.
+`website/og.png` is the deterministic social image from
+`scripts/create-website-og.mjs`. The page does not draw a sample animation.
 
 The complete MoteWeave application continues to run locally through the
 repository root. Node.js 22 or 24 is required; Node.js 24 LTS is recommended.

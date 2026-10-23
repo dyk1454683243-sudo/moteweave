@@ -3,11 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>MoteWeave v0.6.0 — local pixel character and sprite workflow</title>
-  <meta name="description" content="MoteWeave v0.6.0 is a local workflow for pixel character packs, canvas editing, and game-tool exports.">
+  <meta name="theme-color" content="#000000">
+  <title>MoteWeave v0.6.0 — local pixel character workflow</title>
+  <meta name="description" content="MoteWeave v0.6.0 prepares pixel character packs and sprite canvases on your machine.">
   <link rel="canonical" href="https://moteweave.pages.dev/">
   <meta property="og:title" content="MoteWeave v0.6.0">
-  <meta property="og:description" content="Local pixel character and sprite workflow. Studio is the default app. VNext is the opt-in workspace.">
+  <meta property="og:description" content="Local pixel character workflow. Studio is the default app. VNext is the opt-in workspace.">
   <meta property="og:image" content="https://moteweave.pages.dev/og.png">
   <meta property="og:url" content="https://moteweave.pages.dev/">
   <meta name="twitter:card" content="summary_large_image">
@@ -16,185 +17,223 @@
 </head>
 <body>
   <a class="skip-link" href="#main-content">Skip to content</a>
-  <header class="site-header">
-    <div class="wrap bar">
+  <header class="site-header" data-site-header>
+    <div class="shell header-inner">
       <a class="brand" href="#main-content">
-        <span class="mark" aria-hidden="true">MW</span>
-        <span>MoteWeave</span>
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+        <span class="brand-name">MoteWeave</span>
         <span class="chip">v0.6.0</span>
       </a>
-      <nav aria-label="Primary">
-        <ul class="nav-list">
-          <li><a href="#workspace">Workspace</a></li>
-          <li><a href="#pixel-tools">Pixel tools</a></li>
-          <li><a href="#studio">Studio</a></li>
-          <li><a href="#exports">Exports</a></li>
-          <li><a href="#start">Start</a></li>
-          <li><a href="#roadmap">Roadmap</a></li>
-        </ul>
+      <button class="menu-toggle" type="button" id="menu-toggle" aria-expanded="false" aria-controls="site-navigation">
+        <span>Menu</span>
+        <i aria-hidden="true"></i>
+      </button>
+      <nav class="site-nav" id="site-navigation" aria-label="Primary">
+        <a href="#workspace">Workspace</a>
+        <a href="#studio">Studio</a>
+        <a href="#exports">Exports</a>
+        <a href="#start">Start</a>
+        <a href="#roadmap">Roadmap</a>
       </nav>
     </div>
   </header>
   <main id="main-content">
     <section class="hero" aria-labelledby="hero-title">
-      <div class="wrap hero-grid">
-        <div>
-          <p class="kicker">Local pixel workflow · v0.6.0</p>
-          <h1 id="hero-title">Pixel character packs, on your machine.</h1>
-          <p class="lede">Prepare top-down pixel characters, edit sprite canvases, and write files other game tools can read. Studio is the default app. VNext is the opt-in workspace for v1 projects.</p>
+      <div class="shell hero-grid">
+        <div class="hero-copy">
+          <p class="eyebrow"><span class="status-dot" aria-hidden="true"></span> Local pixel workflow · v0.6.0</p>
+          <h1 id="hero-title">Pixel characters, <span>on your machine.</span></h1>
+          <p class="lede">Studio builds the character pack. VNext edits the canvas.</p>
           <p class="actions">
             <a class="button" href="#start">Run it locally</a>
-            <a class="button-link" href="https://github.com/dyk1454683243-sudo/moteweave">Source repository</a>
-            <a class="button-link" href="https://github.com/dyk1454683243-sudo/moteweave/releases/tag/v0.6.0">v0.6.0 release</a>
+            <a class="button button-ghost" href="https://github.com/dyk1454683243-sudo/moteweave">Source repository</a>
+            <a class="button button-ghost" href="https://github.com/dyk1454683243-sudo/moteweave/releases/tag/v0.6.0">v0.6.0 release</a>
           </p>
-          <p class="note">How it runs. This is a source-only preview. The website does not provide user file upload or cloud processing. It does not accept files and does not call models.</p>
+          <p class="note">Source-only. The website does not provide user file upload or cloud processing. It does not accept files and does not call models.</p>
         </div>
-        <figure class="sprite-card">
-          <div class="checker">
-            <img class="sprite" src="./assets/sample-hero.png" width="1536" height="1536" alt="Top-down pixel character sprite sheet from the repository sample fixture.">
+        <figure class="workbench">
+          <div class="window-bar">
+            <span class="window-title"><i class="led" aria-hidden="true"></i> Local sample</span>
+            <span class="window-state">Ready</span>
           </div>
-          <figcaption>Top-down character sample from the repository fixture.</figcaption>
+          <div class="workbench-body">
+            <div class="stage">
+              <img class="pixel" src="./assets/hero-walk.png" width="532" height="532" alt="Original four-frame top-down walk of a pixel cartographer with a scarf and cowlick.">
+            </div>
+            <ol class="pipeline">
+              <li class="is-done"><span>01</span><div><strong>Studio</strong><small>Character pack</small></div></li>
+              <li class="is-now"><span>02</span><div><strong>VNext</strong><small>Canvas edit</small></div></li>
+              <li><span>03</span><div><strong>Extract</strong><small>Local frames</small></div></li>
+              <li><span>04</span><div><strong>Export</strong><small>Zip packs</small></div></li>
+            </ol>
+          </div>
+          <div class="tile-row">
+            <img class="pixel" src="./assets/sample-tiles.png" width="656" height="80" alt="Original tiles: grass, a flower, a dirt path, water, a shore, a rock, a tree, and a lantern.">
+          </div>
         </figure>
+      </div>
+      <div class="shell proof" aria-label="How the app is split">
+        <span>Studio default</span>
+        <i aria-hidden="true"></i>
+        <span>VNext opt-in</span>
+        <i aria-hidden="true"></i>
+        <span>Runs locally</span>
       </div>
     </section>
 
     <section class="section" id="workspace" aria-labelledby="workspace-title">
-      <div class="wrap">
-        <p class="section-index">01 — Workspace</p>
-        <h2 id="workspace-title">VNext workspace and text assistants</h2>
-        <p>VNext is the opt-in workspace for v1 projects. Studio stays the default entry, and the local server opens Character Studio first.</p>
-        <p>Built-in text assistants — Codex, Grok, and Antigravity — discuss the open project or apply one creative action, with undo. Native installs and account login stay on your machine. They are not bundled here.</p>
-        <figure class="window">
-          <p class="window-bar">Local capture · VNext workspace</p>
-          <img src="./assets/vnext-editor.png" width="1280" height="800" alt="VNext workspace with a four-frame walk cycle on the canvas, onion skin on, the pencil selected, and a Hero palette.">
-          <figcaption>Four-frame walk on the canvas, with onion skin and the Hero palette.</figcaption>
-        </figure>
-      </div>
-    </section>
-
-    <section class="section" id="pixel-tools" aria-labelledby="pixel-title">
-      <div class="wrap">
-        <div>
-          <p class="section-index">02 — Canvas</p>
-          <h2 id="pixel-title">Native pixel tools</h2>
-          <p>Draw on the canvas without a provider. v0.6.0 includes brushes, fill, eraser, color controls, onion skin, a project palette, timeline structure, and document export.</p>
-          <h3>Linked cels</h3>
-          <p>A change to a shared cel updates every frame that uses it. A provider-free pixel-tools CLI draws on a local candidate. You confirm the save.</p>
-          <h3>Selection, text, display, PNG</h3>
-          <p>Select pixels, edit canvas text, and set display options in the workspace. Download the displayed frame as a PNG at its original pixel size.</p>
+      <div class="shell">
+        <div class="section-heading">
+          <p class="section-index">01 / Workspace</p>
+          <h2 id="workspace-title">VNext canvas</h2>
         </div>
-        <div>
-          <h3>History storage</h3>
-          <p>The open project keeps a small current state. Full edit history stays on disk, so longer sessions still save. Undo and redo stay the same. There is no full-history download and no new history UI.</p>
-          <h3>Astra animation</h3>
-          <p>With an explicit skill, Astra draws distinct frames and timings on the selected canvas and applies them as one undoable change.</p>
+        <div class="shot-row">
+          <figure class="window">
+            <div class="window-bar">
+              <span class="window-title"><i class="led" aria-hidden="true"></i> VNext</span>
+              <span class="window-state">Local capture</span>
+            </div>
+            <img src="./assets/vnext-editor.png" width="1280" height="800" alt="VNext workspace showing the new walk cycle, onion skin, the pencil, and the Hero palette.">
+          </figure>
+          <ul class="rows">
+            <li><strong>Assistants</strong> Codex, Grok, and Antigravity. One undo.</li>
+            <li><strong>Pixel tools</strong> Brush, fill, onion skin, palette, timeline.</li>
+            <li><strong>Linked cels</strong> One shared cel updates every frame that uses it.</li>
+            <li><strong>History</strong> Full history stays on disk.</li>
+            <li><strong>Astra</strong> An explicit skill makes one undoable change.</li>
+          </ul>
         </div>
       </div>
     </section>
 
-    <section class="section" id="studio" aria-labelledby="studio-title">
-      <div class="wrap">
-        <p class="section-index">03 — Studio</p>
-        <h2 id="studio-title">Studio stays the default</h2>
-        <p>The rail is Character, Extract, Sequence, Map, Project, Self-check, and Settings. Extract opens Frame Extraction. Map opens Map Studio. The Scene item is hidden, and <code>#scene</code> opens Map Studio.</p>
-        <p>v0.6.0 retired Studio character compatibility generation. Reviewed generation and advanced local processing stay. Each module has one primary action.</p>
-        <ul class="cards thirds">
-          <li><strong>Character</strong> Import a local sprite sheet and run the character pack workflow.</li>
-          <li><strong>Extract</strong> Frame Extraction reads local media and previews frames.</li>
-          <li><strong>Sequence</strong> Sequence Studio imports local frames and sorts them by filename.</li>
-          <li><strong>Map</strong> Map Studio turns terrain material into an editable map. Tile structure comes from local rules.</li>
-          <li><strong>Project</strong> Project Pack combines existing character and scene artifact directories into <code>project_pack.zip</code>.</li>
-          <li><strong>Self-check and Settings</strong> Self-check is the QA module. Settings holds local options, including provider routing when you choose one.</li>
-        </ul>
+    <section class="section band" id="studio" aria-labelledby="studio-title">
+      <div class="shell">
+        <div class="section-heading">
+          <p class="section-index">02 / Studio</p>
+          <h2 id="studio-title">Studio stays the default</h2>
+        </div>
+        <div class="shot-row">
+          <figure class="window">
+            <div class="window-bar">
+              <span class="window-title"><i class="led" aria-hidden="true"></i> Character</span>
+              <span class="window-state">Local capture</span>
+            </div>
+            <img src="./assets/studio-character.png" width="1280" height="800" alt="Character Studio with the new sprite sheet processed, quality passed, and clips ready.">
+          </figure>
+          <ul class="rows">
+            <li><strong>Character</strong> Import a local sheet and build the pack.</li>
+            <li><strong>Extract</strong> Read local media and preview frames.</li>
+            <li><strong>Sequence</strong> Sort local frames by filename.</li>
+          </ul>
+        </div>
+        <div class="shot-row reverse">
+          <figure class="window">
+            <div class="window-bar">
+              <span class="window-title"><i class="led" aria-hidden="true"></i> Extract</span>
+              <span class="window-state">Local capture</span>
+            </div>
+            <img src="./assets/studio-extract.png" width="1280" height="800" alt="Frame Extraction showing a preview of the new four-frame walk.">
+          </figure>
+          <ul class="rows">
+            <li><strong>Map</strong> Local rules become an editable map. <code>#scene</code> opens it.</li>
+            <li><strong>Project</strong> Existing artifacts become <code>project_pack.zip</code>.</li>
+            <li><strong>Self-check</strong> QA module and local settings.</li>
+          </ul>
+        </div>
         <figure class="window">
-          <p class="window-bar">Local capture · Character Studio</p>
-          <img src="./assets/studio-character.png" width="1280" height="800" alt="Character Studio with a loaded top-down sprite sheet and a playable local preview.">
-          <figcaption>Character Studio with a loaded sprite sheet and a local preview.</figcaption>
-        </figure>
-        <figure class="window">
-          <p class="window-bar">Local capture · Frame Extraction</p>
-          <img src="./assets/studio-extract.png" width="1280" height="800" alt="Frame Extraction showing a preview of four walk frames from a local GIF.">
-          <figcaption>Frame Extraction preview of a four-frame walk.</figcaption>
-        </figure>
-        <figure class="window">
-          <p class="window-bar">Local capture · Map Studio</p>
-          <img src="./assets/studio-map.png" width="1280" height="800" alt="Map Studio showing a generated map preview from local tile rules.">
-          <figcaption>Map Studio after a local rules build.</figcaption>
+          <div class="window-bar">
+            <span class="window-title"><i class="led" aria-hidden="true"></i> Map</span>
+            <span class="window-state">Local capture</span>
+          </div>
+          <img src="./assets/studio-map.png" width="1280" height="800" alt="Map Studio after a local rules build, showing the generated map preview.">
+          <figcaption>Reviewed generation stays. Compatibility generation is retired.</figcaption>
         </figure>
       </div>
     </section>
 
     <section class="section" id="exports" aria-labelledby="exports-title">
-      <div class="wrap">
-        <p class="section-index">04 — Exports</p>
-        <h2 id="exports-title">Files the local app writes</h2>
-        <p>Exporters sit on the normalized character sheet. The scene tile path writes its own pack.</p>
-        <ul class="cards">
-          <li><strong>Godot NPC JSON</strong> <code>godot_npc_pack.zip</code> includes <code>AI资源库/一图全动作/&lt;character_id&gt;/npc.json</code>, <code>sprite.png</code>, and <code>thumb.png</code>. The NPC document uses <code>schemaVersion</code> 1.</li>
-          <li><strong>RPG Maker</strong> <code>rpgmaker_pack.zip</code> uses a 144×192 sheet, 3 columns by 4 rows, 48×48 frames, and <code>NPC.json</code>.</li>
-          <li><strong>OCAD compatibility</strong> <code>ocad_pack.zip</code> includes 252×252 fixed-region sheets and <code>npc.json</code>.</li>
-          <li><strong>LDtk</strong> The scene tile path writes a single-level <code>project.ldtk</code> plus <code>scene_pack.zip</code>. Multi-level LDtk worlds are not implemented.</li>
-          <li><strong>Character pack</strong> <code>character_pack.zip</code> and <code>editor_metadata.json</code> carry the normalized sheet, frame tags, slices, and attachments.</li>
-          <li><strong>Project pack</strong> <code>project_pack.zip</code> combines an existing character artifact directory and a scene artifact directory.</li>
+      <div class="shell">
+        <div class="section-heading">
+          <p class="section-index">03 / Exports</p>
+          <h2 id="exports-title">Files the local app writes</h2>
+        </div>
+        <ul class="rows cols">
+          <li><strong>Godot NPC JSON</strong> <code>godot_npc_pack.zip</code> writes <code>AI资源库/一图全动作/&lt;character_id&gt;/</code> with <code>npc.json</code>, <code>sprite.png</code>, and <code>thumb.png</code>. <code>schemaVersion</code> 1.</li>
+          <li><strong>RPG Maker</strong> <code>rpgmaker_pack.zip</code>, 144×192, 48×48 frames.</li>
+          <li><strong>OCAD</strong> <code>ocad_pack.zip</code>, 252×252 regions.</li>
+          <li><strong>LDtk</strong> One level: <code>project.ldtk</code> and <code>scene_pack.zip</code>.</li>
+          <li><strong>Character pack</strong> <code>character_pack.zip</code> and <code>editor_metadata.json</code>.</li>
+          <li><strong>Project pack</strong> <code>project_pack.zip</code> from artifacts already on disk.</li>
         </ul>
       </div>
     </section>
 
-    <section class="section" id="boundaries" aria-labelledby="boundaries-title">
-      <div class="wrap">
-        <p class="section-index">05 — Boundaries</p>
-        <h2 id="boundaries-title">What v0.6.0 does not do</h2>
-        <ul>
-          <li>Godot <code>.tres</code> export is not implemented.</li>
-          <li>Full WFC, multi-level LDtk worlds, expanded auto-layer rules, region-scoped generation, and saved external-editor round trips are not implemented.</li>
-          <li>Full parallax asset generation is not implemented.</li>
-          <li>Scene and tile quality is not a broad claim. Live scene evidence is one release smoke.</li>
-          <li>AI generation is an optional path. Local sheet processing does not require it.</li>
-          <li>Hosted auth, billing, and public deployment hardening are not in this preview.</li>
-          <li>Fixed-region calibration has one reviewed 1K acceptance. That is not a production-readiness claim.</li>
+    <section class="section band" id="boundaries" aria-labelledby="boundaries-title">
+      <div class="shell">
+        <div class="section-heading">
+          <p class="section-index">04 / Boundaries</p>
+          <h2 id="boundaries-title">Not in v0.6.0</h2>
+        </div>
+        <ul class="rows cols">
+          <li><strong>Godot .tres</strong> Not implemented.</li>
+          <li><strong>Map scope</strong> No Full WFC, multi-level LDtk, or saved external-editor round trips.</li>
+          <li><strong>Parallax</strong> Not implemented.</li>
+          <li><strong>Scene quality</strong> One release smoke.</li>
+          <li><strong>AI</strong> AI generation is an optional path. Local sheets do not require it.</li>
+          <li><strong>Hosting</strong> Auth, billing, and deployment stay outside this preview.</li>
+          <li><strong>Calibration</strong> One reviewed 1K acceptance.</li>
         </ul>
       </div>
     </section>
 
     <section class="section" id="start" aria-labelledby="start-title">
-      <div class="wrap">
-        <p class="section-index">06 — Start</p>
-        <h2 id="start-title">Getting started</h2>
-        <p>Node.js 22 or 24 is required. Node.js 24 LTS is recommended. Install from the lockfile, then open the URL printed by <code>npm start</code>. The server listens on 127.0.0.1, port 4173. The root path opens Character Studio.</p>
-        <div class="command-block">
-          <h3 id="commands-label">Commands</h3>
+      <div class="shell start-grid">
+        <div>
+          <p class="section-index">05 / Start</p>
+          <h2 id="start-title">Getting started</h2>
+          <p>Node.js 22 or 24. Node.js 24 LTS is recommended. The server listens on 127.0.0.1:4173 and opens Character Studio.</p>
+        </div>
+        <div class="command-card">
+          <div class="window-bar">
+            <span class="window-title" id="commands-label">Commands</span>
+          </div>
           <pre id="local-commands" aria-labelledby="commands-label"><code>$ git clone https://github.com/dyk1454683243-sudo/moteweave.git
 $ cd moteweave
 $ npm ci
 $ npm start</code></pre>
-          <button type="button" class="button" id="copy-commands">Copy commands</button>
-          <p id="copy-status" aria-live="polite"></p>
+          <div class="command-foot">
+            <button type="button" class="button" id="copy-commands">Copy commands</button>
+            <p id="copy-status" aria-live="polite"></p>
+          </div>
         </div>
       </div>
     </section>
 
-    <section class="section" id="roadmap" aria-labelledby="roadmap-title">
-      <div class="wrap">
-        <p class="section-index">07 — Roadmap</p>
-        <h2 id="roadmap-title">Open roadmap issues</h2>
-        <ul class="cards">
-          <li><strong><a href="https://github.com/dyk1454683243-sudo/moteweave/issues/9">Issue 9</a></strong> Public contributor surface for moteweave v0.5+. Still open.</li>
-          <li><strong><a href="https://github.com/dyk1454683243-sudo/moteweave/issues/13">Issue 13</a></strong> Optional Godot <code>.tres</code> export. The <code>.tres</code> file is not produced today. <code>godot_npc_pack.zip</code> remains the Godot export.</li>
+    <section class="section band" id="roadmap" aria-labelledby="roadmap-title">
+      <div class="shell">
+        <div class="section-heading">
+          <p class="section-index">06 / Roadmap</p>
+          <h2 id="roadmap-title">Open issues</h2>
+        </div>
+        <ul class="rows cols">
+          <li><strong><a href="https://github.com/dyk1454683243-sudo/moteweave/issues/9">Issue 9</a></strong> Public contributor surface. Still open.</li>
+          <li><strong><a href="https://github.com/dyk1454683243-sudo/moteweave/issues/13">Issue 13</a></strong> Godot <code>.tres</code> is not produced. <code>godot_npc_pack.zip</code> remains the export.</li>
         </ul>
       </div>
     </section>
 
     <section class="section" id="contributing" aria-labelledby="contributing-title">
-      <div class="wrap">
-        <p class="section-index">08 — Contributing</p>
-        <h2 id="contributing-title">Work from the source</h2>
-        <p>Read <a href="https://github.com/dyk1454683243-sudo/moteweave/blob/main/CONTRIBUTING.md">CONTRIBUTING.md</a> before you change the repository. Contributors and agents also follow <code>AGENTS.md</code>. The license is <a href="https://github.com/dyk1454683243-sudo/moteweave/blob/main/LICENSE">MIT</a>.</p>
-        <p>The canonical site is <a href="https://moteweave.pages.dev/">https://moteweave.pages.dev/</a>. Release notes for 0.6.0 are in the repository changelog and on the <a href="https://github.com/dyk1454683243-sudo/moteweave/releases/tag/v0.6.0">v0.6.0 release</a>.</p>
+      <div class="shell">
+        <div class="section-heading">
+          <p class="section-index">07 / Contributing</p>
+          <h2 id="contributing-title">Work from the source</h2>
+          <p><a href="https://github.com/dyk1454683243-sudo/moteweave/blob/main/CONTRIBUTING.md">CONTRIBUTING.md</a>. Agents follow <code>AGENTS.md</code>. <a href="https://github.com/dyk1454683243-sudo/moteweave/blob/main/LICENSE">MIT</a>. Canonical site: <a href="https://moteweave.pages.dev/">moteweave.pages.dev</a>. Notes in the changelog and the <a href="https://github.com/dyk1454683243-sudo/moteweave/releases/tag/v0.6.0">v0.6.0 release</a>.</p>
+        </div>
       </div>
     </section>
   </main>
   <footer class="site-footer">
-    <div class="wrap">
+    <div class="shell footer-inner">
       <p>MoteWeave v0.6.0. <a href="https://github.com/dyk1454683243-sudo/moteweave/blob/main/LICENSE">MIT License</a>.</p>
       <ul class="footer-row">
         <li><a href="https://github.com/dyk1454683243-sudo/moteweave">GitHub</a></li>

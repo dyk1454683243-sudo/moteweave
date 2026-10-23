@@ -32,7 +32,7 @@
     },
     {
       "path": "configs/public-asset-provenance.json",
-      "reason": "Provenance entries for website/assets screenshots and the copied sample-hero fixture. Merge those entries if an export adds other assets."
+      "reason": "Provenance entries for website/assets screenshots and the original site pixel art. Merge those entries if an export adds other assets."
     },
     {
       "path": "ATTRIBUTIONS.md",
@@ -45,6 +45,10 @@
     {
       "path": "scripts/capture-website-assets.mjs",
       "reason": "Headless Chrome capture of the local Studio and VNext screens used by the public site."
+    },
+    {
+      "path": "scripts/create-website-sample-art.mjs",
+      "reason": "Deterministic original pixel art for the public site: character sheet, walk preview, and tile set."
     },
     {
       "path": "test/website/publicSite.test.js",

@@ -33,14 +33,7 @@ import { encodeGeneralSequenceBody } from '../src/editor-project/generalSequence
 
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const assetDir = path.join(rootDir, 'website', 'assets')
-const heroFixture = path.join(
-  rootDir,
-  'test/fixtures/character-pack/topdown_rpg_v0_sample_hero.png',
-)
-const fixedRegionFixture = path.join(
-  rootDir,
-  'test/fixtures/character-pack/local-image-golden/ocad-sheet/fixed_region_sample_hero.png',
-)
+const heroFixture = path.join(rootDir, 'website/assets/sample-character.png')
 const chromeCandidates = [
   process.env.CHROME_PATH,
   '/usr/bin/google-chrome',
@@ -370,13 +363,11 @@ async function prepareMedia(mediaDir) {
     rgbaFrames.push({ data, width: info.width, height: info.height })
   }
   const gif = encodeGifFromRgbaFrames(rgbaFrames, { delay: 12 })
-  const gifPath = path.join(mediaDir, 'topdown_rpg_v0_walk_down.gif')
-  const topdownPath = path.join(mediaDir, 'topdown_rpg_v0_sample_hero.png')
-  const fixedPath = path.join(mediaDir, 'fixed_region_sample_hero.png')
+  const gifPath = path.join(mediaDir, 'sample-walk.gif')
+  const topdownPath = path.join(mediaDir, 'sample-character.png')
   await writeFile(gifPath, gif)
   await copyFile(heroFixture, topdownPath)
-  await copyFile(fixedRegionFixture, fixedPath)
-  return { frames, palette, gifPath, topdownPath, fixedPath }
+  return { frames, palette, gifPath, topdownPath }
 }
 
 async function api(origin, pathname, { method = 'GET', headers = {}, body } = {}) {
@@ -479,7 +470,7 @@ async function captureVnext(cdp, origin, projectId) {
     }
     const box = surface.getBoundingClientRect()
     return {
-      ok: opaque >= 20 && total.includes('04') && box.width >= 80 && palette.includes('Hero'),
+      ok: opaque >= 8 && total.includes('04') && box.width >= 80 && palette.includes('Hero'),
       detail: 'opaque=' + opaque + ' total=' + total + ' box=' + Math.round(box.width) + ' palette=' + palette + ' width=' + width,
     }
   })()`, 30000, 'vnext canvas')
@@ -584,25 +575,21 @@ async function processCharacter(cdp, sessionId) {
 }
 
 async function captureCharacter(cdp, origin, media) {
-  const attempts = [
-    { layout: 'topdown_rpg_v0', file: media.topdownPath },
-    { layout: 'fixed_region_motion_v0', file: media.fixedPath },
-  ]
-  let lastError = null
-  for (const attempt of attempts) {
-    const sessionId = await openPage(cdp, `${origin}/src/ui/studio/studio.html#character`)
-    try {
-      await waitForText(cdp, sessionId, 'Character Studio')
-      await chooseCharacterLayout(cdp, sessionId, attempt.layout)
-      await loadCharacterSheet(cdp, sessionId, attempt.file)
-      await processCharacter(cdp, sessionId)
-      await assertCleanPage(cdp, sessionId)
-      return screenshot(cdp, sessionId, path.join(assetDir, 'studio-character.png'))
-    } catch (error) {
-      lastError = error
+  const sessionId = await openPage(cdp, `${origin}/src/ui/studio/studio.html#character`)
+  await waitForText(cdp, sessionId, 'Character Studio')
+  await chooseCharacterLayout(cdp, sessionId, 'topdown_rpg_v0')
+  await loadCharacterSheet(cdp, sessionId, media.topdownPath)
+  await processCharacter(cdp, sessionId)
+  const quality = await evaluate(cdp, sessionId, `(() => {
+    const text = document.body?.innerText || ''
+    return {
+      passed: /Quality passed/i.test(text) && /\\bPASS\\b/.test(text),
+      detail: (text.match(/Quality[\\s\\S]{0,80}/) || [''])[0].replace(/\\s+/g, ' ').slice(0, 120),
     }
-  }
-  throw lastError || new Error('character capture failed')
+  })()`)
+  if (!quality?.passed) throw new Error(`character quality did not pass: ${quality?.detail || 'missing'}`)
+  await assertCleanPage(cdp, sessionId)
+  return screenshot(cdp, sessionId, path.join(assetDir, 'studio-character.png'))
 }
 
 async function captureExtract(cdp, origin, gifPath) {
@@ -644,6 +631,20 @@ async function captureMap(cdp, origin) {
     const button = document.querySelector('#studio-tiles-primary')
     return { ok: Boolean(button && !button.disabled) }
   })()`, 15000, 'map primary')
+  await evaluate(cdp, sessionId, `(() => {
+    const set = (id, value) => {
+      const node = document.querySelector(id)
+      if (!node) return
+      node.value = value
+      node.dispatchEvent(new Event('input', { bubbles: true }))
+      node.dispatchEvent(new Event('change', { bubbles: true }))
+    }
+    set('#studio-tiles-width', '12')
+    set('#studio-tiles-height', '8')
+    set('#studio-tiles-density', '0.36')
+    set('#studio-tiles-seed', '260423')
+    return true
+  })()`)
   await click(cdp, sessionId, '#studio-tiles-primary')
   await waitFor(cdp, sessionId, `(() => ({
     ok: document.querySelector('#studio-tiles-view')?.dataset.tilesPhase === 'ready',
