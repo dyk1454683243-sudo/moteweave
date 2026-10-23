@@ -1,6 +1,8 @@
 # Contributing
 
-MoteWeave is a local-first pixel character and sprite workflow. The public site at [https://moteweave.pages.dev/](https://moteweave.pages.dev/) is a static introduction and a programmatic demo only. Full processing stays in the local app. Do not describe the website as accepting uploads, accounts, or provider calls.
+MoteWeave is a local-first pixel character and sprite workflow. The public site at [https://moteweave.pages.dev/](https://moteweave.pages.dev/) is a static introduction. Full processing stays in the local app. Do not describe the website as accepting uploads, accounts, or provider calls.
+
+Public-only files that a private export would overwrite are listed in [`docs/releases/public-overlay.md`](docs/releases/public-overlay.md).
 
 ## Read first
 

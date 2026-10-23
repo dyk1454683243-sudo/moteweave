@@ -42,6 +42,46 @@
       "release_status": "approved"
     },
     {
+      "path": "website/assets/sample-hero.png",
+      "kind": "website_sprite",
+      "source_rights": "repository_owned",
+      "generator": "scripts/create-character-pack-fixture.mjs",
+      "sha256": "bc63993a7e7dc00b16cf87c1e56641eec4646a102e9abd22325f2ae52eb69329",
+      "release_status": "approved"
+    },
+    {
+      "path": "website/assets/studio-character.png",
+      "kind": "website_screenshot",
+      "source_rights": "repository_owned",
+      "generator": "scripts/capture-website-assets.mjs",
+      "sha256": "0ba1eec78ae78afe128c09ccbbe7b771e7ed771a24bae8610b57b038418786e5",
+      "release_status": "approved"
+    },
+    {
+      "path": "website/assets/studio-extract.png",
+      "kind": "website_screenshot",
+      "source_rights": "repository_owned",
+      "generator": "scripts/capture-website-assets.mjs",
+      "sha256": "44e8b3e5cd96a073b8b6b63b45aca9e2aaf558efd067b8ed1b28f0da1b1b8260",
+      "release_status": "approved"
+    },
+    {
+      "path": "website/assets/studio-map.png",
+      "kind": "website_screenshot",
+      "source_rights": "repository_owned",
+      "generator": "scripts/capture-website-assets.mjs",
+      "sha256": "2795a464e60f831c6f18f2624b4a8658b8cd01da15defc18086177c6970aa9b2",
+      "release_status": "approved"
+    },
+    {
+      "path": "website/assets/vnext-editor.png",
+      "kind": "website_screenshot",
+      "source_rights": "repository_owned",
+      "generator": "scripts/capture-website-assets.mjs",
+      "sha256": "b1832010b413b547b02e8a75a6d94410bcbee29fa6551f60bdd15e05a7e2cfab",
+      "release_status": "approved"
+    },
+    {
       "path": "src/ui/vnext/assets/Inter-Regular.woff2",
       "kind": "font",
       "source_rights": "licensed_third_party",

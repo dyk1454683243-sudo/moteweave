@@ -5,6 +5,9 @@
 - Documented the public contributor surface: repository homepage and topics,
   a visitor-facing README intro with Quick Start aligned to `npm ci` / Node.js
   22 or 24, `CONTRIBUTING.md`, and GitHub issue templates. No version bump.
+- Recorded the public overlay registry in `configs/public-overlay.json` and
+  `docs/releases/public-overlay.md`, and replaced the public site's retired
+  programmatic demo with a static v0.6.0 introduction. No version bump.
 
 ## [0.6.0] - 2026-10-23
 

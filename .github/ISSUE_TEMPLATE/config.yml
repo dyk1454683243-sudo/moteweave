@@ -5,4 +5,4 @@ contact_links:
     about: Required workflow before changing the repository.
   - name: Public site
     url: https://moteweave.pages.dev/
-    about: Static introduction and programmatic demo only. No uploads, accounts, or provider calls.
+    about: Static introduction only. No uploads, accounts, or provider calls.

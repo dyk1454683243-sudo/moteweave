@@ -6,10 +6,10 @@
 
 Local-first pixel character and sprite workflow. The public site at
 [https://moteweave.pages.dev/](https://moteweave.pages.dev/) is a static
-introduction plus a programmatic demo only. Full processing runs locally.
+introduction to the local app. Full processing runs locally.
 The website does not accept uploads, accounts, or provider calls.
 
-本地优先的像素角色与精灵工作流：网站只做静态介绍和程序演示，完整处理在本地运行。
+本地优先的像素角色与精灵工作流：网站只做静态介绍，完整处理在本地运行。
 
 This public source preview is published from the private engineering line to
 https://github.com/dyk1454683243-sudo/moteweave.

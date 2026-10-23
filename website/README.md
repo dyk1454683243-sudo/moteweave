@@ -6,10 +6,15 @@ routes with the local MoteWeave application and must be deployed with
 
 ## Scope
 
-- Static product introduction
-- Programmatic browser-only sample demo
+- Static product introduction for v0.6.0
 - Local workflow and capability-boundary documentation
 - No uploads, API calls, authentication, billing, analytics, or cloud processing
+
+Images under `website/assets/` are local captures of the v0.6.0 Studio and
+VNext workspace, plus a byte copy of the repository character-pack fixture
+`test/fixtures/character-pack/topdown_rpg_v0_sample_hero.png`. `website/og.png`
+is the deterministic social image from `scripts/create-website-og.mjs`. The
+page does not draw a sample animation.
 
 The complete MoteWeave application continues to run locally through the
 repository root. Node.js 22 or 24 is required; Node.js 24 LTS is recommended.
