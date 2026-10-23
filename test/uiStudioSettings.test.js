@@ -8,8 +8,17 @@ import {
 } from '../src/server/legacyStudioRedirect.js'
 import {
   STUDIO_TRANSLATIONS,
+  advancedProviderPresentation,
   currentProviderRoutePresentation,
+  providerPresentation,
+  studioHasEligibleNativeGeminiPreset,
 } from '../src/ui/studio/settingsView.js'
+import {
+  advancedProviderRouteForState,
+  advancedProviderRouteIsUndisclosed,
+  clearAdvancedProviderSecret,
+} from '../src/ui/studio/advancedProviderState.js'
+import { STRICT_FIXED_REGION_PROFILE } from '../src/ui/studio/characterApi.js'
 
 const STUDIO_RAIL_DESTINATIONS = [
   '#character',
@@ -33,7 +42,7 @@ test('Studio Settings stays parallel and keeps the accepted rail capability-trut
     readFile('src/ui/studio/studio.css', 'utf8'),
   ])
 
-  assert.match(html, /data-design-source="figma:ro8w6TKkpd969zW2V5bmkx\/749:4446"/)
+  assert.match(html, /data-design-source="figma:ro8w6TKkpd969zW2V5bmkx\/749:4446,978:5077,978:5218,978:5359,1111:5317"/)
   assert.match(html, /location\.protocol === 'file:'[\s\S]*studio-file-mode/)
   assert.match(openingTagForId(html, 'studio-runtime-warning'), /role="alert"/)
   assert.match(html, /<link rel="stylesheet" href="\.\/studio\.css"/)
@@ -84,7 +93,7 @@ test('legacy deep links use the fixed server whitelist and safe Character fallba
     'project-pack': 'project',
     qa: 'qa',
     'character-pack': 'character',
-    prompts: 'scene',
+    prompts: 'tiles',
   })
   assert.equal(
     legacyStudioRedirectLocation('?tab=two-point-five-d'),
@@ -92,7 +101,7 @@ test('legacy deep links use the fixed server whitelist and safe Character fallba
   )
   assert.equal(
     legacyStudioRedirectLocation('?tab=prompts'),
-    '/src/ui/studio/studio.html?open=scene-prompt#scene',
+    '/src/ui/studio/studio.html#tiles',
   )
   for (const search of ['', '?tab=unknown', '?tab=qa&tab=motion-source']) {
     assert.equal(
@@ -264,11 +273,20 @@ test('Studio Settings never seeds or echoes an API key and translates every mark
   const nativeRoute = currentProviderRoutePresentation({
     kind: 'resolved',
     provider: {
+      status: 'ready',
       available: true,
       implemented: true,
       runtime_configured: true,
       provider: 'gemini',
       model: 'gemini-2.5-flash-image',
+      presets: [{
+        id: 'gemini_native_1',
+        available: true,
+        provider: 'gemini',
+        route_kind: 'google_native',
+        supports_image_size: true,
+        image_config: { image_size: '2K', aspect_ratio: '1:1' },
+      }],
     },
   }, {})
   const sharedSnapshot = {
@@ -300,12 +318,40 @@ test('Studio Settings never seeds or echoes an API key and translates every mark
     STUDIO_TRANSLATIONS.en['settings.currentRoute.undisclosedRoute'],
   ].includes(undisclosedEnvironmentRoute.route))
   assert.doesNotMatch(undisclosedEnvironmentRoute.route, /openrouter|example\/model/)
-  assert.equal(sharedRoute.state, 'ready')
+  assert.equal(sharedRoute.state, 'idle')
   assert.match(sharedRoute.route, /openrouter/)
   assert.match(compatibleRoute.route, /openrouter_compatible/)
   assert.notEqual(nativeRoute.impact, sharedRoute.impact)
   assert.match(STUDIO_TRANSLATIONS.zh['settings.currentRoute.description'], /已配置.*不代表已实测连接/)
   assert.match(STUDIO_TRANSLATIONS.en['settings.currentRoute.description'], /configured.*does not mean a live connection was tested/i)
+  assert.match(STUDIO_TRANSLATIONS.zh['settings.advancedProvider.save'], /保存配置/)
+  assert.match(STUDIO_TRANSLATIONS.en['settings.advancedProvider.save'], /Save configuration/)
+  assert.equal(STUDIO_TRANSLATIONS.zh['settings.advancedProvider.savedDetail'].includes('配置已保存（未启用生成）'), true)
+  assert.match(STUDIO_TRANSLATIONS.en['settings.advancedProvider.savedDetail'], /Configuration saved \(generation not enabled\)/)
+  assert.equal(STUDIO_TRANSLATIONS.zh['settings.advancedProvider.saveFailed'], '配置保存失败')
+  assert.equal(STUDIO_TRANSLATIONS.en['settings.advancedProvider.saveFailed'], 'Configuration save failed')
+  assert.doesNotMatch(
+    `${STUDIO_TRANSLATIONS.zh['settings.advancedProvider.save']}\n${STUDIO_TRANSLATIONS.en['settings.advancedProvider.save']}`,
+    /保存并激活|Save and activate/,
+  )
+  assert.doesNotMatch(
+    [
+      STUDIO_TRANSLATIONS.zh['settings.advancedProvider.save'],
+      STUDIO_TRANSLATIONS.zh['settings.advancedProvider.savedBadge'],
+      STUDIO_TRANSLATIONS.zh['settings.advancedProvider.savedDetail'],
+      STUDIO_TRANSLATIONS.zh['settings.provider.nonGeminiBadge'],
+    ].join('\n'),
+    /已激活|当前会话已激活|保存并激活/,
+  )
+  assert.doesNotMatch(
+    [
+      STUDIO_TRANSLATIONS.en['settings.advancedProvider.save'],
+      STUDIO_TRANSLATIONS.en['settings.advancedProvider.savedBadge'],
+      STUDIO_TRANSLATIONS.en['settings.advancedProvider.savedDetail'],
+      STUDIO_TRANSLATIONS.en['settings.provider.nonGeminiBadge'],
+    ].join('\n'),
+    /Save and activate|already active for this session|Activated\b/,
+  )
 
   const css = await readFile('src/ui/studio/studio.css', 'utf8')
   assert.match(css, /--success:\s*#89d185/)
@@ -317,4 +363,289 @@ test('Studio Settings never seeds or echoes an API key and translates every mark
     css,
     /@media \(max-width: 560px\)[\s\S]*\.provider-actions \{[^}]*flex-direction: column/,
   )
+})
+
+test('Studio other Provider config keeps Gemini primary, clears secrets, and hides raw errors', async () => {
+  const [html, settingsView, providerConfig] = await Promise.all([
+    readFile('src/ui/studio/studio.html', 'utf8'),
+    readFile('src/ui/studio/settingsView.js', 'utf8'),
+    readFile('src/ui/providerConfig.js', 'utf8'),
+  ])
+  const start = html.indexOf('id="studio-advanced-provider"')
+  const end = html.indexOf('id="studio-action-view"', start)
+  assert.ok(start > 0 && end > start)
+  const advancedHtml = html.slice(start, end)
+
+  assert.match(html, /id="studio-runtime-provider"[\s\S]*<option value="gemini">Gemini<\/option>/)
+  assert.match(advancedHtml, /value="openrouter"/)
+  assert.match(advancedHtml, /value="openrouter_compatible"/)
+  assert.doesNotMatch(advancedHtml, /option value="gemini"/)
+  assert.match(advancedHtml, /AI 生成[\s\S]*仅 Gemini 可用/)
+  assert.match(advancedHtml, /Scene 在线生成[\s\S]*仅 Gemini 可用/)
+  assert.match(advancedHtml, /Character Strict[\s\S]*原生 Gemini/)
+  assert.match(advancedHtml, /Tiles AI[\s\S]*原生 Gemini/)
+  assert.match(html, /id="studio-advanced-technical-details"/)
+  assert.match(html, /id="studio-gemini-technical-details"/)
+  assert.match(html, /aria-controls="studio-advanced-technical-error"/)
+  assert.match(settingsView, /if \(!validation\.valid\) \{[\s\S]*clearAdvancedProviderSecret/)
+  assert.match(settingsView, /finally \{[\s\S]*clearAdvancedProviderSecret/)
+  assert.match(settingsView, /postProviderConfig\(validation\.payload\)/)
+  assert.match(settingsView, /postProviderConfig\(\{ clear: true \}\)/)
+  assert.match(settingsView, /kind: 'error', technical:/)
+  assert.doesNotMatch(settingsView, /studioT\('settings\.provider\.actionError', \{ error:/)
+  assert.doesNotMatch(settingsView, /studioT\('settings\.advancedProvider\.saveFailed', \{ error:/)
+  assert.doesNotMatch(settingsView, /localStorage\.(?:setItem|getItem)\([^)]*(?:api|key|provider)/i)
+  assert.doesNotMatch(providerConfig, /showToast\(error\.message\)/)
+  assert.match(providerConfig, /clearRuntimeApiKey\(config\)/)
+
+  const secret = { value: 'never echo this' }
+  clearAdvancedProviderSecret(secret)
+  assert.equal(secret.value, '')
+  const runtimeOpenRouter = { available: true, provider: 'openrouter', runtime_configured: true }
+  assert.equal(advancedProviderRouteForState(runtimeOpenRouter, 'openrouter_compatible'), 'openrouter_compatible')
+  assert.equal(advancedProviderRouteForState(runtimeOpenRouter, null), '')
+  assert.equal(advancedProviderRouteIsUndisclosed(runtimeOpenRouter, null), true)
+  assert.equal(advancedProviderRouteIsUndisclosed(runtimeOpenRouter, 'openrouter'), false)
+  const environmentOpenRouter = { available: true, provider: 'openrouter', runtime_configured: false }
+  assert.equal(advancedProviderRouteForState(environmentOpenRouter, null), '')
+  assert.equal(advancedProviderRouteIsUndisclosed(environmentOpenRouter, null), true)
+  assert.equal(advancedProviderRouteIsUndisclosed(environmentOpenRouter, 'openrouter'), false)
+  assert.equal(advancedProviderRouteIsUndisclosed({ ...environmentOpenRouter, available: false }, null), false)
+})
+
+test('Studio generation-ready follows eligible native Gemini presets, not only the active route', async () => {
+  const source = await readFile('src/ui/studio/settingsView.js', 'utf8')
+  assert.match(source, /const generationReady = studioHasEligibleNativeGeminiPreset\(provider\)/)
+  assert.match(source, /selectStrictGeminiPreset\(providerState\)/)
+  assert.match(source, /async function saveAdvancedProvider[\s\S]*providerSnapshot = \{ kind: 'saving' \}[\s\S]*notifyStudioProviderSnapshotListeners/)
+  assert.match(source, /async function clearAdvancedProvider[\s\S]*providerSnapshot = \{ kind: 'clearing' \}[\s\S]*notifyStudioProviderSnapshotListeners/)
+  assert.doesNotMatch(source, /const generationReady = nativeGemini\s*\|\|/)
+  assert.match(
+    source,
+    /environmentAdvanced[\s\S]*advancedProviderRouteIsUndisclosed/,
+  )
+
+  const geminiPreset = {
+    id: 'gemini_native_1',
+    available: true,
+    provider: 'gemini',
+    route_kind: 'google_native',
+    model: 'gemini-2.5-flash-image',
+    supports_image_size: true,
+    image_config: { ...STRICT_FIXED_REGION_PROFILE.imageConfig },
+  }
+  const openRouterPreset = {
+    id: 'openrouter-default',
+    available: true,
+    provider: 'openrouter',
+    route_kind: 'openrouter',
+    model: 'example/model',
+  }
+  const pureGemini = {
+    kind: 'resolved',
+    provider: {
+      status: 'ready',
+      available: true,
+      implemented: true,
+      runtime_configured: true,
+      provider: 'gemini',
+      model: 'gemini-2.5-flash-image',
+      presets: [geminiPreset],
+    },
+  }
+  const geminiEmptyPresets = {
+    kind: 'resolved',
+    provider: {
+      available: true,
+      implemented: true,
+      runtime_configured: true,
+      provider: 'gemini',
+      model: 'gemini-2.5-flash-image',
+      presets: [],
+    },
+  }
+  const geminiUnavailablePlusOpenRouter = {
+    kind: 'resolved',
+    provider: {
+      available: true,
+      implemented: true,
+      runtime_configured: true,
+      provider: 'gemini',
+      model: 'gemini-2.5-flash-image',
+      presets: [
+        { ...geminiPreset, available: false },
+        openRouterPreset,
+      ],
+    },
+  }
+  const sessionOpenRouter = {
+    kind: 'resolved',
+    provider: {
+      available: true,
+      implemented: true,
+      runtime_configured: true,
+      provider: 'openrouter',
+      model: 'example/model',
+      presets: [openRouterPreset],
+    },
+  }
+  const environmentOpenRouter = {
+    kind: 'resolved',
+    provider: {
+      ...sessionOpenRouter.provider,
+      runtime_configured: false,
+    },
+  }
+  const mixedActiveOpenRouter = {
+    kind: 'resolved',
+    provider: {
+      status: 'ready',
+      available: true,
+      implemented: true,
+      runtime_configured: true,
+      provider: 'openrouter',
+      model: 'example/model',
+      presets: [openRouterPreset, geminiPreset],
+    },
+  }
+
+  assert.equal(studioHasEligibleNativeGeminiPreset(pureGemini.provider), true)
+  assert.equal(studioHasEligibleNativeGeminiPreset(geminiEmptyPresets.provider), false)
+  assert.equal(studioHasEligibleNativeGeminiPreset(geminiUnavailablePlusOpenRouter.provider), false)
+  assert.equal(studioHasEligibleNativeGeminiPreset(sessionOpenRouter.provider), false)
+  assert.equal(studioHasEligibleNativeGeminiPreset(mixedActiveOpenRouter.provider), true)
+  assert.equal(studioHasEligibleNativeGeminiPreset({
+    presets: [{ ...geminiPreset, id: '../escape' }],
+  }), false)
+  assert.equal(studioHasEligibleNativeGeminiPreset({
+    ...pureGemini.provider,
+    status: 'idle',
+  }), false)
+  assert.equal(studioHasEligibleNativeGeminiPreset({
+    status: 'ready',
+    presets: [{ ...geminiPreset, supports_image_size: false }],
+  }), false)
+  assert.equal(studioHasEligibleNativeGeminiPreset({
+    status: 'ready',
+    presets: [{ ...geminiPreset, image_config: { image_size: '1K', aspect_ratio: '1:1' } }],
+  }), false)
+  assert.equal(studioHasEligibleNativeGeminiPreset({
+    status: 'ready',
+    presets: [{ ...geminiPreset, image_config: { image_size: '2K', aspect_ratio: '16:9' } }],
+  }), false)
+
+  const geminiRoute = currentProviderRoutePresentation(pureGemini, {}, null)
+  const emptyGeminiRoute = currentProviderRoutePresentation(geminiEmptyPresets, {}, null)
+  const unavailableGeminiRoute = currentProviderRoutePresentation(geminiUnavailablePlusOpenRouter, {}, null)
+  const sessionRoute = currentProviderRoutePresentation(sessionOpenRouter, {}, 'openrouter')
+  const environmentRoute = currentProviderRoutePresentation(environmentOpenRouter, {}, null)
+  const mixedRoute = currentProviderRoutePresentation(mixedActiveOpenRouter, {}, 'openrouter')
+
+  assert.equal(geminiRoute.state, 'ready')
+  assert.match(geminiRoute.route, /gemini/)
+  assert.match(geminiRoute.impact, /Native Gemini|原生 Gemini/)
+
+  assert.equal(emptyGeminiRoute.state, 'idle')
+  assert.match(emptyGeminiRoute.route, /gemini/)
+  assert.match(emptyGeminiRoute.impact, /remain locked|保持锁定/)
+  assert.doesNotMatch(emptyGeminiRoute.badge, /Service session|服务会话|Local environment|本地环境/)
+
+  assert.equal(unavailableGeminiRoute.state, 'idle')
+  assert.match(unavailableGeminiRoute.route, /gemini/)
+  assert.match(unavailableGeminiRoute.impact, /remain locked|保持锁定/)
+
+  assert.equal(sessionRoute.state, 'idle')
+  assert.match(sessionRoute.route, /openrouter/)
+  assert.ok([
+    STUDIO_TRANSLATIONS.zh['settings.advancedProvider.savedBadge'],
+    STUDIO_TRANSLATIONS.en['settings.advancedProvider.savedBadge'],
+  ].includes(sessionRoute.badge))
+  assert.match(sessionRoute.impact, /service-session configuration was saved|服务会话配置已保存/)
+  assert.doesNotMatch(sessionRoute.impact, /Environment configuration detected|检测到环境配置/)
+
+  assert.equal(environmentRoute.state, 'idle')
+  assert.ok([
+    STUDIO_TRANSLATIONS.zh['settings.currentRoute.undisclosedRoute'],
+    STUDIO_TRANSLATIONS.en['settings.currentRoute.undisclosedRoute'],
+  ].includes(environmentRoute.route))
+  assert.ok([
+    STUDIO_TRANSLATIONS.zh['settings.advancedProvider.environmentBadge'],
+    STUDIO_TRANSLATIONS.en['settings.advancedProvider.environmentBadge'],
+  ].includes(environmentRoute.badge))
+  assert.match(environmentRoute.impact, /Environment configuration was detected|检测到环境配置/)
+  assert.match(environmentRoute.impact, /This is not a saved service-session replacement|这不是“配置已保存 \/ 服务会话已替换”/)
+  assert.doesNotMatch(environmentRoute.impact, /^(Configuration saved|配置已保存)/)
+  assert.doesNotMatch(environmentRoute.badge, /Configuration saved|配置已保存|Saved ·|已保存/)
+
+  assert.equal(mixedRoute.state, 'ready')
+  assert.match(mixedRoute.route, /openrouter/)
+  assert.doesNotMatch(mixedRoute.route, /gemini_native/)
+  assert.ok([
+    STUDIO_TRANSLATIONS.zh['settings.provider.usesNativeGeminiBadge'],
+    STUDIO_TRANSLATIONS.en['settings.provider.usesNativeGeminiBadge'],
+  ].includes(mixedRoute.badge))
+  assert.match(mixedRoute.impact, /eligible native Gemini preset|合格的原生 Gemini preset/)
+  assert.doesNotMatch(mixedRoute.impact, /stay locked|保持锁定/)
+
+  const emptyGeminiCard = providerPresentation(geminiEmptyPresets)
+  const unavailableGeminiCard = providerPresentation(geminiUnavailablePlusOpenRouter)
+  const environmentMainCard = providerPresentation(environmentOpenRouter)
+  const sessionMainCard = providerPresentation(sessionOpenRouter)
+  assert.equal(emptyGeminiCard.state, 'idle')
+  assert.match(emptyGeminiCard.detail, /No eligible native Gemini preset|没有合格的原生 Gemini preset/)
+  assert.equal(unavailableGeminiCard.state, 'idle')
+  assert.match(unavailableGeminiCard.detail, /No eligible native Gemini preset|没有合格的原生 Gemini preset/)
+  assert.equal(environmentMainCard.state, 'idle')
+  assert.match(environmentMainCard.detail, /Environment configuration was detected|检测到环境配置/)
+  assert.doesNotMatch(environmentMainCard.detail, /^(The current service-session configuration|当前服务会话配置)/)
+  assert.match(sessionMainCard.detail, /service-session configuration is not native Gemini|当前服务会话配置不是原生 Gemini/)
+
+  const sessionCard = advancedProviderPresentation({
+    serviceAvailable: true,
+    advancedSnapshot: { kind: 'idle' },
+    snapshot: sessionOpenRouter,
+    provider: sessionOpenRouter.provider,
+    selectedAdvancedRoute: 'openrouter',
+  })
+  const environmentCard = advancedProviderPresentation({
+    serviceAvailable: true,
+    advancedSnapshot: { kind: 'idle' },
+    snapshot: environmentOpenRouter,
+    provider: environmentOpenRouter.provider,
+    selectedAdvancedRoute: null,
+  })
+  const mixedCard = advancedProviderPresentation({
+    serviceAvailable: true,
+    advancedSnapshot: { kind: 'idle' },
+    snapshot: mixedActiveOpenRouter,
+    provider: mixedActiveOpenRouter.provider,
+    selectedAdvancedRoute: 'openrouter',
+  })
+  assert.ok([
+    STUDIO_TRANSLATIONS.zh['settings.advancedProvider.savedBadge'],
+    STUDIO_TRANSLATIONS.en['settings.advancedProvider.savedBadge'],
+  ].includes(sessionCard.badge))
+  assert.match(sessionCard.detail, /Configuration saved \(generation not enabled\)|配置已保存（未启用生成）/)
+  assert.ok([
+    STUDIO_TRANSLATIONS.zh['settings.advancedProvider.environmentBadge'],
+    STUDIO_TRANSLATIONS.en['settings.advancedProvider.environmentBadge'],
+  ].includes(environmentCard.badge))
+  assert.match(environmentCard.detail, /Environment configuration detected, but it is not connected to Studio generation|检测到环境配置，但未接入 Studio 生成/)
+  assert.doesNotMatch(
+    `${environmentCard.badge}\n${environmentCard.detail}`,
+    /Configuration saved|service session was replaced|配置已保存|服务会话已替换|服务会话配置已被替换|Saved · route undisclosed|已保存 · 路线未披露/,
+  )
+  assert.doesNotMatch(
+    `${environmentRoute.badge}\n${environmentRoute.source}\n${environmentMainCard.badge}\n${environmentCard.badge}\n${environmentCard.detail}`,
+    /Configuration saved|service session was replaced|配置已保存|服务会话已替换|服务会话配置已被替换/,
+  )
+  assert.match(environmentMainCard.detail, /This is not a saved service-session replacement|这不是“配置已保存 \/ 服务会话已替换”/)
+  assert.ok([
+    STUDIO_TRANSLATIONS.zh['settings.advancedProvider.savedBadge'],
+    STUDIO_TRANSLATIONS.en['settings.advancedProvider.savedBadge'],
+  ].includes(mixedCard.badge))
+  assert.match(mixedCard.detail, /Configuration saved \(generation not enabled\)|配置已保存（未启用生成）/)
+
+  assert.match(STUDIO_TRANSLATIONS.zh['settings.advancedProvider.environmentDetail'], /检测到环境配置，但未接入 Studio 生成/)
+  assert.match(STUDIO_TRANSLATIONS.en['settings.advancedProvider.environmentDetail'], /Environment configuration detected, but it is not connected to Studio generation/)
 })

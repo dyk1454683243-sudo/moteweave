@@ -37,25 +37,29 @@ test('retired Character DOM controllers are absent while maintained pure logic r
   )
 })
 
-test('Studio Character owns the maintained local, strict, and compatibility API surfaces', async () => {
-  const [html, localView, localApi, strictApi, compatApi, settings] = await Promise.all([
+test('Studio Character owns the maintained local and strict API surfaces', async () => {
+  const [html, localView, localApi, strictApi, settings, characterView] = await Promise.all([
     readFile('src/ui/studio/studio.html', 'utf8'),
     readFile('src/ui/studio/characterLocalView.js', 'utf8'),
     readFile('src/ui/studio/characterLocalApi.js', 'utf8'),
     readFile('src/ui/studio/characterApi.js', 'utf8'),
-    readFile('src/ui/studio/characterCompatApi.js', 'utf8'),
     readFile('src/ui/studio/settingsView.js', 'utf8'),
+    readFile('src/ui/studio/characterView.js', 'utf8'),
   ])
   for (const id of [
     'studio-character-view',
     'character-local-workspace',
     'character-ai-workspace',
-    'character-compat-workspace',
   ]) assert.match(html, new RegExp(`id="${id}"`))
+  assert.doesNotMatch(html, /character-compat-workspace|character-compat-entry|data-character-mode="compat"|971:5301|971:6230|971:7159|971:8101|996:5274/)
+  assert.doesNotMatch(characterView, /characterCompatView|character-compat|activeCharacterMode === 'compat'|compatCandidate/)
+  await assert.rejects(access('src/ui/studio/characterCompatView.js'), { code: 'ENOENT' })
+  await assert.rejects(access('src/ui/studio/characterCompatApi.js'), { code: 'ENOENT' })
+  const css = await readFile('src/ui/studio/studio.css', 'utf8')
+  assert.doesNotMatch(css, /character-compat|data-character-mode="compat"/)
   assert.match(localApi, /'\/api\/process-sheet'/)
   assert.match(strictApi, /'\/api\/generate-character\/review'/)
   assert.match(strictApi, /`\/api\/generate-character\/\$\{encodeURIComponent\(jobId\)\}\/accept`/)
-  assert.match(compatApi, /'\/api\/generate-character'/)
   assert.match(localView, /templateCalibrationCore\.js/)
   assert.match(settings, /initProviderConfigSurface/)
   assert.doesNotMatch(html, /href="\/legacy|data-tab="character-pack"/)

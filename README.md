@@ -1,7 +1,7 @@
 # MoteWeave
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
-[![version 0.5.0](https://img.shields.io/badge/version-0.5.0-blue)](CHANGELOG.md)
+[![version 0.6.0](https://img.shields.io/badge/version-0.6.0-blue)](CHANGELOG.md)
 [![site](https://img.shields.io/badge/site-moteweave.pages.dev-111111)](https://moteweave.pages.dev/)
 
 Local-first pixel character and sprite workflow. The public site at
@@ -16,9 +16,10 @@ https://github.com/dyk1454683243-sudo/moteweave.
 
 This project turns AI-generated or uploaded top-down sprite sheets into a standard character pack for browser preview and game-engine import.
 
-Current package version: `0.5.0`. Changes after this version are recorded under
-`Unreleased` in `CHANGELOG.md`. The release scope, evidence, and publication
-boundary are recorded in `docs/releases/v0.5.0.md`.
+Current package version: `0.6.0`. Changes after this version are recorded under
+`Unreleased` in `CHANGELOG.md`. The 0.6.0 notes are in `CHANGELOG.md`. The
+v0.5.0 release scope, evidence, and publication boundary remain in
+`docs/releases/v0.5.0.md`.
 
 ## Contributing
 

@@ -1,7 +1,62 @@
 export const EDITOR_PROJECT_VERSION = 'editor_project_v0'
+export const EDITOR_PROJECT_V1_VERSION = 'editor_project_v1'
+export const EDITOR_PROJECT_V2_VERSION = 'editor_project_v2'
 export const EDITOR_SCENE_VERSION = 'editor_scene_v0'
 export const EDITOR_INTERACTION_VERSION = 'editor_interaction_v0'
 export const PROCESSING_RECIPE_VERSION = 'processing_recipe_v0'
+export const SPRITE_DOCUMENT_VERSION = 'sprite_document_v1'
+
+export const SPRITE_DOCUMENT_LIMITS = Object.freeze({
+  maxCanvasEdge: 4096,
+  maxBlankCanvasEdge: 1024,
+  maxFrames: 256,
+  maxLayers: 32,
+  maxNonEmptyCels: 4096,
+  maxExpandedRgbaBytes: 128 * 1024 * 1024,
+  maxManagedPngBytes: 32 * 1024 * 1024,
+  maxSheetPixels: 4096 * 4096,
+  maxJsonRequestBytes: 64 * 1024,
+  maxPaletteRequestBytes: 256 * 1024,
+  maxQueryBytes: 2 * 1024,
+  maxManifestBytes: 2 * 1024 * 1024,
+  maxProjectJsonBytes: 2 * 1024 * 1024,
+  maxCanvasesOrDocuments: 64,
+  maxProjectReferences: 64,
+  maxTurnReferences: 8,
+  maxCopyBytes: 512 * 1024 * 1024,
+  maxCopyManagedFiles: 4096,
+  maxPixelCacheBytes: 256 * 1024 * 1024,
+  maxNameLength: 128,
+})
+
+export const PROJECT_REFERENCE_PURPOSES = Object.freeze([
+  'character',
+  'palette',
+  'style',
+  'frame',
+  'cel',
+])
+
+export const PROJECT_REFERENCE_SOURCE_KINDS = Object.freeze([
+  'frame_composite',
+  'cel',
+])
+
+export const PROJECT_REFERENCE_STATUSES = Object.freeze([
+  'active',
+  'revoked',
+])
+
+export const EDITOR_PROJECT_LIST_LIMITS = Object.freeze({
+  maxFirstLevelEntries: 512,
+  maxCandidates: 256,
+  maxIndexBytes: 2 * 1024 * 1024,
+  maxCumulativeReadBytes: 32 * 1024 * 1024,
+  maxResponseBytes: 256 * 1024,
+})
+
+export const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+export const SHA256_HEX_PATTERN = /^[0-9a-f]{64}$/
 
 export const ID_PATTERN = /^[a-z0-9][a-z0-9_-]*$/
 export const JOB_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_.:-]*$/
@@ -108,6 +163,7 @@ export const PROVENANCE_SOURCE_TYPES = Object.freeze([
   'manual_import',
   'local_procedural',
   'derived_revision',
+  'subscription_sheet',
 ])
 
 export const PROCESSING_TARGET_PIPELINES = Object.freeze([

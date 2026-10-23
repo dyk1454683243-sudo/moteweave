@@ -147,7 +147,7 @@ test('Studio advanced local Character submits JPEG, paired matte, and normalized
   const body = JSON.parse(captured[0].options.body)
   assert.equal(body.source_base64, 'AQIDBA==')
   assert.equal(body.source_black_base64, 'AQIDBA==')
-  assert.equal(body.options.sourceLayout, 'topdown_rpg_v0')
+  assert.equal(body.options.sourceLayout, 'fixed_region_motion_v0')
   assert.deepEqual(body.options.outputFrameSizes, [96, 192, 288, 384])
 })
 

@@ -81,15 +81,21 @@ export async function fetchProviderState() {
   return response.json()
 }
 
+function clearRuntimeApiKey(config) {
+  const keyInput = $(config.apiKeySelector)
+  if (keyInput) keyInput.value = ''
+}
+
 async function saveRuntimeProviderConfig(config) {
   const button = $(config.saveSelector)
-  const keyInput = $(config.apiKeySelector)
   const payload = runtimeProviderPayload(config)
   if (!payload.model || !payload.apiKey) {
+    clearRuntimeApiKey(config)
     setProviderText(config.statusSelector, 'Model and API key are required')
     return
   }
   if (payload.provider === CUSTOM_COMPATIBLE_PROVIDER && !payload.baseUrl) {
+    clearRuntimeApiKey(config)
     setProviderText(config.statusSelector, 'Base URL is required for compatible API')
     return
   }
@@ -97,13 +103,13 @@ async function saveRuntimeProviderConfig(config) {
   setProviderText(config.statusSelector, 'Saving provider...')
   try {
     const provider = await postProviderConfig(payload)
-    if (keyInput) keyInput.value = ''
     config.onProviderState?.(provider)
     showToast(config.saveToastMessage || 'Provider ready')
   } catch (error) {
-    setProviderText(config.statusSelector, error.message)
-    showToast(error.message)
+    if (typeof config.onSaveError === 'function') config.onSaveError(error)
+    else setProviderText(config.statusSelector, 'Configuration save failed')
   } finally {
+    clearRuntimeApiKey(config)
     if (button) button.disabled = false
   }
 }
@@ -117,9 +123,10 @@ async function clearRuntimeProviderConfig(config) {
     config.onProviderState?.(provider)
     showToast(config.clearToastMessage || 'Provider cleared')
   } catch (error) {
-    setProviderText(config.statusSelector, error.message)
-    showToast(error.message)
+    if (typeof config.onSaveError === 'function') config.onSaveError(error)
+    else setProviderText(config.statusSelector, 'Configuration save failed')
   } finally {
+    clearRuntimeApiKey(config)
     if (button) button.disabled = false
   }
 }

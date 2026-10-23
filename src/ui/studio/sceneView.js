@@ -7,6 +7,7 @@ import {
   SCENE_MAX_CANDIDATES,
   SCENE_SOURCE_MAX_BYTES,
   diagnosticSceneArtifacts,
+  fetchSceneGeminiPreset,
   fetchSceneJsonArtifact,
   normalizeSceneOptions,
   pollSceneJob,
@@ -51,8 +52,12 @@ export const SCENE_COPY = Object.freeze({
     liveSourceTitle: 'Generate a tile source',
     liveDescriptionLabel: 'Scene description',
     liveDescriptionPlaceholder: 'Example: muted mossy stone path, crisp pixel blocks, top-down scene',
-    candidateCount: 'Candidates',
-    providerNote: 'Uses the shared Provider from Settings. Each candidate is exactly one call.',
+    candidateCount: 'Generation count',
+    providerNote: 'Choose 1 to 8 generations. Each generation uses one native Gemini call.',
+    geminiUnavailable: 'Native Gemini is unavailable. Online generation is locked; local PNG / WebP / JPEG import is unaffected.',
+    geminiLockedStatus: 'Online generation locked',
+    geminiLockedCrumb: '· Native Gemini unavailable',
+    primaryGeminiLocked: 'Online generation locked',
     mapOptionsTitle: 'Preview parameters',
     fieldWidth: 'Width',
     fieldHeight: 'Height',
@@ -60,12 +65,17 @@ export const SCENE_COPY = Object.freeze({
     fieldSeed: 'Seed',
     fieldDensity: 'Density',
     advancedTitle: 'Advanced / experimental',
+    advancedHint: 'palette snap · edge condition',
     styleSnap: 'Palette snap',
     maxColors: 'Maximum colors',
     edgeCondition: 'Edge condition',
     edgeBand: 'Edge band',
     edgeMode: 'Mode',
+    edgeModeAware: 'Edge-aware v1',
+    edgeModeGlobal: 'Global v0',
     rawPolicy: 'Raw-tile policy',
+    rawPolicyWarn: 'Warn',
+    rawPolicyStrict: 'Strict',
     bindingTitle: 'Current binding',
     canvasLabel: 'Current Scene dual-grid preview',
     qualityTitle: 'Quality gate',
@@ -92,7 +102,7 @@ export const SCENE_COPY = Object.freeze({
     locked: 'Locked',
     unavailable: 'Unavailable',
     noArtifacts: 'No current artifacts',
-    candidateBinding: '{count} candidate(s)',
+    candidateBinding: '{count} generation(s)',
     confirmCalls: 'I confirm at most {count} Provider call(s) for this run',
     phaseEmptyTitle: 'From source tiles to an exportable scene',
     phaseEmptySummary: 'Tiles are Scene input. Real artifacts unlock only after the current result passes its quality gate.',
@@ -219,8 +229,12 @@ export const SCENE_COPY = Object.freeze({
     liveSourceTitle: '在线生成图块源',
     liveDescriptionLabel: '场景描述',
     liveDescriptionPlaceholder: '例如：低饱和苔藓石径、清晰像素块、俯视场景',
-    candidateCount: '候选数',
-    providerNote: '使用“设置”中的共享 Provider；每个候选恰好一次调用。',
+    candidateCount: '生成次数',
+    providerNote: '可选择 1 到 8 次。每次生成消耗 1 次原生 Gemini 调用。',
+    geminiUnavailable: '原生 Gemini 不可用。在线生成已锁定；本地 PNG / WebP / JPEG 导入不受影响。',
+    geminiLockedStatus: '在线生成已锁定',
+    geminiLockedCrumb: '· 原生 Gemini 不可用',
+    primaryGeminiLocked: '在线生成已锁定',
     mapOptionsTitle: '预览参数',
     fieldWidth: '宽度',
     fieldHeight: '高度',
@@ -228,12 +242,17 @@ export const SCENE_COPY = Object.freeze({
     fieldSeed: '种子',
     fieldDensity: '密度',
     advancedTitle: '高级 / 实验参数',
-    styleSnap: 'Palette snap',
+    advancedHint: '调色板对齐 · 边缘条件',
+    styleSnap: '调色板对齐',
     maxColors: '最大颜色数',
-    edgeCondition: 'Edge condition',
+    edgeCondition: '边缘条件',
     edgeBand: '边缘带',
     edgeMode: '模式',
+    edgeModeAware: '边缘感知 v1',
+    edgeModeGlobal: '全局 v0',
     rawPolicy: '原始图块策略',
+    rawPolicyWarn: '警告',
+    rawPolicyStrict: '严格',
     bindingTitle: '当前绑定',
     canvasLabel: '当前 Scene dual-grid 预览',
     qualityTitle: '质量门禁',
@@ -260,7 +279,7 @@ export const SCENE_COPY = Object.freeze({
     locked: '锁定',
     unavailable: '不可用',
     noArtifacts: '没有当前产物',
-    candidateBinding: '{count} 个候选',
+    candidateBinding: '{count} 次生成',
     confirmCalls: '我确认本次最多 {count} 次 Provider 调用',
     phaseEmptyTitle: '从源图块到可导出场景',
     phaseEmptySummary: '图块是场景输入；只有当前结果通过质量门禁后才解锁真实产物。',
@@ -438,6 +457,8 @@ export function createInitialSceneState({ serviceAvailable = true } = {}) {
     description: '',
     candidateCount: 1,
     liveConfirmed: false,
+    geminiStatus: 'unknown',
+    geminiPreset: null,
     lockedUnknownSubmission: false,
     binding: null,
     job: null,
@@ -493,6 +514,10 @@ function liveInputReady(state) {
   return Boolean(String(state.description ?? '').trim())
 }
 
+function sceneGeminiReady(state) {
+  return state?.geminiStatus === 'ready' && Boolean(state?.geminiPreset?.id)
+}
+
 export function deriveScenePresentation(state = createInitialSceneState()) {
   const phase = normalizedPhase(state.phase)
   let action = 'blocked'
@@ -500,7 +525,12 @@ export function deriveScenePresentation(state = createInitialSceneState()) {
     if (phase === 'poll_paused' && state.job) action = 'resume'
     else if (phase !== 'running' && phase !== 'submission_unknown') {
       if (state.mode === 'local' && state.sourceFile) action = 'process'
-      else if (state.mode === 'live' && liveInputReady(state) && state.liveConfirmed) action = 'generate'
+      else if (
+        state.mode === 'live' &&
+        liveInputReady(state) &&
+        state.liveConfirmed &&
+        sceneGeminiReady(state)
+      ) action = 'generate'
     }
   }
   return Object.freeze({ phase, action, busy: state.busy !== null, mode: state.mode })
@@ -711,6 +741,7 @@ function primaryLabel(state, presentation) {
     return state.job || state.resultJob ? sceneT('primaryReprocess') : sceneT('primaryProcess')
   }
   if (!liveInputReady(state) || !state.liveConfirmed) return sceneT('primaryConfirmLive')
+  if (!sceneGeminiReady(state)) return sceneT('primaryGeminiLocked')
   return state.job || state.resultJob
     ? sceneT('primaryRegenerate')
     : sceneT('primaryGenerate', { count: state.candidateCount })
@@ -725,6 +756,8 @@ function errorText(error) {
     service_required: 'serviceRequired',
     quality_binding_mismatch: 'qualityBindingError',
     submission_unknown: 'submissionUnknown',
+    gemini_not_ready: 'geminiUnavailable',
+    gemini_preset_mismatch: 'geminiUnavailable',
   }
   if (known[error.code]) return sceneT(known[error.code])
   return String(error.message || error || sceneT('unknownError'))
@@ -764,12 +797,15 @@ function renderDynamicState(state) {
   if (!root) return
   const phase = normalizedPhase(state.phase)
   const keys = PHASE_PRESENTATION_KEYS[phase]
+  const liveLocked = state.mode === 'live' && !sceneGeminiReady(state)
   root.dataset.scenePhase = phase
   root.dataset.sceneMode = state.mode
   setText('studio-scene-phase-title', sceneT(keys.title))
   setText('studio-scene-phase-summary', sceneT(keys.summary))
-  setText('studio-scene-header-crumb', sceneT(keys.crumb))
-  setText('studio-scene-status', state.phase === 'running' && state.job?.status ? state.job.status : sceneT(keys.status))
+  setText('studio-scene-header-crumb', liveLocked && phase !== 'running' ? sceneT('geminiLockedCrumb') : sceneT(keys.crumb))
+  setText('studio-scene-status', liveLocked && phase !== 'running'
+    ? sceneT('geminiLockedStatus')
+    : (state.phase === 'running' && state.job?.status ? state.job.status : sceneT(keys.status)))
   setText('studio-scene-phase-pill', sceneT(keys.pill))
   setText('studio-scene-stage-title', sceneT(keys.stage))
   setText('studio-scene-stage-metrics', state.previewBundle ? `${state.options.width}×${state.options.height} · ${state.options.pattern}` : sceneT('stageBoundary'))
@@ -780,7 +816,8 @@ function renderDynamicState(state) {
 
   const statusNode = byId('studio-scene-status')
   if (statusNode) {
-    statusNode.dataset.state = phase === 'complete' ? 'ready'
+    statusNode.dataset.state = liveLocked && phase !== 'running' ? 'error'
+      : phase === 'complete' ? 'ready'
       : ['quality_failed', 'failed', 'submission_unknown'].includes(phase) ? 'error'
         : phase === 'running' ? 'loading'
           : 'idle'
@@ -827,6 +864,10 @@ function renderControls(state) {
     picker.classList.toggle('is-disabled', inputsLocked)
     picker.setAttribute('aria-disabled', String(inputsLocked))
   }
+  const confirm = byId('studio-scene-live-confirm')
+  if (confirm) confirm.disabled = inputsLocked || (state.mode === 'live' && !sceneGeminiReady(state))
+  const lock = byId('studio-scene-gemini-lock')
+  if (lock) lock.hidden = !(state.mode === 'live' && !sceneGeminiReady(state))
   const primary = byId('studio-scene-primary')
   if (primary) {
     primary.textContent = primaryLabel(state, presentation)
@@ -844,6 +885,10 @@ function renderControls(state) {
   setText('studio-scene-source-meta', state.sourceFile
     ? `${state.sourceFile.type || 'image'} · ${state.sourceFile.size ?? '—'} bytes · 192×192`
     : sceneT('localSourceProfile'))
+  const candidates = byId('studio-scene-candidates')
+  if (candidates && String(candidates.value) !== String(state.candidateCount)) {
+    candidates.value = String(state.candidateCount)
+  }
   setText('studio-scene-live-confirm-copy', sceneT('confirmCalls', { count: state.candidateCount }))
   setText('studio-scene-density-value', Number(state.options.density).toFixed(2))
   const binding = bindingCopy(state)
@@ -1020,12 +1065,18 @@ function switchMode(mode) {
   state.error = null
   if (mode === 'local') {
     state.phase = state.resultJob ? 'stale' : state.sourceFile ? 'ready' : 'empty'
-  } else if (state.lockedUnknownSubmission) {
+    renderStudioScene(state)
+    return
+  }
+  if (state.lockedUnknownSubmission) {
     state.phase = 'submission_unknown'
   } else {
     state.phase = state.resultJob ? 'stale' : liveInputReady(state) ? 'ready' : 'empty'
   }
+  state.geminiStatus = 'unknown'
+  state.geminiPreset = null
   renderStudioScene(state)
+  void refreshSceneGeminiReadiness(state)
 }
 
 async function loadJobPreview(job, options) {
@@ -1269,6 +1320,30 @@ function bindEvents() {
 export function renderStudioSceneLanguage() {
   if (!sceneState) return null
   return renderStudioScene(sceneState)
+}
+
+async function refreshSceneGeminiReadiness(state) {
+  if (!state?.serviceAvailable || state.mode !== 'live') return
+  try {
+    const preset = await fetchSceneGeminiPreset()
+    if (sceneState !== state || state.mode !== 'live') return
+    state.geminiPreset = preset
+    state.geminiStatus = 'ready'
+  } catch {
+    if (sceneState !== state || state.mode !== 'live') return
+    state.geminiPreset = null
+    state.geminiStatus = 'unavailable'
+  }
+  renderStudioScene(state)
+}
+
+export function refreshStudioSceneLiveReadiness() {
+  const state = sceneState
+  if (!state?.serviceAvailable || state.mode !== 'live' || state.busy) return
+  state.geminiStatus = 'unknown'
+  state.geminiPreset = null
+  renderStudioScene(state)
+  void refreshSceneGeminiReadiness(state)
 }
 
 export function initStudioScene({ serviceAvailable = true } = {}) {

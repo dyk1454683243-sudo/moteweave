@@ -1,4 +1,3 @@
-import { getAnimationNameForIntent, getMovementIntent, movePreviewActor } from '../../character-pack/playablePreview.js'
 import { getCurrentLanguage } from '../i18n.js'
 import {
   buildLocalCharacterOptions,
@@ -10,6 +9,22 @@ import {
   validateLocalCharacterFile,
   verifyLocalCharacterResult,
 } from './characterLocalApi.js'
+import {
+  bindSharedCharacterResult,
+  clearSharedCharacterResult,
+  closeSharedCharacterExportDialog,
+  createAiAcceptedSourceResultPresentation,
+  createLocalCompleteResultPresentation,
+  createLocalQualityOnlyPresentation,
+  getSharedCharacterExportPresentation,
+  getSharedCharacterResultOwner,
+  openSharedCharacterExportDialog,
+  queryAdvancedConfigControls,
+  readSharedCharacterResultSnapshot,
+  refreshSharedCharacterResultPresentation,
+  ADVANCED_CONFIG_CONTROL_SELECTOR,
+  stopSharedCharacterPreview,
+} from './characterResultView.js'
 import {
   addAdvancedCutLine,
   advancedLocalInputFingerprint,
@@ -28,17 +43,74 @@ import {
   TEMPLATE_CALIBRATION_STAGE_SIZE,
 } from '../characterPack/templateCalibrationCore.js'
 import { FIXED_REGION_MOTION_LAYOUT_ID } from '../../character-pack/sourceLayoutIds.js'
+import {
+  bindCharacterComboboxKinds,
+  closeAllCharacterComboboxes,
+  registerCharacterCombobox,
+  syncCharacterCombobox,
+} from './characterCombobox.js'
 
-const MOVEMENT_KEYS = new Set([
-  'w', 'a', 's', 'd', 'W', 'A', 'S', 'D',
-  'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+const CHARACTER_LOCAL_COMBOBOX_KINDS = Object.freeze([
+  'advancedLayout',
+  'advancedBackgroundMode',
+  'advancedOutlineMode',
+  'advancedFrame',
 ])
+registerCharacterCombobox('advancedLayout', {
+  select: 'character-advanced-layout',
+  trigger: 'character-advanced-layout-trigger',
+  value: 'character-advanced-layout-value',
+  list: 'character-advanced-layout-list',
+  optionPrefix: 'character-advanced-layout-option',
+  labelledBy: 'character-advanced-layout-label',
+})
+registerCharacterCombobox('advancedBackgroundMode', {
+  select: 'character-advanced-background-mode',
+  trigger: 'character-advanced-background-mode-trigger',
+  value: 'character-advanced-background-mode-value',
+  list: 'character-advanced-background-mode-list',
+  optionPrefix: 'character-advanced-background-mode-option',
+  labelledBy: 'character-advanced-background-mode-label',
+})
+registerCharacterCombobox('advancedOutlineMode', {
+  select: 'character-advanced-outline-mode',
+  trigger: 'character-advanced-outline-mode-trigger',
+  value: 'character-advanced-outline-mode-value',
+  list: 'character-advanced-outline-mode-list',
+  optionPrefix: 'character-advanced-outline-mode-option',
+  labelledBy: 'character-advanced-outline-mode-label',
+})
+registerCharacterCombobox('advancedFrame', {
+  select: 'character-advanced-frame',
+  trigger: 'character-advanced-frame-trigger',
+  value: 'character-advanced-frame-value',
+  list: 'character-advanced-frame-list',
+  optionPrefix: 'character-advanced-frame-option',
+  labelledBy: 'character-advanced-frame-label',
+  scrollable: true,
+})
 
-const EXPORT_LINKS = Object.freeze([
-  ['character-local-export-pack', 'zip_url'],
-  ['character-local-export-godot', 'godot_npc_zip_url'],
-  ['character-local-export-rpgmaker', 'rpgmaker_zip_url'],
-  ['character-local-export-ocad', 'ocad_zip_url'],
+function syncLocalCharacterComboboxes({ editable = true } = {}) {
+  for (const kind of CHARACTER_LOCAL_COMBOBOX_KINDS) syncCharacterCombobox(kind, { editable })
+}
+
+const ADVANCED_ANIMATION_LOCK_OPTIONS = Object.freeze([
+  ['idle_down', 'advancedLockIdleDown'],
+  ['idle_up', 'advancedLockIdleUp'],
+  ['idle_left', 'advancedLockIdleLeft'],
+  ['idle_right', 'advancedLockIdleRight'],
+  ['walk_down', 'advancedLockWalkDown'],
+  ['walk_up', 'advancedLockWalkUp'],
+  ['walk_left', 'advancedLockWalkLeft'],
+  ['walk_right', 'advancedLockWalkRight'],
+  ['attack_down', 'advancedLockAttackDown'],
+  ['attack_up', 'advancedLockAttackUp'],
+  ['attack_left', 'advancedLockAttackLeft'],
+  ['attack_right', 'advancedLockAttackRight'],
+  ['hurt', 'advancedLockHurt'],
+  ['happy', 'advancedLockHappy'],
+  ['sit', 'advancedLockSit'],
+  ['talk', 'advancedLockTalk'],
 ])
 
 const LOCAL_COPY = Object.freeze({
@@ -49,17 +121,17 @@ const LOCAL_COPY = Object.freeze({
     statusRunning: 'Local processing',
     statusPaused: 'Observation paused',
     statusUnknown: 'Submission outcome unknown',
-    statusFailed: 'Quality blocked',
+    statusFailed: 'Processing blocked',
     statusComplete: 'Quality passed · export ready',
     exportLocked: 'Process before export',
     exportReady: 'Export',
     flowEyebrow: 'Current flow',
     flowTitle: 'Local sprite-sheet import',
-    flowSummary: 'Upload one PNG or WebP sheet and run the maintained local quality pipeline.',
+    flowSummary: 'Upload a sheet, bind layout and parameters, then start processing.',
     sourceTitle: 'Sprite sheet',
-    sourceHint: 'PNG / WebP · up to 32 MiB',
+    sourceHint: 'PNG / WebP / JPEG · up to 32 MiB',
     sourceDrop: 'Choose a sprite sheet',
-    sourceDropHelp: 'Processing uses the locked Standard RPG 8 × 8 layout.',
+    sourceDropHelp: 'Choose the maintained 8 × 8 or fixed-region layout below.',
     sourceActionsAria: 'Source file actions',
     replace: 'Replace',
     clear: 'Clear',
@@ -72,24 +144,18 @@ const LOCAL_COPY = Object.freeze({
     defaultFps: 'FPS · defined per animation',
     defaultMatte: 'Matte · automatic',
     defaultsAria: 'Locked processing defaults',
-    advanced: 'Advanced defaults',
-    advancedHelp: 'Maintained defaults are submitted exactly as shown; no hidden UI value overrides them.',
-    advancedCleanup: 'Cleanup · on · min alpha 18 · min area 4',
-    advancedAnchor: 'Anchor · (0, 0) · no frame adjustments',
-    advancedMotion: 'Auto-correct · on · stabilization · on · max shift 2',
-    advancedExport: 'Scales · 1× / 2× · pixel finishing off',
     advancedMode: 'Advanced processing',
     advancedModeHelp: 'JPEG, fixed-region layout, matte pairing, calibration, cut lines, and maintained tuning.',
     advancedModeActive: 'Advanced processing · current input bound',
     advancedSourceHint: 'PNG / WebP / JPEG · up to 32 MiB',
-    advancedFlowSummary: 'Upload PNG, WebP, or JPEG and bind maintained advanced parameters to one local Job.',
-    advancedSourceDropHelp: 'Choose the maintained 8 × 8 or fixed-region layout in Advanced processing.',
-    advancedProfileTitle: 'Advanced · current values',
+    advancedFlowSummary: 'Upload a sheet, bind layout and parameters, then start processing.',
+    advancedSourceDropHelp: 'Choose the maintained 8 × 8 or fixed-region layout below.',
+    advancedProfileTitle: 'Current values',
     advancedProfileFixed: 'Fixed-region motion source',
     advancedProfileTopdown: 'Standard RPG topdown · 8 × 8',
-    advancedPrimary: 'Start advanced processing',
-    advancedConfigKicker: 'Advanced processing · current input binding',
-    advancedConfigTitle: 'Advanced local configuration',
+    advancedPrimary: 'Start processing',
+    advancedConfigKicker: 'Current input binding',
+    advancedConfigTitle: 'Processing parameters',
     advancedConfigHelp: 'Changing a file or parameter immediately revokes the prior Job, exports, and Project candidate.',
     advancedSourceLayout: 'Source layout',
     advancedLayoutTopdown: 'Standard RPG · 8 × 8',
@@ -99,6 +165,11 @@ const LOCAL_COPY = Object.freeze({
     advancedBlackClear: 'Clear matte',
     advancedBackground: 'Background & cleanup',
     advancedBackgroundMode: 'Background mode',
+    advancedBackgroundAuto: 'Automatic',
+    advancedBackgroundFlood: 'Solid-color flood removal',
+    advancedBackgroundEdgePalette: 'Edge-palette removal',
+    advancedBackgroundAlpha: 'Alpha cleanup',
+    advancedBackgroundDualMatte: 'White/black matte pair',
     advancedTolerance: 'Tolerance',
     advancedMinAlpha: 'Min alpha',
     advancedMinArea: 'Min area',
@@ -108,15 +179,35 @@ const LOCAL_COPY = Object.freeze({
     advancedMaxColors: 'Max colors',
     advancedOutline: 'Outline',
     advancedOutlineMode: 'Outline mode',
+    advancedOutlineOuter: 'Outer outline',
+    advancedOutlineInner: 'Inner outline',
+    advancedOutlineBoth: 'Inner + outer outline',
     advancedGeometry: 'Frames & anchors',
     advancedAnchorX: 'Anchor X',
     advancedAnchorY: 'Anchor Y',
     advancedFrame: 'Frame',
+    advancedFrameOption: 'Frame {index}',
     advancedNudgeX: 'Nudge X',
     advancedNudgeY: 'Nudge Y',
     advancedSaveNudge: 'Save nudge',
     advancedClearNudge: 'Clear nudge',
     advancedAnimationLocks: 'Animation lock (no stabilization)',
+    advancedLockIdleDown: 'Idle · Down',
+    advancedLockIdleUp: 'Idle · Up',
+    advancedLockIdleLeft: 'Idle · Left',
+    advancedLockIdleRight: 'Idle · Right',
+    advancedLockWalkDown: 'Walk · Down',
+    advancedLockWalkUp: 'Walk · Up',
+    advancedLockWalkLeft: 'Walk · Left',
+    advancedLockWalkRight: 'Walk · Right',
+    advancedLockAttackDown: 'Attack · Down',
+    advancedLockAttackUp: 'Attack · Up',
+    advancedLockAttackLeft: 'Attack · Left',
+    advancedLockAttackRight: 'Attack · Right',
+    advancedLockHurt: 'Hurt',
+    advancedLockHappy: 'Happy',
+    advancedLockSit: 'Sit',
+    advancedLockTalk: 'Talk',
     advancedAutoCorrect: 'Auto-correct',
     advancedStabilize: 'Motion stabilization',
     advancedMaxShift: 'Max shift',
@@ -176,10 +267,11 @@ const LOCAL_COPY = Object.freeze({
     stagePausedHelp: 'Resume only re-observes this Job; it does not create replacement work.',
     stageUnknownKicker: 'Fail closed',
     stageUnknownTitle: 'No authoritative Job receipt',
-    stageUnknownHelp: 'The request may have reached the server. Automatic resubmission is disabled.',
-    stageFailedKicker: 'Quality blocked',
-    stageFailedTitle: 'The real report blocked verified downloads',
-    stageFailedHelp: 'Inspect the issue, impact, suggestion, and diagnostic code below.',
+    stageUnknownHelp: 'Automatic resubmission stays disabled to avoid creating duplicate work.',
+    stageFailedKicker: 'Processing blocked',
+    stageFailedTitle: 'Verified download is unavailable',
+    stageFailedReportHelp: 'Review the Quality Report at the top right. Verified download stays locked.',
+    stageFailedNoReportHelp: 'No Quality Report was returned. Verified download stays locked.',
     stageCompleteKicker: 'Playable preview',
     stageCompleteTitle: 'WASD / arrow keys move the verified result',
     stageCompleteHelp: 'The sprite, animation manifest, Quality Report, and exports belong to this exact Job.',
@@ -221,6 +313,16 @@ const LOCAL_COPY = Object.freeze({
     issueGenericTitle: 'The maintained quality gate reported an issue',
     issueGenericImpact: 'Verified downloads remain locked because the real diagnostic did not pass.',
     issueGenericSuggestion: 'Open the Quality Report and correct the referenced source condition.',
+    failureSubmissionUnknown: 'The service did not return an authoritative Job receipt, so this input cannot be submitted again automatically.',
+    failureQualityBlocked: 'The quality check blocked this result.',
+    failurePostProcessing: 'The service could not finish processing this result.',
+    failureModel: 'The service did not produce a usable result.',
+    failureSafety: 'The service stopped this result because it did not pass the safety check.',
+    failureVerification: 'The Job finished, but its returned files could not be verified.',
+    failureTimeout: 'The service response timed out before a verified result was available.',
+    failureService: 'The service request ended without a verified result.',
+    failureGeneric: 'Processing ended without a verified result.',
+    failureDetail: 'Current task response: {detail}',
     errorSourceRead: 'The selected image could not be decoded.',
     errorSourceRequired: 'Choose a PNG or WebP sprite sheet first.',
     errorName: 'Enter a valid resource name.',
@@ -235,17 +337,17 @@ const LOCAL_COPY = Object.freeze({
     statusRunning: '本地处理中',
     statusPaused: '任务观察已暂停',
     statusUnknown: '提交结果未知',
-    statusFailed: '质量已阻断',
+    statusFailed: '处理已阻断',
     statusComplete: '质量通过 · 可导出',
     exportLocked: '处理完成后导出',
     exportReady: '导出',
     flowEyebrow: '当前流程',
     flowTitle: '本地精灵表导入',
-    flowSummary: '上传一张 PNG 或 WebP 精灵表，运行仓库维护中的本地质量管线。',
+    flowSummary: '上传精灵表，绑定布局与参数后开始处理。',
     sourceTitle: '精灵表',
-    sourceHint: 'PNG / WebP · 最大 32 MiB',
+    sourceHint: 'PNG / WebP / JPEG · 最大 32 MiB',
     sourceDrop: '选择精灵表',
-    sourceDropHelp: '处理使用锁定的标准 RPG 8 × 8 布局。',
+    sourceDropHelp: '在下方选择维护中的 8 × 8 或固定区域布局。',
     sourceActionsAria: '源文件操作',
     replace: '替换',
     clear: '清除',
@@ -258,24 +360,18 @@ const LOCAL_COPY = Object.freeze({
     defaultFps: 'FPS · 由每个动画定义',
     defaultMatte: 'Matte · 自动',
     defaultsAria: '锁定的处理默认值',
-    advanced: '高级默认值',
-    advancedHelp: '下列维护中默认值会原样提交，不存在由隐藏控件覆盖的参数。',
-    advancedCleanup: '清理 · 开 · 最小 Alpha 18 · 最小面积 4',
-    advancedAnchor: '锚点 · (0, 0) · 无逐帧调整',
-    advancedMotion: '自动校正 · 开 · 稳定处理 · 开 · 最大位移 2',
-    advancedExport: '尺寸 · 1× / 2× · 像素精修关闭',
     advancedMode: '高级处理',
     advancedModeHelp: 'JPEG、固定区域布局、黑底配对、校准、切线及维护中的高级参数。',
     advancedModeActive: '高级处理 · 当前输入已绑定',
     advancedSourceHint: 'PNG / WebP / JPEG · 最大 32 MiB',
-    advancedFlowSummary: '上传 PNG、WebP 或 JPEG，并将维护中的高级参数绑定到一个本地任务。',
-    advancedSourceDropHelp: '在高级处理中选择维护中的 8 × 8 或固定区域布局。',
-    advancedProfileTitle: '高级 · 当前参数',
+    advancedFlowSummary: '上传精灵表，绑定布局与参数后开始处理。',
+    advancedSourceDropHelp: '在下方选择维护中的 8 × 8 或固定区域布局。',
+    advancedProfileTitle: '当前参数',
     advancedProfileFixed: '固定区域动作源图',
     advancedProfileTopdown: '标准 RPG 俯视 · 8 × 8',
-    advancedPrimary: '开始高级处理',
-    advancedConfigKicker: '高级处理 · 当前输入绑定',
-    advancedConfigTitle: '高级本地配置',
+    advancedPrimary: '开始处理',
+    advancedConfigKicker: '当前输入绑定',
+    advancedConfigTitle: '处理参数',
     advancedConfigHelp: '更换文件或参数会立即撤销旧任务、导出和 Project candidate。',
     advancedSourceLayout: '源布局',
     advancedLayoutTopdown: '标准 RPG · 8 × 8',
@@ -285,6 +381,11 @@ const LOCAL_COPY = Object.freeze({
     advancedBlackClear: '清除黑底图',
     advancedBackground: '背景与清理',
     advancedBackgroundMode: '背景模式',
+    advancedBackgroundAuto: '自动检测',
+    advancedBackgroundFlood: '纯色连通去背',
+    advancedBackgroundEdgePalette: '边缘取色去背',
+    advancedBackgroundAlpha: '透明通道清理',
+    advancedBackgroundDualMatte: '黑白底配对',
     advancedTolerance: '容差',
     advancedMinAlpha: '最小 Alpha',
     advancedMinArea: '最小面积',
@@ -294,15 +395,35 @@ const LOCAL_COPY = Object.freeze({
     advancedMaxColors: '最大颜色数',
     advancedOutline: '描边',
     advancedOutlineMode: '描边模式',
+    advancedOutlineOuter: '外描边',
+    advancedOutlineInner: '内描边',
+    advancedOutlineBoth: '内外描边',
     advancedGeometry: '帧与锚点',
     advancedAnchorX: '锚点 X',
     advancedAnchorY: '锚点 Y',
     advancedFrame: '帧',
+    advancedFrameOption: '帧 {index}',
     advancedNudgeX: '逐帧位移 X',
     advancedNudgeY: '逐帧位移 Y',
     advancedSaveNudge: '保存位移',
     advancedClearNudge: '清除位移',
     advancedAnimationLocks: '动画锁（不参与稳定）',
+    advancedLockIdleDown: '待机 · 向下',
+    advancedLockIdleUp: '待机 · 向上',
+    advancedLockIdleLeft: '待机 · 向左',
+    advancedLockIdleRight: '待机 · 向右',
+    advancedLockWalkDown: '行走 · 向下',
+    advancedLockWalkUp: '行走 · 向上',
+    advancedLockWalkLeft: '行走 · 向左',
+    advancedLockWalkRight: '行走 · 向右',
+    advancedLockAttackDown: '攻击 · 向下',
+    advancedLockAttackUp: '攻击 · 向上',
+    advancedLockAttackLeft: '攻击 · 向左',
+    advancedLockAttackRight: '攻击 · 向右',
+    advancedLockHurt: '受伤',
+    advancedLockHappy: '开心',
+    advancedLockSit: '坐下',
+    advancedLockTalk: '说话',
     advancedAutoCorrect: '自动校正',
     advancedStabilize: '运动稳定',
     advancedMaxShift: '最大位移',
@@ -362,10 +483,11 @@ const LOCAL_COPY = Object.freeze({
     stagePausedHelp: '继续只会重新观察这个任务，不会创建替代任务。',
     stageUnknownKicker: '失败即关闭',
     stageUnknownTitle: '没有权威任务回执',
-    stageUnknownHelp: '请求可能已到达服务端，因此禁止自动重新提交。',
-    stageFailedKicker: '质量已阻断',
-    stageFailedTitle: '真实报告阻止了已验证下载',
-    stageFailedHelp: '请检查下方问题、影响、建议和诊断代码。',
+    stageUnknownHelp: '为避免创建重复任务，自动重新提交保持禁用。',
+    stageFailedKicker: '处理已阻断',
+    stageFailedTitle: '已验证下载不可用',
+    stageFailedReportHelp: '可在右上角质量报告中查看明细；已验证下载保持锁定。',
+    stageFailedNoReportHelp: '服务端未返回质量报告；已验证下载保持锁定。',
     stageCompleteKicker: '可试玩预览',
     stageCompleteTitle: '使用 WASD / 方向键移动已核验结果',
     stageCompleteHelp: '精灵图、动画清单、质量报告和导出均绑定到这个精确任务。',
@@ -407,6 +529,16 @@ const LOCAL_COPY = Object.freeze({
     issueGenericTitle: '维护中的质量门报告了问题',
     issueGenericImpact: '真实诊断未通过，因此已验证下载继续保持锁定。',
     issueGenericSuggestion: '打开质量报告并修正所指源文件条件。',
+    failureSubmissionUnknown: '服务端没有返回权威任务回执，因此不能自动再次提交这个输入。',
+    failureQualityBlocked: '质量检查阻止了这个结果。',
+    failurePostProcessing: '服务端未能完成这个结果的后处理。',
+    failureModel: '服务端没有生成可用结果。',
+    failureSafety: '这个结果未通过安全检查，服务端已停止处理。',
+    failureVerification: '任务已经完成，但返回的文件未能通过核验。',
+    failureTimeout: '服务端响应超时，尚未得到已验证结果。',
+    failureService: '服务请求结束时没有得到已验证结果。',
+    failureGeneric: '处理结束时没有得到已验证结果。',
+    failureDetail: '当前任务返回：{detail}',
     errorSourceRead: '无法解码所选图像。',
     errorSourceRequired: '请先选择 PNG 或 WebP 精灵表。',
     errorName: '请输入有效的资源名称。',
@@ -416,20 +548,62 @@ const LOCAL_COPY = Object.freeze({
   }),
 })
 
+const LOCAL_FAILURE_STATUS_KEYS = Object.freeze({
+  failed_quality_gate: 'failureQualityBlocked',
+  failed_post_processing: 'failurePostProcessing',
+  failed_model_error: 'failureModel',
+  failed_safety_filter: 'failureSafety',
+  done: 'failureVerification',
+})
+
+const LOCAL_FAILURE_ERROR_KEYS = Object.freeze({
+  quality_gate_blocked: 'failureQualityBlocked',
+  request_timeout: 'failureTimeout',
+  fetch_unavailable: 'failureService',
+  request_failed: 'failureService',
+  http_error: 'failureService',
+  job_not_found: 'failureService',
+  invalid_job_receipt: 'failureVerification',
+  job_binding_mismatch: 'failureVerification',
+  job_not_terminal: 'failureVerification',
+  invalid_quality_report: 'failureVerification',
+  invalid_animations: 'failureVerification',
+  source_layout_binding_mismatch: 'failureVerification',
+  response_size_exceeded: 'failureVerification',
+  invalid_json_response: 'failureVerification',
+  invalid_text_response: 'failureVerification',
+})
+
+const LOCAL_ADVANCED_CONFIG_CONTROL_SELECTOR = ADVANCED_CONFIG_CONTROL_SELECTOR
+
 let initialized = false
 let serviceConnectionAvailable = true
-let localActive = true
+let processingActive = true
+let processingSurfaceActive = true
 let operationEpoch = 0
 let sourceSelectionEpoch = 0
 let blackSelectionEpoch = 0
 let calibrationEpoch = 0
+let selectedAdjustmentFrame = 0
 let advancedPanelReturnFocus = null
 let activeController = null
 let state = createInitialLocalCharacterState()
-let preview = createPreviewState()
+
+export { LOCAL_ADVANCED_CONFIG_CONTROL_SELECTOR }
+
+function localMutationAllowed() {
+  return processingActive
+    && !['running', 'submission_unknown'].includes(state.phase)
+    && state.busy !== 'decode'
+    && !state.calibration?.busy
+}
+
+function renderProcessingSurface() {
+  if (processingSurfaceActive) renderStudioCharacterLocal()
+}
 
 function byId(id) {
-  return document.getElementById(id)
+  return globalThis.document?.getElementById?.(id) ?? null
 }
 
 function localT(key, replacements = {}) {
@@ -448,31 +622,17 @@ function setHidden(id, hidden) {
   if (node) node.hidden = hidden
 }
 
-function createPreviewState() {
-  return {
-    image: null,
-    animations: null,
-    keys: new Set(),
-    animationName: null,
-    direction: 'down',
-    frameCursor: 0,
-    lastFrameTime: 0,
-    lastMoveTime: 0,
-    wasMoving: false,
-    position: { x: 450, y: 310 },
-    raf: null,
-  }
-}
-
 export function createInitialLocalCharacterState() {
   return {
     phase: 'empty',
     busy: null,
     file: null,
     sourceUrl: null,
+    sourceOrigin: null,
+    sourceProvenance: null,
     dimensions: null,
     name: '',
-    processingMode: 'standard',
+    processingMode: 'advanced',
     advancedPanel: null,
     advancedSettings: createAdvancedLocalSettings(),
     blackFile: null,
@@ -492,21 +652,114 @@ export function createInitialLocalCharacterState() {
     job: null,
     result: null,
     failureReport: null,
+    failureReasonKey: null,
     error: null,
   }
 }
 
+function isLocalCharacterQualityReport(value) {
+  const validation = value?.validation
+  return Boolean(
+    value &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    validation &&
+    typeof validation === 'object' &&
+    !Array.isArray(validation) &&
+    ['pass', 'warning', 'fail'].includes(validation.status) &&
+    Array.isArray(validation.warnings) &&
+    Array.isArray(validation.blocking_errors)
+  )
+}
+
+function localCharacterFailureReasonKey({ phase, error, job, failureReport } = {}) {
+  if (phase === 'submission_unknown') return 'failureSubmissionUnknown'
+  const errorKey = LOCAL_FAILURE_ERROR_KEYS[String(error?.code ?? '')]
+  if (errorKey) return errorKey
+  const statusKey = LOCAL_FAILURE_STATUS_KEYS[String(job?.status ?? '')]
+  if (statusKey) return statusKey
+  if (isLocalCharacterQualityReport(failureReport)) return 'failureQualityBlocked'
+  return 'failureGeneric'
+}
+
+export function createLocalCharacterFailureState(value, {
+  phase = 'failed',
+  job = value?.job ?? null,
+  error = null,
+  errorMessage = null,
+  failureReport = null,
+} = {}) {
+  const verifiedReport = isLocalCharacterQualityReport(failureReport)
+    ? failureReport
+    : isLocalCharacterQualityReport(error?.payload)
+      ? error.payload
+      : null
+  return {
+    ...value,
+    phase,
+    busy: null,
+    job,
+    result: null,
+    failureReport: verifiedReport,
+    failureReasonKey: localCharacterFailureReasonKey({
+      phase,
+      error,
+      job,
+      failureReport: verifiedReport,
+    }),
+    error: errorMessage ?? String(error?.message || error || ''),
+  }
+}
+
+export function deriveLocalCharacterBlockingPresentation(value, language = 'en') {
+  if (!['failed', 'submission_unknown'].includes(value?.phase)) return null
+  const failureReport = isLocalCharacterQualityReport(value?.failureReport)
+    ? value.failureReport
+    : null
+  const reasonKey = value?.failureReasonKey ?? localCharacterFailureReasonKey({
+    phase: value?.phase,
+    job: value?.job,
+    failureReport,
+  })
+  const locale = language === 'en' ? 'en' : 'zh'
+  return Object.freeze({
+    reasonKey,
+    reason: LOCAL_COPY[locale][reasonKey] ?? LOCAL_COPY.en[reasonKey] ?? reasonKey,
+    hasQualityReport: Boolean(failureReport),
+  })
+}
+
+export function deriveLocalCharacterVisibleError(value, language = 'en') {
+  const blocking = deriveLocalCharacterBlockingPresentation(value, language)
+  const detail = String(value?.error ?? '').trim()
+  if (!blocking) return detail
+  if (!detail || detail === blocking.reason) return blocking.reason
+
+  const receiptCodes = new Set([
+    value?.job?.status,
+    value?.job?.failure_status,
+  ].filter(Boolean).map((entry) => String(entry).trim()))
+  const isBareMachineCode = /^[a-z0-9]+(?:_[a-z0-9]+)+$/i.test(detail)
+  if (receiptCodes.has(detail) || isBareMachineCode) return blocking.reason
+
+  const locale = language === 'en' ? 'en' : 'zh'
+  const template = LOCAL_COPY[locale].failureDetail ?? LOCAL_COPY.en.failureDetail
+  const detailCopy = template.replace('{detail}', detail)
+  return `${blocking.reason} ${detailCopy}`
+}
+
 export function deriveLocalCharacterPresentation(value = state) {
   const phase = value?.phase ?? 'empty'
+  const hasFailureReport = isLocalCharacterQualityReport(value?.failureReport)
   const copy = {
     empty: ['statusEmpty', 'stageEmptyKicker', 'stageEmptyTitle', 'stageEmptyHelp', 'primaryStart', 'blocked'],
     ready: ['statusReady', 'stageReadyKicker', 'stageReadyTitle', 'stageReadyHelp', 'primaryStart', 'build'],
     running: ['statusRunning', 'stageRunningKicker', 'stageRunningTitle', 'stageRunningHelp', 'primaryRunning', 'running'],
     poll_paused: ['statusPaused', 'stagePausedKicker', 'stagePausedTitle', 'stagePausedHelp', 'primaryResume', 'resume'],
     submission_unknown: ['statusUnknown', 'stageUnknownKicker', 'stageUnknownTitle', 'stageUnknownHelp', 'primaryUnknown', 'blocked'],
-    failed: ['statusFailed', 'stageFailedKicker', 'stageFailedTitle', 'stageFailedHelp', 'primaryRetry', 'build'],
+    failed: ['statusFailed', 'stageFailedKicker', 'stageFailedTitle', hasFailureReport ? 'stageFailedReportHelp' : 'stageFailedNoReportHelp', 'primaryRetry', 'build'],
     complete: ['statusComplete', 'stageCompleteKicker', 'stageCompleteTitle', 'stageCompleteHelp', 'exportReady', 'export'],
-  }[phase] ?? ['statusFailed', 'stageFailedKicker', 'stageFailedTitle', 'stageFailedHelp', 'primaryRetry', 'blocked']
+  }[phase] ?? ['statusFailed', 'stageFailedKicker', 'stageFailedTitle', 'stageFailedNoReportHelp', 'primaryRetry', 'blocked']
   return Object.freeze({
     phase,
     statusKey: copy[0],
@@ -533,11 +786,15 @@ function currentInputKey(value = state) {
       name: value.name,
       settings: value.advancedSettings,
     })
-    return advancedLocalInputFingerprint({
-      file: value.file,
-      blackFile,
-      options,
-      inputEpoch: value.inputEpoch,
+    return JSON.stringify({
+      processingFingerprint: advancedLocalInputFingerprint({
+        file: value.file,
+        blackFile,
+        options,
+        inputEpoch: value.inputEpoch,
+      }),
+      sourceOrigin: value.sourceOrigin ?? 'local',
+      sourceProvenance: value.sourceProvenance ?? null,
     })
   }
   return JSON.stringify({
@@ -545,6 +802,8 @@ function currentInputKey(value = state) {
     fileName: value.file.name,
     fileSize: value.file.size,
     fileType: value.file.type,
+    sourceOrigin: value.sourceOrigin ?? 'local',
+    sourceProvenance: value.sourceProvenance ?? null,
     name: value.name.trim(),
     options: buildLocalCharacterOptions({ file: value.file, name: value.name }),
   })
@@ -561,21 +820,54 @@ function isCurrentOperation(epoch) {
   return epoch === operationEpoch
 }
 
-function stopPreview() {
-  if (preview.raf != null) cancelAnimationFrame(preview.raf)
-  preview.raf = null
-  preview.keys.clear()
+function clearVerifiedResult() {
+  stopSharedCharacterPreview()
+  closeSharedCharacterExportDialog()
+  if (getSharedCharacterResultOwner() === 'local') clearSharedCharacterResult({ owner: 'local' })
 }
 
-function clearVerifiedResult() {
-  stopPreview()
-  preview = createPreviewState()
-  closeExportDialog()
+function abandonLocalTemporaryWork() {
+  blackSelectionEpoch += 1
+  if (state.busy === 'decode') {
+    sourceSelectionEpoch += 1
+    blackSelectionEpoch += 1
+    calibrationEpoch += 1
+    revokeInputUrls()
+    state = {
+      ...state,
+      busy: null,
+      file: null,
+      sourceUrl: null,
+      dimensions: null,
+      blackFile: null,
+      blackUrl: null,
+      blackDimensions: null,
+      error: null,
+    }
+  }
+  if (state.calibration?.busy) {
+    calibrationEpoch += 1
+    revokeUrl(state.calibration.previewUrl)
+    state = {
+      ...state,
+      calibration: {
+        ...state.calibration,
+        busy: false,
+        previewFile: null,
+        previewUrl: null,
+        report: null,
+      },
+    }
+  }
+}
+
+function persistLocalOwnedState(patch) {
+  state = { ...state, ...patch }
+  renderProcessingSurface()
 }
 
 function setState(patch) {
-  state = { ...state, ...patch }
-  renderStudioCharacterLocal()
+  persistLocalOwnedState(patch)
 }
 
 function errorDetail(error) {
@@ -586,11 +878,23 @@ function errorDetail(error) {
   return localT('errorGeneric', { detail: String(error?.message || error || 'unknown') })
 }
 
+let imageDimensionLoader = null
+let calibrationDecodeLoader = null
+
+export function setLocalCharacterImageDimensionLoader(loader) {
+  imageDimensionLoader = typeof loader === 'function' ? loader : null
+}
+
+export function setLocalCharacterCalibrationDecoder(loader) {
+  calibrationDecodeLoader = typeof loader === 'function' ? loader : null
+}
+
 function objectUrlForFile(file) {
   return globalThis.URL?.createObjectURL?.(file) ?? null
 }
 
 function readImageDimensions(url) {
+  if (imageDimensionLoader) return Promise.resolve(imageDimensionLoader(url))
   return new Promise((resolve, reject) => {
     const image = new Image()
     image.onload = () => resolve({ width: image.naturalWidth, height: image.naturalHeight })
@@ -629,8 +933,31 @@ function settingsForSource(settings, dimensions) {
   }
 }
 
-async function selectSource(file) {
-  if (['running', 'submission_unknown'].includes(state.phase)) return
+async function selectSource(file, {
+  sourceOrigin = 'local',
+  sourceProvenance = null,
+  signal,
+  transactional = false,
+  allowActiveRunSupersession = false,
+} = {}) {
+  const supersedingActiveRun = allowActiveRunSupersession
+    && ['running', 'submission_unknown'].includes(state.phase)
+    && state.busy !== 'decode'
+    && !state.calibration?.busy
+  if ((!localMutationAllowed() && !supersedingActiveRun) || signal?.aborted) return false
+  if (supersedingActiveRun) {
+    activeController?.abort()
+    operationEpoch += 1
+    state = {
+      ...state,
+      phase: state.job ? 'poll_paused' : 'submission_unknown',
+      busy: null,
+      result: null,
+      failureReport: null,
+      failureReasonKey: null,
+      error: null,
+    }
+  }
   const selectionEpoch = ++sourceSelectionEpoch
   blackSelectionEpoch += 1
   calibrationEpoch += 1
@@ -639,6 +966,7 @@ async function selectSource(file) {
   const previousMode = state.processingMode
   const previousSettings = state.advancedSettings
   const previousPanel = state.advancedPanel
+  const previousState = state
   let nextMode = previousMode
   try {
     if (previousMode === 'advanced') validateAdvancedLocalSourceFile(file)
@@ -651,18 +979,22 @@ async function selectSource(file) {
       nextMode = previousMode
     }
   }
-  revokeInputUrls()
-  clearVerifiedResult()
   const nextInputEpoch = state.inputEpoch + 1
-  state = {
-    ...createInitialLocalCharacterState(),
-    busy: 'decode',
-    processingMode: nextMode,
-    advancedPanel: nextMode === 'advanced' ? previousPanel : null,
-    advancedSettings: previousSettings,
-    inputEpoch: nextInputEpoch,
+  if (!transactional) {
+    revokeInputUrls()
+    clearVerifiedResult()
+    state = {
+      ...createInitialLocalCharacterState(),
+      busy: 'decode',
+      processingMode: nextMode,
+      advancedPanel: nextMode === 'advanced' ? previousPanel : null,
+      advancedSettings: previousSettings,
+      sourceOrigin,
+      sourceProvenance,
+      inputEpoch: nextInputEpoch,
+    }
+    renderProcessingSurface()
   }
-  renderStudioCharacterLocal()
   let nextUrl = null
   try {
     if (nextMode === 'advanced') validateAdvancedLocalSourceFile(file)
@@ -670,27 +1002,44 @@ async function selectSource(file) {
     nextUrl = objectUrlForFile(file)
     if (!nextUrl) throw new Error(localT('errorSourceRead'))
     const dimensions = await readImageDimensions(nextUrl)
-    if (selectionEpoch !== sourceSelectionEpoch) {
+    if (selectionEpoch !== sourceSelectionEpoch || signal?.aborted) {
       globalThis.URL?.revokeObjectURL?.(nextUrl)
-      return
+      return false
     }
+    if (!processingActive) {
+      globalThis.URL?.revokeObjectURL?.(nextUrl)
+      return false
+    }
+    if (transactional) {
+      revokeInputUrls(previousState)
+      clearVerifiedResult()
+    }
+    const commitMode = transactional ? state.processingMode : nextMode
+    const commitPanel = transactional ? state.advancedPanel : previousPanel
+    const commitSettings = transactional ? state.advancedSettings : previousSettings
+    const commitInputEpoch = transactional ? state.inputEpoch + 1 : nextInputEpoch
     state = {
       ...createInitialLocalCharacterState(),
       phase: 'ready',
       file,
       sourceUrl: nextUrl,
+      sourceOrigin,
+      sourceProvenance,
       dimensions,
       name: defaultName(file),
-      processingMode: nextMode,
-      advancedPanel: nextMode === 'advanced' ? previousPanel : null,
-      advancedSettings: settingsForSource(previousSettings, dimensions),
-      inputEpoch: nextInputEpoch,
+      processingMode: commitMode,
+      advancedPanel: commitMode === 'advanced' ? commitPanel : null,
+      advancedSettings: settingsForSource(commitSettings, dimensions),
+      inputEpoch: commitInputEpoch,
     }
-    renderStudioCharacterLocal()
+    renderProcessingSurface()
+    return true
   } catch (error) {
     if (nextUrl) globalThis.URL?.revokeObjectURL?.(nextUrl)
-    if (selectionEpoch !== sourceSelectionEpoch) return
+    if (selectionEpoch !== sourceSelectionEpoch || !processingActive || signal?.aborted) return false
+    if (transactional) return false
     setState({ busy: null, error: errorDetail(error) })
+    return false
   }
 }
 
@@ -698,7 +1047,7 @@ function clearSource({
   processingMode = state.processingMode,
   advancedPanel = state.advancedPanel,
 } = {}) {
-  if (['running', 'submission_unknown'].includes(state.phase)) return
+  if (!localMutationAllowed()) return
   sourceSelectionEpoch += 1
   blackSelectionEpoch += 1
   calibrationEpoch += 1
@@ -723,11 +1072,11 @@ function clearSource({
   }
   const input = byId('character-local-file')
   if (input) input.value = ''
-  renderStudioCharacterLocal()
+  renderProcessingSurface()
 }
 
 function invalidateForName(name) {
-  if (['running', 'submission_unknown'].includes(state.phase)) return
+  if (!localMutationAllowed()) return
   const nextName = String(name ?? '')
   if (nextName === state.name) return
   clearVerifiedResult()
@@ -740,16 +1089,17 @@ function invalidateForName(name) {
     job: null,
     result: null,
     failureReport: null,
+    failureReasonKey: null,
     error: null,
   }
-  renderStudioCharacterLocal()
+  renderProcessingSurface()
 }
 
 function invalidateInputState(patch = {}) {
-  if (['running', 'submission_unknown'].includes(state.phase)) return false
+  if (!localMutationAllowed()) return false
   clearVerifiedResult()
-  state = invalidateAdvancedLocalResultState(state, patch)
-  renderStudioCharacterLocal()
+  state = invalidateAdvancedLocalResultState(state, { ...patch, failureReasonKey: null })
+  renderProcessingSurface()
   return true
 }
 
@@ -763,7 +1113,16 @@ export function canUseStandardLocalSource(file) {
 }
 
 function openAdvancedPanel(panel = 'config') {
-  if (['running', 'submission_unknown'].includes(state.phase)) return
+  if (!localMutationAllowed()) return
+  if (panel === 'config') {
+    if (state.processingMode !== 'advanced') {
+      invalidateInputState({ processingMode: 'advanced', advancedPanel: null })
+    } else {
+      setState({ advancedPanel: null, error: null })
+    }
+    queueMicrotask(() => byId('character-advanced-title')?.focus())
+    return
+  }
   if (!state.advancedPanel) advancedPanelReturnFocus = document.activeElement
   if (state.processingMode !== 'advanced') {
     invalidateInputState({ processingMode: 'advanced', advancedPanel: panel })
@@ -771,7 +1130,6 @@ function openAdvancedPanel(panel = 'config') {
     setState({ advancedPanel: panel, error: null })
   }
   const headingId = {
-    config: 'character-advanced-title',
     calibration: 'character-calibration-title',
     cuts: 'character-cuts-title',
   }[panel]
@@ -779,15 +1137,15 @@ function openAdvancedPanel(panel = 'config') {
 }
 
 function closeAdvancedPanel() {
-  if (['running', 'submission_unknown'].includes(state.phase)) return
+  if (!localMutationAllowed()) return
   setState({ advancedPanel: null })
-  const returnFocus = advancedPanelReturnFocus ?? byId('character-advanced-entry')
+  const returnFocus = advancedPanelReturnFocus ?? byId('character-advanced-title')
   advancedPanelReturnFocus = null
   queueMicrotask(() => returnFocus?.focus?.())
 }
 
 function returnToStandardImport() {
-  if (['running', 'submission_unknown'].includes(state.phase)) return
+  if (!localMutationAllowed()) return
   if (state.processingMode === 'standard') {
     closeAdvancedPanel()
     return
@@ -795,12 +1153,12 @@ function returnToStandardImport() {
   if (state.file && !canUseStandardLocalSource(state.file)) {
     clearSource({ processingMode: 'standard', advancedPanel: null })
     advancedPanelReturnFocus = null
-    queueMicrotask(() => byId('character-advanced-entry')?.focus())
+    queueMicrotask(() => byId('character-advanced-title')?.focus())
     return
   }
   invalidateInputState({ processingMode: 'standard', advancedPanel: null })
   advancedPanelReturnFocus = null
-  queueMicrotask(() => byId('character-advanced-entry')?.focus())
+  queueMicrotask(() => byId('character-advanced-title')?.focus())
 }
 
 function inputNumber(id, fallback) {
@@ -843,7 +1201,7 @@ function readAdvancedSettingsFromControls() {
 }
 
 function updateAdvancedSettingsFromControls() {
-  if (['running', 'submission_unknown'].includes(state.phase)) return
+  if (!localMutationAllowed()) return
   const next = readAdvancedSettingsFromControls()
   if (JSON.stringify(next) === JSON.stringify(state.advancedSettings)) return
   const layoutChanged = next.sourceLayout !== state.advancedSettings.sourceLayout
@@ -885,7 +1243,7 @@ function updateAdvancedSettingsFromControls() {
 }
 
 async function selectBlackMatte(file) {
-  if (['running', 'submission_unknown'].includes(state.phase)) return
+  if (!localMutationAllowed()) return
   const selectionEpoch = ++blackSelectionEpoch
   revokeUrl(state.blackUrl)
   invalidateInputState({
@@ -900,7 +1258,7 @@ async function selectBlackMatte(file) {
     url = objectUrlForFile(file)
     if (!url) throw new Error(localT('errorSourceRead'))
     const dimensions = await readImageDimensions(url)
-    if (!canCommitAdvancedBlackMatteSelection({
+    if (!localMutationAllowed() || !canCommitAdvancedBlackMatteSelection({
       selectionEpoch,
       currentSelectionEpoch: blackSelectionEpoch,
       backgroundMode: state.advancedSettings.backgroundMode,
@@ -920,10 +1278,10 @@ async function selectBlackMatte(file) {
       blackDimensions: dimensions,
       error: null,
     }
-    renderStudioCharacterLocal()
+    renderProcessingSurface()
   } catch (error) {
     if (url) revokeUrl(url)
-    if (!canCommitAdvancedBlackMatteSelection({
+    if (!localMutationAllowed() || !canCommitAdvancedBlackMatteSelection({
       selectionEpoch,
       currentSelectionEpoch: blackSelectionEpoch,
       backgroundMode: state.advancedSettings.backgroundMode,
@@ -933,7 +1291,7 @@ async function selectBlackMatte(file) {
 }
 
 function clearBlackMatte() {
-  if (['running', 'submission_unknown'].includes(state.phase)) return
+  if (!localMutationAllowed()) return
   blackSelectionEpoch += 1
   revokeUrl(state.blackUrl)
   invalidateInputState({ blackFile: null, blackUrl: null, blackDimensions: null })
@@ -942,8 +1300,8 @@ function clearBlackMatte() {
 }
 
 function updateFrameAdjustment(clear = false) {
-  if (['running', 'submission_unknown'].includes(state.phase)) return
-  const frame = inputNumber('character-advanced-frame', 0)
+  if (!localMutationAllowed()) return
+  const frame = selectedAdjustmentFrame
   const frameAdjustments = { ...state.advancedSettings.frameAdjustments }
   if (clear) delete frameAdjustments[frame]
   else {
@@ -959,7 +1317,7 @@ function updateFrameAdjustment(clear = false) {
 }
 
 function setAutomaticGrid() {
-  if (['running', 'submission_unknown'].includes(state.phase)) return
+  if (!localMutationAllowed()) return
   invalidateInputState({
     processingMode: 'advanced',
     advancedSettings: { ...state.advancedSettings, manualCutLinesEnabled: false },
@@ -967,6 +1325,7 @@ function setAutomaticGrid() {
 }
 
 async function decodeFileToStageRgba(file) {
+  if (calibrationDecodeLoader) return calibrationDecodeLoader(file)
   const url = objectUrlForFile(file)
   if (!url) throw new Error(localT('errorSourceRead'))
   try {
@@ -1012,10 +1371,10 @@ function rgbaToPngBlob(image) {
 
 async function buildCalibrationPreview() {
   if (
+    !localMutationAllowed() ||
     !state.file ||
     state.advancedSettings.sourceLayout !== FIXED_REGION_MOTION_LAYOUT_ID ||
-    state.calibration?.busy ||
-    ['running', 'submission_unknown'].includes(state.phase)
+    state.calibration?.busy
   ) return
   const operation = ++calibrationEpoch
   const sourceEpoch = sourceSelectionEpoch
@@ -1039,6 +1398,7 @@ async function buildCalibrationPreview() {
       operation !== calibrationEpoch ||
       sourceEpoch !== sourceSelectionEpoch ||
       state.file !== file ||
+      !processingActive ||
       state.advancedSettings.sourceLayout !== FIXED_REGION_MOTION_LAYOUT_ID
     ) return
     const staged = stageTemplateCalibrationSource(decoded)
@@ -1048,6 +1408,7 @@ async function buildCalibrationPreview() {
       operation !== calibrationEpoch ||
       sourceEpoch !== sourceSelectionEpoch ||
       state.file !== file ||
+      !processingActive ||
       state.advancedSettings.sourceLayout !== FIXED_REGION_MOTION_LAYOUT_ID
     ) return
     const stem = String(file.name || 'character-sheet').replace(/\.[^.]+$/, '')
@@ -1061,6 +1422,7 @@ async function buildCalibrationPreview() {
       operation !== calibrationEpoch ||
       sourceEpoch !== sourceSelectionEpoch ||
       state.file !== file ||
+      !processingActive ||
       state.advancedSettings.sourceLayout !== FIXED_REGION_MOTION_LAYOUT_ID
     ) {
       revokeUrl(previewUrl)
@@ -1077,10 +1439,10 @@ async function buildCalibrationPreview() {
         sourceInputEpoch: sourceEpoch,
       },
     }
-    renderStudioCharacterLocal()
+    renderProcessingSurface()
   } catch (error) {
     if (previewUrl) revokeUrl(previewUrl)
-    if (operation !== calibrationEpoch) return
+    if (operation !== calibrationEpoch || !processingActive) return
     setState({
       calibration: {
         ...state.calibration,
@@ -1097,11 +1459,11 @@ async function buildCalibrationPreview() {
 function useCalibrationPreview() {
   const calibration = state.calibration
   if (
+    !localMutationAllowed() ||
     !calibration?.previewFile ||
     !calibration.previewUrl ||
     calibration.report?.missing_region_count !== 0 ||
-    calibration.sourceInputEpoch !== sourceSelectionEpoch ||
-    ['running', 'submission_unknown'].includes(state.phase)
+    calibration.sourceInputEpoch !== sourceSelectionEpoch
   ) return
   calibrationEpoch += 1
   blackSelectionEpoch += 1
@@ -1143,10 +1505,11 @@ function useCalibrationPreview() {
     error: null,
   }
   sourceSelectionEpoch += 1
-  renderStudioCharacterLocal()
+  renderProcessingSurface()
 }
 
 function restoreOriginalCalibration({ render = true } = {}) {
+  if (!localMutationAllowed()) return false
   const original = state.calibrationOriginal
   if (!original) return false
   calibrationEpoch += 1
@@ -1181,12 +1544,12 @@ function restoreOriginalCalibration({ render = true } = {}) {
     failureReport: null,
     error: null,
   }
-  if (render) renderStudioCharacterLocal()
+  if (render) renderProcessingSurface()
   return true
 }
 
 function resetCalibration() {
-  if (['running', 'submission_unknown'].includes(state.phase)) return
+  if (!localMutationAllowed()) return
   if (restoreOriginalCalibration()) return
   calibrationEpoch += 1
   revokeUrl(state.calibration?.previewUrl)
@@ -1211,6 +1574,7 @@ function cutLineCounts(cutLines) {
 }
 
 function updateCutLines(cutLines, { enable = state.advancedSettings.manualCutLinesEnabled } = {}) {
+  if (!localMutationAllowed()) return
   invalidateInputState({
     processingMode: 'advanced',
     advancedPanel: 'cuts',
@@ -1223,7 +1587,7 @@ function updateCutLines(cutLines, { enable = state.advancedSettings.manualCutLin
 }
 
 function addCutLine(axis) {
-  if (!state.dimensions || ['running', 'submission_unknown'].includes(state.phase)) return
+  if (!localMutationAllowed() || !state.dimensions) return
   const current = state.advancedSettings.manualCutLines ?? makeEvenAdvancedCutLines(
     state.dimensions.width,
     state.dimensions.height,
@@ -1232,7 +1596,7 @@ function addCutLine(axis) {
 }
 
 function clearCutLines() {
-  if (!state.dimensions || ['running', 'submission_unknown'].includes(state.phase)) return
+  if (!localMutationAllowed() || !state.dimensions) return
   updateCutLines({
     width: state.dimensions.width,
     height: state.dimensions.height,
@@ -1242,23 +1606,23 @@ function clearCutLines() {
 }
 
 function useEvenCutLines() {
-  if (!state.dimensions || ['running', 'submission_unknown'].includes(state.phase)) return
+  if (!localMutationAllowed() || !state.dimensions) return
   updateCutLines(makeEvenAdvancedCutLines(state.dimensions.width, state.dimensions.height), { enable: false })
 }
 
 function confirmCutLines() {
-  if (!state.dimensions || ['running', 'submission_unknown'].includes(state.phase)) return
+  if (!localMutationAllowed() || !state.dimensions) return
   const counts = cutLineCounts(state.advancedSettings.manualCutLines)
   if (counts.vertical !== 7 || counts.horizontal !== 7) {
     setState({ error: errorDetail(new Error('Manual cut lines require exactly seven positions on each axis')) })
     return
   }
   updateCutLines(state.advancedSettings.manualCutLines, { enable: true })
-  setState({ advancedPanel: 'config' })
+  setState({ advancedPanel: null })
 }
 
 function startCutLineDrag(event, axis, index) {
-  if (['running', 'submission_unknown'].includes(state.phase)) return
+  if (!localMutationAllowed()) return
   event.preventDefault()
   const previewNode = byId('character-advanced-cut-preview')
   const rect = previewNode?.getBoundingClientRect?.()
@@ -1267,6 +1631,7 @@ function startCutLineDrag(event, axis, index) {
     enable: state.advancedSettings.manualCutLinesEnabled,
   })
   const move = (moveEvent) => {
+    if (!localMutationAllowed()) return
     const cuts = state.advancedSettings.manualCutLines
     const position = axis === 'vertical'
       ? ((moveEvent.clientX - rect.left) / rect.width) * cuts.width
@@ -1283,136 +1648,59 @@ function startCutLineDrag(event, axis, index) {
   const stop = () => {
     document.removeEventListener('pointermove', move)
     document.removeEventListener('pointerup', stop)
-    renderStudioCharacterLocal()
+    if (localMutationAllowed()) renderProcessingSurface()
   }
   document.addEventListener('pointermove', move)
   document.addEventListener('pointerup', stop, { once: true })
 }
 
-function loadImageUrl(url) {
-  return new Promise((resolve, reject) => {
-    const image = new Image()
-    image.onload = () => resolve(image)
-    image.onerror = () => {
-      const error = new Error(`Could not display ${url}`)
-      error.code = 'request_failed'
-      reject(error)
+async function bindLocalSharedResult() {
+  if (!processingSurfaceActive) return
+  const keepAcceptedSourceVisible = ['ready', 'submission_unknown'].includes(state.phase)
+    && state.sourceOrigin === 'ai'
+    && state.sourceUrl
+  if (keepAcceptedSourceVisible) {
+    const presentation = createAiAcceptedSourceResultPresentation(state.sourceUrl)
+    const current = getSharedCharacterExportPresentation()
+    if (
+      getSharedCharacterResultOwner() === 'ai'
+      && current.bindKey === presentation.bindKey
+      && current.acceptedStatic
+      && !current.hydrateError
+    ) {
+      refreshSharedCharacterResultPresentation()
+      return
     }
-    image.src = url
-  })
-}
-
-function chooseAnimation(animations, preferred, fallback = null) {
-  if (animations[preferred]) return preferred
-  if (fallback && animations[fallback]) return fallback
-  return Object.keys(animations)[0] ?? null
-}
-
-function drawChecker(ctx) {
-  const { width, height } = ctx.canvas
-  ctx.clearRect(0, 0, width, height)
-  for (let y = 0; y < height; y += 16) {
-    for (let x = 0; x < width; x += 16) {
-      ctx.fillStyle = (x / 16 + y / 16) % 2 ? '#111722' : '#0b1018'
-      ctx.fillRect(x, y, 16, 16)
-    }
+    await bindSharedCharacterResult(presentation, { owner: 'ai' })
+    return
   }
-}
-
-function drawPreviewFrame(timestamp = 0) {
-  preview.raf = null
-  if (!localActive || state.phase !== 'complete' || !preview.image || !preview.animations) return
-  const canvas = byId('character-local-canvas')
-  const ctx = canvas?.getContext?.('2d')
-  if (!ctx) return
-  const animations = preview.animations.animations
-  const movementDelta = preview.lastMoveTime ? Math.min(50, timestamp - preview.lastMoveTime) : 0
-  preview.lastMoveTime = timestamp
-  const intent = getMovementIntent(preview.keys, preview.direction)
-  if (intent.moving) {
-    preview.direction = intent.direction
-    preview.wasMoving = true
-    preview.animationName = chooseAnimation(
-      animations,
-      getAnimationNameForIntent(intent, preview.direction),
-      preview.animationName,
+  if (getSharedCharacterResultOwner() !== 'local') clearSharedCharacterResult({ force: true })
+  if (state.phase === 'complete' && state.result) {
+    const presentation = createLocalCompleteResultPresentation(state.result)
+    const current = getSharedCharacterExportPresentation()
+    const runtime = readSharedCharacterResultSnapshot()
+    if (
+      getSharedCharacterResultOwner() === 'local'
+      && current.bindKey === presentation.bindKey
+      && current.playable
+      && current.exportUnlocked
+      && !current.hydrateError
+      && runtime.playable
+    ) {
+      refreshSharedCharacterResultPresentation()
+      return
+    }
+    await bindSharedCharacterResult(presentation, { owner: 'local' })
+    return
+  }
+  if (['failed', 'submission_unknown'].includes(state.phase) && state.failureReport) {
+    await bindSharedCharacterResult(
+      createLocalQualityOnlyPresentation(state.failureReport, state.job?.debug_report_url),
+      { owner: 'local' },
     )
-    preview.position = movePreviewActor(preview.position, intent, {
-      deltaMs: movementDelta,
-      speed: 82,
-      minX: 80,
-      maxX: canvas.width - 80,
-      minY: 150,
-      maxY: canvas.height - 30,
-    })
-  } else if (preview.wasMoving) {
-    preview.wasMoving = false
-    preview.animationName = chooseAnimation(animations, `idle_${preview.direction}`, preview.animationName)
-    preview.frameCursor = 0
-    preview.lastFrameTime = 0
+    return
   }
-  const animation = animations[preview.animationName]
-  if (!animation) return
-  const frameSize = preview.animations.frame_size
-  const sheetSize = preview.animations.sheet_size
-  const columns = Math.max(1, Math.floor(sheetSize.w / frameSize.w))
-  const delay = 1000 / Math.max(1, Number(animation.fps) || 8)
-  if (!preview.lastFrameTime || timestamp - preview.lastFrameTime >= delay) {
-    preview.frameCursor = (preview.frameCursor + 1) % animation.frames.length
-    preview.lastFrameTime = timestamp
-  }
-  const frameIndex = animation.frames[preview.frameCursor]
-  const sourceX = (frameIndex % columns) * frameSize.w
-  const sourceY = Math.floor(frameIndex / columns) * frameSize.h
-  drawChecker(ctx)
-  ctx.imageSmoothingEnabled = false
-  ctx.strokeStyle = 'rgba(51, 215, 197, .28)'
-  ctx.beginPath()
-  ctx.moveTo(0, preview.position.y)
-  ctx.lineTo(canvas.width, preview.position.y)
-  ctx.stroke()
-  const scale = Math.max(1, Math.min(3, Math.floor(canvas.height / Math.max(1, frameSize.h * 2.1))))
-  const anchor = preview.animations.anchor ?? { x: frameSize.w / 2, y: frameSize.h - 8 }
-  const targetX = Math.round(preview.position.x - anchor.x * scale)
-  const targetY = Math.round(preview.position.y - anchor.y * scale)
-  ctx.drawImage(
-    preview.image,
-    sourceX,
-    sourceY,
-    frameSize.w,
-    frameSize.h,
-    targetX,
-    targetY,
-    frameSize.w * scale,
-    frameSize.h * scale,
-  )
-  setText('character-local-preview-state', localT('previewState', {
-    animation: preview.animationName,
-    x: Math.round(preview.position.x),
-    y: Math.round(preview.position.y),
-  }))
-  preview.raf = requestAnimationFrame(drawPreviewFrame)
-}
-
-function startPreviewLoop() {
-  stopPreview()
-  if (!localActive || state.phase !== 'complete' || !preview.image || !preview.animations) return
-  preview.lastMoveTime = 0
-  preview.raf = requestAnimationFrame(drawPreviewFrame)
-}
-
-async function preparePreview(result) {
-  const image = await loadImageUrl(result.job.normalized_sheet_url)
-  stopPreview()
-  preview = createPreviewState()
-  preview.image = image
-  preview.animations = result.animations
-  preview.animationName = chooseAnimation(result.animations.animations, 'idle_down')
-  const canvas = byId('character-local-canvas')
-  preview.position = {
-    x: (canvas?.width ?? 900) / 2,
-    y: Math.round((canvas?.height ?? 470) * 0.68),
-  }
+  clearSharedCharacterResult({ owner: 'local' })
 }
 
 async function finishObservedJob(terminalJob, operation) {
@@ -1424,7 +1712,6 @@ async function finishObservedJob(terminalJob, operation) {
         ? state.binding.sourceLayout
         : null,
     })
-    await preparePreview(result)
     if (!isCurrentOperation(operation.epoch) || state.binding?.inputKey !== currentInputKey()) return
     setState({
       phase: 'complete',
@@ -1432,9 +1719,9 @@ async function finishObservedJob(terminalJob, operation) {
       job: terminalJob,
       result,
       failureReport: null,
+      failureReasonKey: null,
       error: null,
     })
-    startPreviewLoop()
     return
   }
   let failureReport = null
@@ -1444,14 +1731,11 @@ async function finishObservedJob(terminalJob, operation) {
     if (isRecoverableLocalCharacterObservationError(error)) throw error
   }
   if (!isCurrentOperation(operation.epoch)) return
-  setState({
-    phase: 'failed',
-    busy: null,
+  setState(createLocalCharacterFailureState(state, {
     job: terminalJob,
-    result: null,
     failureReport,
-    error: terminalJob.reason || terminalJob.failure_status || terminalJob.status,
-  })
+    errorMessage: terminalJob.reason || terminalJob.failure_status || terminalJob.status,
+  }))
 }
 
 async function observeLocalJob(initialJob, operation) {
@@ -1459,8 +1743,7 @@ async function observeLocalJob(initialJob, operation) {
     signal: operation.signal,
     onUpdate(job) {
       if (!isCurrentOperation(operation.epoch)) return
-      state = { ...state, phase: 'running', busy: 'observe', job, error: null }
-      renderStudioCharacterLocal()
+      persistLocalOwnedState({ phase: 'running', busy: 'observe', job, error: null })
     },
   })
   if (!isCurrentOperation(operation.epoch)) return
@@ -1468,7 +1751,7 @@ async function observeLocalJob(initialJob, operation) {
 }
 
 async function submitLocalJob() {
-  if (!serviceConnectionAvailable || !state.file) {
+  if (!processingSurfaceActive || !localMutationAllowed() || !serviceConnectionAvailable || !state.file) {
     setState({ error: localT(state.processingMode === 'advanced' ? 'errorAdvancedSourceRequired' : 'errorSourceRequired') })
     return
   }
@@ -1490,7 +1773,9 @@ async function submitLocalJob() {
   })
   setState(beginLocalCharacterRunState(state, binding))
   advancedPanelReturnFocus = null
-  queueMicrotask(() => byId('character-local-stage-title')?.focus())
+  queueMicrotask(() => {
+    if (processingSurfaceActive) byId('character-stage-title')?.focus()
+  })
   let receivedJob = null
   try {
     receivedJob = state.processingMode === 'advanced'
@@ -1506,23 +1791,20 @@ async function submitLocalJob() {
           signal: operation.signal,
         })
     if (!isCurrentOperation(operation.epoch) || state.binding?.inputKey !== inputKey) return
-    state = { ...state, busy: 'observe', job: receivedJob }
-    renderStudioCharacterLocal()
+    persistLocalOwnedState({ busy: 'observe', job: receivedJob })
     await observeLocalJob(receivedJob, operation)
   } catch (error) {
     if (!isCurrentOperation(operation.epoch) || error?.name === 'AbortError') return
-    setState({
-      phase: receivedJob && isRecoverableLocalCharacterObservationError(error)
-        ? 'poll_paused'
-        : receivedJob
-          ? 'failed'
-          : 'submission_unknown',
-      busy: null,
-      job: receivedJob,
-      result: null,
-      failureReport: null,
-      error: errorDetail(error),
-    })
+    if (receivedJob && isRecoverableLocalCharacterObservationError(error)) {
+      persistLocalOwnedState({ phase: 'poll_paused', busy: null, error: errorDetail(error) })
+      return
+    }
+    persistLocalOwnedState(createLocalCharacterFailureState(state, {
+      phase: receivedJob ? 'failed' : 'submission_unknown',
+      job: state.job ?? receivedJob,
+      error,
+      errorMessage: errorDetail(error),
+    }))
   }
 }
 
@@ -1536,12 +1818,13 @@ export function beginLocalCharacterRunState(value, binding) {
     job: null,
     result: null,
     failureReport: null,
+    failureReasonKey: null,
     error: null,
   }
 }
 
 async function resumeLocalJob() {
-  if (!state.job || state.phase !== 'poll_paused') return
+  if (!processingActive || !state.job || state.phase !== 'poll_paused') return
   const operation = beginOperation()
   const job = state.job
   setState({ phase: 'running', busy: 'observe', error: null })
@@ -1549,180 +1832,31 @@ async function resumeLocalJob() {
     await observeLocalJob(job, operation)
   } catch (error) {
     if (!isCurrentOperation(operation.epoch) || error?.name === 'AbortError') return
-    setState({
-      phase: isRecoverableLocalCharacterObservationError(error) ? 'poll_paused' : 'failed',
-      busy: null,
-      error: errorDetail(error),
-    })
+    if (isRecoverableLocalCharacterObservationError(error)) {
+      setState({ phase: 'poll_paused', busy: null, error: errorDetail(error) })
+      return
+    }
+    setState(createLocalCharacterFailureState(state, {
+      job: state.job,
+      error,
+      errorMessage: errorDetail(error),
+    }))
   }
 }
 
 function handlePrimaryAction() {
+  if (!processingActive || !processingSurfaceActive) return
   const action = deriveLocalCharacterPresentation().action
   if (action === 'build') void submitLocalJob()
   else if (action === 'resume') void resumeLocalJob()
-  else if (action === 'export') openExportDialog()
+  else if (action === 'export') openSharedCharacterExportDialog()
 }
 
-function progressForState() {
-  if (state.phase === 'complete') return { value: 100, key: 'progressDone' }
-  if (state.busy === 'verify') return { value: 90, key: 'progressVerify' }
-  if (state.job?.status === 'post_processing') return { value: 68, key: 'progressPost' }
-  return { value: 22, key: 'progressQueued' }
-}
-
-function qualityMessages(report) {
-  const validation = report?.validation ?? {}
-  return [
-    ...(Array.isArray(validation.blocking_errors) ? validation.blocking_errors : []),
-    ...(Array.isArray(validation.warnings) ? validation.warnings : []),
-  ].map(String)
-}
-
-function issueCopy(code) {
-  if (/^frame_\d+_empty$/.test(code)) {
-    return ['issueEmptyTitle', 'issueEmptyImpact', 'issueEmptySuggestion']
-  }
-  if (/^frame_\d+_cropped$/.test(code)) {
-    return ['issueCropTitle', 'issueCropImpact', 'issueCropSuggestion']
-  }
-  if (/^source_region_empty:/.test(code)) {
-    return ['issueRegionTitle', 'issueRegionImpact', 'issueRegionSuggestion']
-  }
-  return ['issueGenericTitle', 'issueGenericImpact', 'issueGenericSuggestion']
-}
-
-function renderIssueList(id, report, fallback = null) {
-  const list = byId(id)
-  if (!list) return
-  list.replaceChildren()
-  const messages = qualityMessages(report)
-  if (!messages.length && fallback) messages.push(String(fallback))
-  if (!messages.length) {
-    const empty = document.createElement('p')
-    empty.className = 'character-local-issue-empty'
-    empty.textContent = localT('qualityNone')
-    list.append(empty)
-    return
-  }
-  for (const code of messages) {
-    const [titleKey, impactKey, suggestionKey] = issueCopy(code)
-    const article = document.createElement('article')
-    const title = document.createElement('strong')
-    const diagnostic = document.createElement('code')
-    const impact = document.createElement('p')
-    const suggestion = document.createElement('p')
-    title.textContent = localT(titleKey)
-    diagnostic.textContent = code
-    impact.textContent = `${localT('issueImpact')} · ${localT(impactKey)}`
-    suggestion.textContent = `${localT('issueSuggestion')} · ${localT(suggestionKey)}`
-    article.append(title, diagnostic, impact, suggestion)
-    list.append(article)
-  }
-}
-
-function repairedFrameCount(report) {
-  const normalization = report?.normalization ?? {}
-  return [
-    normalization.auto_correction?.applied_count,
-    normalization.motion_stabilization?.applied_count,
-    normalization.manual_adjustments?.applied_count,
-  ].reduce((sum, value) => sum + (Number.isFinite(Number(value)) ? Number(value) : 0), 0)
-}
-
-function renderQuality() {
-  const report = state.result?.debugReport ?? state.failureReport
-  const validation = report?.validation
-  setHidden('character-local-quality', !validation)
-  if (!validation) return
-  const status = ['pass', 'warning', 'fail'].includes(validation.status) ? validation.status : 'fail'
-  const statusKey = status === 'pass' ? 'qualityPass' : status === 'warning' ? 'qualityWarning' : 'qualityFail'
-  const badge = byId('character-local-quality-status')
-  if (badge) {
-    badge.textContent = localT(statusKey)
-    badge.dataset.state = status
-  }
-  setText('character-local-quality-frames', String(validation.frame_count ?? report.frames?.length ?? '—'))
-  setText('character-local-quality-repaired', String(repairedFrameCount(report)))
-  setText('character-local-quality-findings', String(qualityMessages(report).length))
-  const reportLink = byId('character-local-quality-link')
-  if (reportLink) {
-    const url = state.job?.debug_report_url
-    if (url) reportLink.href = url
-    else reportLink.removeAttribute('href')
-  }
-  renderIssueList('character-local-quality-issues', report)
-}
-
-function renderClipButtons() {
-  const container = byId('character-local-clips')
-  if (!container) return
-  container.replaceChildren()
-  const animations = state.result?.animations?.animations
-  if (!animations) {
-    const waiting = document.createElement('p')
-    waiting.textContent = localT('clipsWaiting')
-    container.append(waiting)
-    return
-  }
-  for (const [name, animation] of Object.entries(animations)) {
-    if (animation?.ui_hidden) continue
-    const button = document.createElement('button')
-    button.type = 'button'
-    button.className = 'character-local-clip'
-    button.classList.toggle('is-active', name === preview.animationName)
-    button.setAttribute('aria-pressed', String(name === preview.animationName))
-    const title = document.createElement('strong')
-    const detail = document.createElement('span')
-    title.textContent = animation.display_label || animation.label || name
-    detail.textContent = `${animation.frames.length}f · ${animation.fps ?? 8} FPS`
-    button.append(title, detail)
-    button.addEventListener('click', () => {
-      preview.animationName = name
-      const direction = name.split('_').at(-1)
-      if (['down', 'up', 'left', 'right'].includes(direction)) preview.direction = direction
-      preview.frameCursor = 0
-      preview.lastFrameTime = 0
-      renderClipButtons()
-    })
-    container.append(button)
-  }
-}
-
-function renderExportLinks() {
-  const release = state.phase === 'complete' ? state.result?.job : null
-  for (const [id, field] of EXPORT_LINKS) {
-    const link = byId(id)
-    if (!link) continue
-    const url = release?.[field]
-    if (url) {
-      link.href = url
-      link.removeAttribute('aria-disabled')
-      link.removeAttribute('tabindex')
-    } else {
-      link.removeAttribute('href')
-      link.setAttribute('aria-disabled', 'true')
-      link.tabIndex = -1
-    }
-  }
-}
-
-function openExportDialog() {
-  if (state.phase !== 'complete') return
-  const dialog = byId('character-local-export-dialog')
-  if (!dialog) return
-  if (typeof dialog.showModal === 'function') {
-    if (!dialog.open) dialog.showModal()
-  } else {
-    dialog.setAttribute('open', '')
-  }
-}
-
-function closeExportDialog() {
-  const dialog = byId('character-local-export-dialog')
-  if (!dialog) return
-  if (typeof dialog.close === 'function' && dialog.open) dialog.close()
-  else dialog.removeAttribute('open')
+export function deriveLocalCharacterActivityPresentation(value = state) {
+  if (value?.phase !== 'running') return Object.freeze({ visible: false, key: null })
+  if (value?.busy === 'verify') return Object.freeze({ visible: true, key: 'progressVerify' })
+  if (value?.job?.status === 'post_processing') return Object.freeze({ visible: true, key: 'progressPost' })
+  return Object.freeze({ visible: true, key: 'progressQueued' })
 }
 
 function setControlValue(id, value) {
@@ -1735,11 +1869,24 @@ function setControlChecked(id, checked) {
   if (control) control.checked = Boolean(checked)
 }
 
+function handleFrameSelectorChange() {
+  if (!localMutationAllowed()) {
+    setControlValue('character-advanced-frame', selectedAdjustmentFrame)
+    return
+  }
+  const next = inputNumber('character-advanced-frame', selectedAdjustmentFrame)
+  selectedAdjustmentFrame = Number.isInteger(next) && next >= 0 ? next : 0
+  renderFrameAdjustmentControls()
+}
+
 function renderFrameAdjustmentControls() {
-  const frame = inputNumber('character-advanced-frame', 0)
-  const adjustment = state.advancedSettings.frameAdjustments?.[frame] ?? { dx: 0, dy: 0 }
+  setControlValue('character-advanced-frame', selectedAdjustmentFrame)
+  const adjustment = state.advancedSettings.frameAdjustments?.[selectedAdjustmentFrame] ?? { dx: 0, dy: 0 }
   setControlValue('character-advanced-nudge-x', adjustment.dx)
   setControlValue('character-advanced-nudge-y', adjustment.dy)
+  syncCharacterCombobox('advancedFrame', {
+    editable: !(['running', 'submission_unknown'].includes(state.phase) || state.busy === 'decode' || !serviceConnectionAvailable),
+  })
 }
 
 function renderCutLineEditor() {
@@ -1763,6 +1910,7 @@ function renderCutLineEditor() {
     button.setAttribute('aria-label', localT(axis === 'vertical' ? 'cutVerticalAria' : 'cutHorizontalAria', { index: index + 1 }))
     button.addEventListener('pointerdown', (event) => startCutLineDrag(event, axis, index))
     button.addEventListener('keydown', (event) => {
+      if (!localMutationAllowed()) return
       const delta = axis === 'vertical'
         ? event.key === 'ArrowLeft' ? -1 : event.key === 'ArrowRight' ? 1 : 0
         : event.key === 'ArrowUp' ? -1 : event.key === 'ArrowDown' ? 1 : 0
@@ -1833,10 +1981,8 @@ function renderCalibrationPanel(locked) {
 }
 
 function renderAdvancedPanels() {
-  const advanced = state.processingMode === 'advanced'
   const locked = ['running', 'submission_unknown'].includes(state.phase) || state.busy === 'decode'
   const panel = state.advancedPanel
-  setHidden('character-advanced-config', panel !== 'config')
   setHidden('character-advanced-calibration', panel !== 'calibration')
   setHidden('character-advanced-cuts', panel !== 'cuts')
   const workspace = byId('character-local-workspace')
@@ -1844,13 +1990,6 @@ function renderAdvancedPanels() {
     workspace.dataset.characterProcessingMode = state.processingMode
     if (panel) workspace.dataset.characterAdvancedPanel = panel
     else delete workspace.dataset.characterAdvancedPanel
-  }
-  const entry = byId('character-advanced-entry')
-  if (entry) {
-    entry.textContent = localT(advanced ? 'advancedModeActive' : 'advancedMode')
-    entry.setAttribute('aria-pressed', String(advanced))
-    entry.setAttribute('aria-expanded', String(Boolean(panel)))
-    entry.disabled = locked
   }
   const settings = state.advancedSettings
   setControlValue('character-advanced-layout', settings.sourceLayout)
@@ -1876,10 +2015,12 @@ function renderAdvancedPanels() {
   for (const option of byId('character-advanced-locks')?.options ?? []) option.selected = locks.has(option.value)
   renderFrameAdjustmentControls()
   setText('character-advanced-black-name', state.blackFile?.name ?? '—')
-  document.querySelectorAll('#character-advanced-config input, #character-advanced-config select, #character-advanced-config button').forEach((control) => {
-    if (control.id === 'character-advanced-close') control.disabled = locked
-    else control.disabled = locked || !serviceConnectionAvailable
+  queryAdvancedConfigControls(byId('character-local-advanced-form') || byId('character-advanced-config')).forEach((control) => {
+    control.disabled = locked || !serviceConnectionAvailable
   })
+  const comboboxEditable = !(locked || !serviceConnectionAvailable)
+  if (!comboboxEditable) closeAllCharacterComboboxes()
+  syncLocalCharacterComboboxes({ editable: comboboxEditable })
   const calibrationOpen = byId('character-advanced-calibration-open')
   if (calibrationOpen) {
     calibrationOpen.disabled = locked || !state.file || settings.sourceLayout !== FIXED_REGION_MOTION_LAYOUT_ID
@@ -1892,14 +2033,6 @@ function renderAdvancedPanels() {
   }
   const blackClear = byId('character-advanced-black-clear')
   if (blackClear) blackClear.disabled = locked || !state.blackFile
-  const run = byId('character-advanced-run')
-  if (run) {
-    let valid = Boolean(state.file) && !locked && serviceConnectionAvailable
-    if (valid) {
-      try { currentInputKey() } catch { valid = false }
-    }
-    run.disabled = !valid
-  }
   renderCalibrationPanel(locked)
   renderCutLineEditor()
   for (const id of [
@@ -1929,16 +2062,22 @@ function renderStaticCopy() {
   document.querySelectorAll('[data-character-advanced-copy]').forEach((node) => {
     node.textContent = localT(node.dataset.characterAdvancedCopy)
   })
+  document.querySelectorAll('[data-character-advanced-frame-index]').forEach((node) => {
+    node.textContent = localT('advancedFrameOption', {
+      index: node.dataset.characterAdvancedFrameIndex,
+    })
+  })
   document.querySelectorAll('[data-character-advanced-aria]').forEach((node) => {
     node.setAttribute('aria-label', localT(node.dataset.characterAdvancedAria))
   })
 }
 
 export function renderStudioCharacterLocal() {
-  if (!localActive) return
+  if (!processingSurfaceActive) return
   const workspace = byId('character-local-workspace')
   if (!workspace) return
   const presentation = deriveLocalCharacterPresentation()
+  const blocking = deriveLocalCharacterBlockingPresentation(state, getCurrentLanguage())
   workspace.dataset.characterLocalPhase = presentation.phase
   renderStaticCopy()
   setText('character-header-crumb', localT('crumb'))
@@ -1957,17 +2096,18 @@ export function renderStudioCharacterLocal() {
   setText('character-local-stage-kicker', localT(presentation.kickerKey))
   setText('character-local-stage-title', localT(presentation.titleKey))
   setText('character-local-stage-help', localT(presentation.helpKey))
+  setText('character-stage-kicker', localT(presentation.kickerKey))
+  setText('character-stage-title', localT(presentation.titleKey))
+  setText('character-stage-help', localT(presentation.helpKey))
   setText('character-local-stage-phase', localT(presentation.statusKey))
 
   const hasSource = Boolean(state.file)
   const advanced = state.processingMode === 'advanced'
   const sourceHint = workspace.querySelector('.character-local-source > header span')
   const sourceDropHelp = byId('character-local-source-empty')?.querySelector('small')
-  const flowSummary = workspace.querySelector('.character-local-flow-header p')
   const profileEyebrow = workspace.querySelector('.character-local-profile > .eyebrow')
   const profileTitle = byId('character-local-profile-title')
   if (sourceHint && advanced) sourceHint.textContent = localT('advancedSourceHint')
-  if (flowSummary && advanced) flowSummary.textContent = localT('advancedFlowSummary')
   if (sourceDropHelp && advanced) sourceDropHelp.textContent = localT('advancedSourceDropHelp')
   if (profileEyebrow && advanced) profileEyebrow.textContent = localT('advancedProfileTitle')
   if (profileTitle && advanced) profileTitle.textContent = localT(
@@ -2006,19 +2146,12 @@ export function renderStudioCharacterLocal() {
   const replace = byId('character-local-replace')
   if (replace) replace.classList.toggle('is-disabled', detailLocked || !serviceConnectionAvailable)
 
-  setHidden('character-local-progress', state.phase !== 'running' && state.phase !== 'poll_paused')
-  const progress = progressForState()
+  const activity = deriveLocalCharacterActivityPresentation()
+  setHidden('character-local-progress', !activity.visible)
   const progressBar = byId('character-local-progress-bar')
-  if (progressBar) progressBar.value = progress.value
-  setText('character-local-progress-label', localT(progress.key))
+  if (progressBar) progressBar.removeAttribute('value')
+  setText('character-local-progress-label', activity.key ? localT(activity.key) : '')
   setText('character-local-progress-job', state.job?.id ? `${localT('jobLabel')} · ${state.job.id}` : '—')
-  setHidden('character-local-failure', !['failed', 'submission_unknown'].includes(state.phase))
-  renderIssueList(
-    'character-local-failure-issues',
-    state.failureReport,
-    state.error || state.job?.reason || state.job?.status,
-  )
-  setHidden('character-local-preview', state.phase !== 'complete')
   const primary = byId('character-local-primary')
   if (primary) {
     primary.textContent = localT(
@@ -2035,42 +2168,204 @@ export function renderStudioCharacterLocal() {
   }
   const error = byId('character-local-error')
   if (error) {
-    error.textContent = state.error || ''
-    error.hidden = !state.error || ['failed', 'submission_unknown'].includes(state.phase)
+    const visibleError = deriveLocalCharacterVisibleError(state, getCurrentLanguage())
+    error.textContent = visibleError
+    error.hidden = !visibleError
   }
 
   renderAdvancedPanels()
+  void bindLocalSharedResult()
+}
 
-  renderQuality()
-  renderClipButtons()
-  renderExportLinks()
-  const topExport = byId('character-export-link')
-  if (topExport) {
-    if (presentation.releaseReady) {
-      topExport.href = '#character-local-export-dialog'
-      topExport.removeAttribute('aria-disabled')
-      topExport.removeAttribute('tabindex')
-      topExport.textContent = localT('exportReady')
-    } else {
-      topExport.removeAttribute('href')
-      topExport.setAttribute('aria-disabled', 'true')
-      topExport.tabIndex = -1
-      topExport.textContent = localT('exportLocked')
-    }
+function refreshSharedAdvancedProfileCopy() {
+  const layout = byId('character-advanced-layout')?.value
+  const profileEyebrow = globalThis.document?.querySelector?.('.character-local-profile > .eyebrow')
+  const profileTitle = byId('character-local-profile-title')
+  if (profileEyebrow) profileEyebrow.textContent = localT('advancedProfileTitle')
+  if (profileTitle) {
+    profileTitle.textContent = localT(
+      layout === FIXED_REGION_MOTION_LAYOUT_ID
+        ? 'advancedProfileFixed'
+        : 'advancedProfileTopdown',
+    )
   }
 }
 
 export function renderStudioCharacterLocalLanguage() {
-  renderStudioCharacterLocal()
+  if (processingSurfaceActive) {
+    renderProcessingSurface()
+    return
+  }
+  renderStaticCopy()
+  refreshSharedAdvancedProfileCopy()
+  syncLocalCharacterComboboxes({ editable: serviceConnectionAvailable })
+}
+
+export function setStudioCharacterProcessingContext({
+  active = true,
+  surfaceActive = active,
+} = {}) {
+  processingActive = Boolean(active)
+  processingSurfaceActive = Boolean(surfaceActive)
+  if (!processingActive) {
+    activeController?.abort()
+    operationEpoch += 1
+    sourceSelectionEpoch += 1
+    blackSelectionEpoch += 1
+    calibrationEpoch += 1
+    stopSharedCharacterPreview()
+    abandonLocalTemporaryWork()
+  } else if (!processingSurfaceActive) {
+    stopSharedCharacterPreview()
+    abandonLocalTemporaryWork()
+  }
+  renderProcessingSurface()
 }
 
 export function setStudioCharacterLocalActive(active) {
-  localActive = Boolean(active)
-  if (!localActive) stopPreview()
-  else {
-    renderStudioCharacterLocal()
-    startPreviewLoop()
+  setStudioCharacterProcessingContext({ active, surfaceActive: active })
+}
+
+export function canMutateStudioCharacterLocalParameters() {
+  return localMutationAllowed()
+}
+
+export function getStudioLocalCharacterAdvancedSettings() {
+  return state.advancedSettings
+}
+
+export function inspectStudioLocalCharacterIsolationSnapshot() {
+  return Object.freeze({
+    phase: state.phase,
+    jobId: state.job?.id ?? null,
+    hasResult: Boolean(state.result),
+    status: state.job?.status ?? null,
+    inputEpoch: state.inputEpoch,
+    busy: state.busy,
+    binding: state.binding,
+    advancedPanel: state.advancedPanel,
+    processingMode: state.processingMode,
+    blackFileName: state.blackFile?.name ?? null,
+    blackUrl: state.blackUrl,
+    blackDimensions: state.blackDimensions ?? null,
+    error: state.error ?? null,
+    fileName: state.file?.name ?? null,
+    sourceUrl: state.sourceUrl,
+    dimensions: state.dimensions ?? null,
+    selectedAdjustmentFrame,
+    advancedSettings: JSON.parse(JSON.stringify(state.advancedSettings)),
+    calibration: Object.freeze({
+      busy: Boolean(state.calibration?.busy),
+      active: Boolean(state.calibration?.active),
+      hasPreview: Boolean(state.calibration?.previewFile),
+      hasReport: Boolean(state.calibration?.report),
+      sourceInputEpoch: state.calibration?.sourceInputEpoch ?? null,
+    }),
+  })
+}
+
+export function inspectStudioLocalCharacterState() {
+  return Object.freeze({
+    phase: state.phase,
+    jobId: state.job?.id ?? null,
+    hasResult: Boolean(state.result),
+    status: state.job?.status ?? null,
+    failureReasonKey: state.failureReasonKey,
+  })
+}
+
+export function getStudioCharacterProcessingSourceState() {
+  return Object.freeze({
+    hasSource: Boolean(state.file),
+    sourceOrigin: state.sourceOrigin,
+    sourceProvenance: state.sourceProvenance,
+    phase: state.phase,
+  })
+}
+
+export function adoptStudioCharacterProcessingSource(file, {
+  sourceOrigin = 'ai',
+  sourceProvenance = null,
+  signal,
+} = {}) {
+  return selectSource(file, {
+    sourceOrigin,
+    sourceProvenance,
+    signal,
+    transactional: true,
+    allowActiveRunSupersession: true,
+  })
+}
+
+export function seedStudioLocalCharacterCompleteForTest(result) {
+  state = {
+    ...createInitialLocalCharacterState(),
+    phase: 'complete',
+    job: result?.job ?? null,
+    result: result ?? null,
+    advancedSettings: state.advancedSettings,
+    sourceOrigin: state.sourceOrigin,
+    sourceProvenance: state.sourceProvenance,
   }
+}
+
+export function selectStudioLocalCharacterSourceForTest(file) {
+  return selectSource(file)
+}
+
+export function startStudioLocalCharacterCalibrationForTest() {
+  return buildCalibrationPreview()
+}
+
+export function submitStudioLocalCharacterJobForTest() {
+  return submitLocalJob()
+}
+
+export function selectStudioLocalCharacterBlackMatteForTest(file) {
+  return selectBlackMatte(file)
+}
+
+export function seedStudioLocalCharacterReadyForTest({
+  file,
+  dimensions = { width: 32, height: 32 },
+  processingMode = 'standard',
+  sourceLayout = 'topdown_rpg_v0',
+  backgroundMode,
+} = {}) {
+  state = {
+    ...createInitialLocalCharacterState(),
+    phase: 'ready',
+    file: file ?? state.file,
+    sourceUrl: state.sourceUrl ?? 'blob:local-test',
+    dimensions,
+    name: 'character',
+    processingMode,
+    advancedSettings: {
+      ...state.advancedSettings,
+      sourceLayout,
+      ...(backgroundMode ? { backgroundMode } : {}),
+    },
+  }
+}
+
+export function seedStudioLocalCharacterActiveRunForTest({
+  phase = 'running',
+  job = null,
+} = {}) {
+  state = {
+    ...state,
+    phase,
+    busy: phase === 'running' ? 'observe' : null,
+    job,
+    result: null,
+    failureReport: null,
+    failureReasonKey: null,
+    error: null,
+  }
+}
+
+export function notifyLocalAdvancedControlsChanged() {
+  updateAdvancedSettingsFromControls()
 }
 
 export function getStudioLocalCharacterProjectCandidate() {
@@ -2083,6 +2378,15 @@ export function getStudioLocalCharacterProjectCandidate() {
     state.binding?.inputKey !== currentKey ||
     !result.job?.zip_url
   ) return null
+  const shared = getSharedCharacterExportPresentation()
+  const presentation = createLocalCompleteResultPresentation(result)
+  if (
+    getSharedCharacterResultOwner() !== 'local'
+    || shared?.bindKey !== presentation.bindKey
+    || !shared.playable
+    || !shared.exportUnlocked
+    || shared.hydrateError
+  ) return null
   return Object.freeze({
     kind: 'character',
     jobId: result.job.id,
@@ -2093,48 +2397,31 @@ export function getStudioLocalCharacterProjectCandidate() {
   })
 }
 
-function handleMovementKey(event, pressed) {
-  if (!localActive || state.phase !== 'complete' || !MOVEMENT_KEYS.has(event.key)) return
-  if (['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON', 'A'].includes(event.target?.tagName)) return
-  event.preventDefault()
-  if (pressed) preview.keys.add(event.key)
-  else preview.keys.delete(event.key)
-}
-
 function initAdvancedLocalControls() {
   const frame = byId('character-advanced-frame')
   if (frame && !frame.options.length) {
     for (let index = 0; index < 64; index += 1) {
       const option = document.createElement('option')
       option.value = String(index)
-      option.textContent = `Frame ${index}`
+      option.dataset.characterAdvancedFrameIndex = String(index)
       frame.append(option)
     }
   }
   const locks = byId('character-advanced-locks')
   if (locks && !locks.options.length) {
-    for (const name of [
-      'idle_down', 'idle_up', 'idle_left', 'idle_right',
-      'walk_down', 'walk_up', 'walk_left', 'walk_right',
-      'attack_down', 'attack_up', 'attack_left', 'attack_right',
-      'hurt', 'happy', 'sit', 'talk',
-    ]) {
+    for (const [name, copyKey] of ADVANCED_ANIMATION_LOCK_OPTIONS) {
       const option = document.createElement('option')
       option.value = name
-      option.textContent = name
+      option.dataset.characterAdvancedCopy = copyKey
       locks.append(option)
     }
   }
-  byId('character-advanced-entry')?.addEventListener('click', () => openAdvancedPanel('config'))
-  byId('character-advanced-close')?.addEventListener('click', closeAdvancedPanel)
   document.querySelectorAll('.character-advanced-panel-close').forEach((button) => {
     button.addEventListener('click', closeAdvancedPanel)
   })
   document.querySelectorAll('.character-advanced-panel-back').forEach((button) => {
     button.addEventListener('click', () => openAdvancedPanel('config'))
   })
-  byId('character-advanced-back-standard')?.addEventListener('click', returnToStandardImport)
-  byId('character-advanced-run')?.addEventListener('click', () => void submitLocalJob())
   byId('character-advanced-black-file')?.addEventListener('change', (event) => {
     const file = event.currentTarget?.files?.[0]
     if (file) void selectBlackMatte(file)
@@ -2163,7 +2450,7 @@ function initAdvancedLocalControls() {
     'character-advanced-export-3x',
     'character-advanced-export-4x',
   ]) byId(id)?.addEventListener('change', updateAdvancedSettingsFromControls)
-  byId('character-advanced-frame')?.addEventListener('change', renderFrameAdjustmentControls)
+  byId('character-advanced-frame')?.addEventListener('change', handleFrameSelectorChange)
   byId('character-advanced-nudge-save')?.addEventListener('click', () => updateFrameAdjustment(false))
   byId('character-advanced-nudge-clear')?.addEventListener('click', () => updateFrameAdjustment(true))
   byId('character-advanced-auto-grid')?.addEventListener('click', setAutomaticGrid)
@@ -2187,25 +2474,24 @@ export function initStudioCharacterLocal({ serviceAvailable = true } = {}) {
   const sourceInput = byId('character-local-file')
   if (sourceInput) sourceInput.accept = 'image/png,image/webp,image/jpeg,.png,.webp,.jpg,.jpeg'
   initAdvancedLocalControls()
+  bindCharacterComboboxKinds(CHARACTER_LOCAL_COMBOBOX_KINDS)
+  syncLocalCharacterComboboxes({ editable: serviceConnectionAvailable })
+  byId('character-local-advanced-form')?.addEventListener('submit', (event) => {
+    event.preventDefault?.()
+  })
   byId('character-local-file')?.addEventListener('change', (event) => {
+    if (!processingActive) return
     const file = event.currentTarget?.files?.[0]
     if (file) void selectSource(file)
   })
-  byId('character-local-clear')?.addEventListener('click', () => clearSource())
+  byId('character-local-clear')?.addEventListener('click', () => {
+    if (!processingActive) return
+    clearSource()
+  })
   byId('character-local-name')?.addEventListener('input', (event) => {
+    if (!processingActive) return
     invalidateForName(event.currentTarget?.value)
   })
   byId('character-local-primary')?.addEventListener('click', handlePrimaryAction)
-  byId('character-export-link')?.addEventListener('click', (event) => {
-    if (!localActive) return
-    event.preventDefault()
-    if (state.phase === 'complete') openExportDialog()
-  })
-  byId('character-local-export-close')?.addEventListener('click', closeExportDialog)
-  byId('character-local-export-dialog')?.addEventListener('click', (event) => {
-    if (event.target === event.currentTarget) closeExportDialog()
-  })
-  globalThis.addEventListener?.('keydown', (event) => handleMovementKey(event, true))
-  globalThis.addEventListener?.('keyup', (event) => handleMovementKey(event, false))
-  renderStudioCharacterLocal()
+  renderProcessingSurface()
 }

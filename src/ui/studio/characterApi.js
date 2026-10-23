@@ -7,6 +7,7 @@ const ACCEPTED_PUBLICATION_PREFIX = 'accepted_v1_'
 export const STRICT_FIXED_REGION_PROFILE = Object.freeze({
   generationProfileId: 'full_sheet_fixed_region_v1',
   mode: 'production_sheet_v0',
+  sourceLayout: 'fixed_region_motion_v0',
   imageConfig: Object.freeze({ image_size: '2K', aspect_ratio: '1:1' }),
   generationOptions: Object.freeze({ candidateCount: 1 }),
   maxProviderCalls: 1,
@@ -38,6 +39,8 @@ export const STRICT_ARTIFACT_BYTE_LIMITS = Object.freeze({
   json: 16 * 1024 * 1024,
   image: 64 * 1024 * 1024,
 })
+
+export const SHARED_CHARACTER_SOURCE_LIMIT_BYTES = 32 * 1024 * 1024
 
 export const STRICT_V2_URL_FIELDS = Object.freeze({
   background_removed_provider_output_url: 'background_removed_provider_output.png',
@@ -80,6 +83,7 @@ export const STRICT_ACCEPT_URL_FIELDS = Object.freeze({
   source_url: 'source.png',
   normalized_sheet_url: 'normalized_sheet.png',
   animations_url: 'animations.json',
+  debug_report_url: 'debug_report.json',
   metadata_url: 'metadata.json',
   editor_metadata_url: 'editor_metadata.json',
   generation_release_gate_url: 'generation_release_gate.json',
@@ -685,6 +689,76 @@ export async function sha256Bytes(value, { cryptoImpl = globalThis.crypto } = {}
   return [...digest].map((byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 
+const SHARED_PROCESSING_SOURCE_TYPES = Object.freeze({
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  webp: 'image/webp',
+})
+
+function defaultAcceptedSourceFileFactory({ bytes, name, type }) {
+  if (typeof globalThis.File === 'function') {
+    return new globalThis.File([bytes], name, { type, lastModified: 0 })
+  }
+  if (typeof globalThis.Blob === 'function') {
+    const blob = new globalThis.Blob([bytes], { type })
+    Object.defineProperties(blob, {
+      name: { value: name, enumerable: true },
+      lastModified: { value: 0, enumerable: true },
+    })
+    return blob
+  }
+  throw strictError('accepted_source_file_unavailable', 'Accepted AI source cannot become a processing file')
+}
+
+export async function loadAcceptedRawCharacterSource(acceptance, acceptedBinding, {
+  fetchImpl = globalThis.fetch,
+  signal,
+  fileFactory = defaultAcceptedSourceFileFactory,
+} = {}) {
+  if (!isRecord(acceptance) || !isRecord(acceptedBinding)) {
+    throw strictError('accepted_source_binding_missing', 'Accepted AI source binding is missing')
+  }
+  const publicationId = assertSafeId(acceptance.publication_id, 'publication_id')
+  const url = String(acceptance.raw_provider_output_url ?? '')
+  const fileName = url.split('/').at(-1) || ''
+  const extension = fileName.match(/^raw_provider_output\.(png|jpg|webp)$/)?.[1]
+  if (!extension) {
+    throw strictError(
+      'accepted_source_type_unsupported',
+      'Accepted AI raw source must be PNG, JPEG, or WebP before shared processing',
+    )
+  }
+  assertRelativeGeneratedUrl(url, {
+    jobId: publicationId,
+    fileName,
+  })
+  const expectedHash = assertHash(
+    acceptedBinding.expectedRawProviderOutputSha256,
+    'expectedRawProviderOutputSha256',
+  )
+  const bytes = await fetchArtifactBytes(url, {
+    fetchImpl,
+    signal,
+    maxBytes: SHARED_CHARACTER_SOURCE_LIMIT_BYTES,
+    label: 'accepted AI raw source',
+  })
+  const actualHash = await sha256Bytes(bytes)
+  if (actualHash !== expectedHash) {
+    throw strictError(
+      'accepted_source_hash_mismatch',
+      'Accepted AI raw source does not match the manually accepted hash',
+    )
+  }
+  if (typeof fileFactory !== 'function') {
+    throw strictError('accepted_source_file_unavailable', 'Accepted AI source cannot become a processing file')
+  }
+  return fileFactory({
+    bytes,
+    name: fileName,
+    type: SHARED_PROCESSING_SOURCE_TYPES[extension],
+  })
+}
+
 function parseGenerationJson(bytes) {
   try {
     const value = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes))
@@ -760,6 +834,8 @@ function assertRecoverableReviewArtifacts({
     requestManifest.protocol !== 'full_sheet_generation_review_v1' ||
     requestManifest.schema_version !== 1 ||
     requestManifest.review_id !== reviewId ||
+    typeof requestManifest.request_input?.description !== 'string' ||
+    !requestManifest.request_input.description.trim() ||
     requestManifest.plan_hash !== reviewArtifact.plan_hash ||
     requestManifest.reference_manifest_sha256 !== referenceManifestSha256 ||
     reviewArtifact.reference_manifest_sha256 !== referenceManifestSha256 ||
@@ -929,11 +1005,20 @@ export async function restoreStrictReviewRequiredGeneration(selector, {
     'generation_reference_manifest.json',
     'invalid_pending_review',
   )
+  const requestManifest = parseStrictJsonArtifact(
+    requestBytes,
+    'generation_request_manifest.json',
+    'invalid_pending_review',
+  )
+  const { plan_hash: requestPlanHash, ...requestManifestBase } = requestManifest
+  if (await hashStrictJsonValue(requestManifestBase, { cryptoImpl }) !== requestPlanHash) {
+    throw strictError('pending_review_mismatch', 'Pending Review request manifest hash changed')
+  }
   const referenceManifestSha256 = await hashStrictJsonValue(referenceManifest, { cryptoImpl })
   const review = assertRecoverableReviewArtifacts({
     reviewId,
     reviewArtifact: parseStrictJsonArtifact(reviewBytes, 'generation_review.json', 'invalid_pending_review'),
-    requestManifest: parseStrictJsonArtifact(requestBytes, 'generation_request_manifest.json', 'invalid_pending_review'),
+    requestManifest,
     referenceManifest,
     referenceManifestSha256,
   })
@@ -943,7 +1028,11 @@ export async function restoreStrictReviewRequiredGeneration(selector, {
     generation: parseGenerationJson(generationBytes),
     releaseGate: parseStrictJsonArtifact(gateBytes, 'generation_release_gate.json', 'invalid_pending_gate'),
   })
-  return Object.freeze({ job: Object.freeze(job), review: Object.freeze(review) })
+  return Object.freeze({
+    job: Object.freeze(job),
+    review: Object.freeze(review),
+    sealedDescription: String(requestManifest.request_input?.description ?? ''),
+  })
 }
 
 function assertV2ArtifactManifest(generation) {

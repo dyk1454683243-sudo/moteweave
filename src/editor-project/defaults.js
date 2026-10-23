@@ -1,4 +1,5 @@
 import {
+  EDITOR_PROJECT_V1_VERSION,
   EDITOR_PROJECT_VERSION,
   EDITOR_SCENE_VERSION,
 } from './constants.js'
@@ -83,4 +84,40 @@ export function createDefaultEditorProject({
       ...clonePlain(settings),
     },
   }
+}
+
+export function createDefaultEditorProjectV1({
+  id = 'project_demo',
+  name = 'Untitled Project',
+  revision = 1,
+  sceneId = 'scene_main',
+  sceneName = 'Main Scene',
+  createdAt,
+  updatedAt = createdAt,
+  settings,
+  upgradedFrom = null,
+  conversationId = null,
+} = {}) {
+  const project = createDefaultEditorProject({
+    id,
+    name,
+    revision,
+    sceneId,
+    sceneName,
+    createdAt,
+    updatedAt,
+    settings,
+  })
+  project.version = EDITOR_PROJECT_V1_VERSION
+  project.upgraded_from = upgradedFrom == null ? null : clonePlain(upgradedFrom)
+  project.pages = [{
+    id: 'page_1',
+    name: 'Page 1',
+    canvas_order: [],
+  }]
+  project.canvases = {}
+  project.conversation_id = conversationId ?? null
+  project.sprite_documents = {}
+  project.operation_receipts = {}
+  return project
 }

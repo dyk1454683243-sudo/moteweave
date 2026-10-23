@@ -9,7 +9,12 @@ import {
   CHARACTER_REPAIR_OUTPUT_FRAME_SIZES,
   COORDINATE_SPACES,
   EDITOR_INTERACTION_VERSION,
+  EDITOR_PROJECT_V1_VERSION,
+  EDITOR_PROJECT_V2_VERSION,
   EDITOR_PROJECT_VERSION,
+  SHA256_HEX_PATTERN,
+  SPRITE_DOCUMENT_LIMITS,
+  UUID_PATTERN,
   EDITOR_SCENE_VERSION,
   ENTITY_TYPES,
   IMPLEMENTATION_REVISION_PATTERN,
@@ -21,6 +26,9 @@ import {
   PROCESSING_RECIPE_VERSION,
   PROCESSING_TARGET_PIPELINES,
   PRODUCTION_STATUSES,
+  PROJECT_REFERENCE_PURPOSES,
+  PROJECT_REFERENCE_SOURCE_KINDS,
+  PROJECT_REFERENCE_STATUSES,
   PROVENANCE_SOURCE_TYPES,
   QUALITY_STATUSES,
   RESERVED_ASSET_KINDS,
@@ -465,6 +473,268 @@ function validateSceneFlow(sceneFlow, scenes, errors) {
   }
 }
 
+const V1_PROJECT_KEYS = Object.freeze([
+  'version',
+  'id',
+  'name',
+  'revision',
+  'created_at',
+  'updated_at',
+  'active_scene_id',
+  'assets',
+  'scenes',
+  'scene_flow',
+  'settings',
+  'upgraded_from',
+  'pages',
+  'canvases',
+  'conversation_id',
+  'sprite_documents',
+  'references',
+  'operation_receipts',
+])
+
+const V1_REFERENCE_KEYS = Object.freeze([
+  'id',
+  'name',
+  'purpose',
+  'status',
+  'project_id',
+  'canvas_id',
+  'document_id',
+  'working_revision',
+  'frame_id',
+  'frame_index',
+  'layer_id',
+  'source_kind',
+  'width',
+  'height',
+  'rgba_sha256',
+  'manifest_sha256',
+  'created_at',
+  'operation_id',
+  'revoked_at',
+  'revoked_operation_id',
+])
+
+function unknownV1Keys(value, allowed) {
+  return Object.keys(value ?? {}).filter((key) => !allowed.includes(key))
+}
+
+function isSha256Hex(value) {
+  return typeof value === 'string' && SHA256_HEX_PATTERN.test(value)
+}
+
+function isUuid(value) {
+  return typeof value === 'string' && UUID_PATTERN.test(value)
+}
+
+function projectJsonBytes(value) {
+  const json = typeof value === 'string' ? value : JSON.stringify(value)
+  return new TextEncoder().encode(json).byteLength
+}
+
+function validateV1Receipt(receipt, project, errors) {
+  if (!isPlainObject(receipt)) {
+    pushUnique(errors, 'invalid_operation_receipt')
+    return
+  }
+  if (!isUuid(receipt.operation_id) || !isSha256Hex(receipt.payload_sha256)) {
+    pushUnique(errors, 'invalid_operation_receipt')
+  }
+  if (receipt.project_id !== project.id) pushUnique(errors, 'receipt_project_mismatch')
+  if (!isPositiveInteger(receipt.project_revision)) pushUnique(errors, 'invalid_operation_receipt')
+  if (receipt.document_id != null && !isValidId(receipt.document_id)) pushUnique(errors, 'invalid_operation_receipt')
+  if (receipt.document_revision != null && !isPositiveInteger(receipt.document_revision)) {
+    pushUnique(errors, 'invalid_operation_receipt')
+  }
+}
+
+function validateV1Reference(ref, project, seenIds, errors) {
+  if (!isPlainObject(ref) || unknownV1Keys(ref, V1_REFERENCE_KEYS).length) {
+    pushUnique(errors, 'invalid_project_reference')
+    return
+  }
+  if (!isValidId(ref.id) || seenIds.has(ref.id)) {
+    pushUnique(errors, 'invalid_project_reference')
+  } else {
+    seenIds.add(ref.id)
+  }
+  if (typeof ref.name !== 'string' || !ref.name || ref.name !== ref.name.trim()
+    || ref.name.length > SPRITE_DOCUMENT_LIMITS.maxNameLength || /[\u0000-\u001f]/.test(ref.name)) {
+    pushUnique(errors, 'invalid_project_reference')
+  }
+  if (!PROJECT_REFERENCE_PURPOSES.includes(ref.purpose)) pushUnique(errors, 'invalid_project_reference')
+  if (!PROJECT_REFERENCE_STATUSES.includes(ref.status)) pushUnique(errors, 'invalid_project_reference')
+  if (ref.project_id !== project.id) pushUnique(errors, 'reference_project_mismatch')
+  if (!isValidId(ref.canvas_id) || !isValidId(ref.document_id) || !isPositiveInteger(ref.working_revision)) {
+    pushUnique(errors, 'invalid_project_reference')
+  }
+  if (!isValidId(ref.frame_id) || !isNonNegativeInteger(ref.frame_index)) {
+    pushUnique(errors, 'invalid_project_reference')
+  }
+  if (!PROJECT_REFERENCE_SOURCE_KINDS.includes(ref.source_kind)) {
+    pushUnique(errors, 'invalid_project_reference')
+  }
+  if (ref.source_kind === 'cel') {
+    if (!isValidId(ref.layer_id)) pushUnique(errors, 'invalid_project_reference')
+  } else if (ref.layer_id != null) {
+    pushUnique(errors, 'invalid_project_reference')
+  }
+  if (!isPositiveInteger(ref.width) || !isPositiveInteger(ref.height)
+    || ref.width > SPRITE_DOCUMENT_LIMITS.maxCanvasEdge || ref.height > SPRITE_DOCUMENT_LIMITS.maxCanvasEdge) {
+    pushUnique(errors, 'invalid_project_reference')
+  }
+  if (!isSha256Hex(ref.rgba_sha256) || !isSha256Hex(ref.manifest_sha256)) {
+    pushUnique(errors, 'invalid_project_reference')
+  }
+  if (!isIsoTimestamp(ref.created_at) || !isUuid(ref.operation_id)) {
+    pushUnique(errors, 'invalid_project_reference')
+  }
+  if (ref.status === 'revoked') {
+    if (ref.revoked_at != null && !isIsoTimestamp(ref.revoked_at)) pushUnique(errors, 'invalid_project_reference')
+    if (ref.revoked_operation_id != null && !isUuid(ref.revoked_operation_id)) pushUnique(errors, 'invalid_project_reference')
+  } else if (ref.revoked_at != null || ref.revoked_operation_id != null) {
+    pushUnique(errors, 'invalid_project_reference')
+  }
+}
+
+export function collectEditorProjectV1Errors(project, errors) {
+  if (unknownV1Keys(project, V1_PROJECT_KEYS).length) pushUnique(errors, 'unknown_project_field')
+  if (typeof project.name !== 'string' || !project.name || project.name.length > SPRITE_DOCUMENT_LIMITS.maxNameLength) {
+    pushUnique(errors, 'invalid_project_name')
+  }
+  if (project.upgraded_from != null) {
+    if (!isPlainObject(project.upgraded_from) || !isValidId(project.upgraded_from.project_id)
+      || !isPositiveInteger(project.upgraded_from.revision)
+      || unknownV1Keys(project.upgraded_from, ['project_id', 'revision']).length) {
+      pushUnique(errors, 'invalid_upgraded_from')
+    }
+  }
+  if (project.conversation_id != null && (typeof project.conversation_id !== 'string' || !project.conversation_id
+    || project.conversation_id.length > SPRITE_DOCUMENT_LIMITS.maxNameLength)) {
+    pushUnique(errors, 'invalid_conversation_id')
+  }
+  if (!Array.isArray(project.pages) || project.pages.length !== 1) pushUnique(errors, 'invalid_pages')
+  const page = project.pages?.[0]
+  if (!page || !isValidId(page.id) || typeof page.name !== 'string' || !Array.isArray(page.canvas_order)) {
+    pushUnique(errors, 'invalid_pages')
+  }
+  if (!isObjectMap(project.canvases) || !isObjectMap(project.sprite_documents) || !isObjectMap(project.operation_receipts)) {
+    pushUnique(errors, 'invalid_v1_index')
+  }
+  const canvasCount = Object.keys(project.canvases ?? {}).length
+  const documentCount = Object.keys(project.sprite_documents ?? {}).length
+  if (canvasCount > SPRITE_DOCUMENT_LIMITS.maxCanvasesOrDocuments
+    || documentCount > SPRITE_DOCUMENT_LIMITS.maxCanvasesOrDocuments) {
+    pushUnique(errors, 'project_resource_limit')
+  }
+  for (const [key, canvas] of Object.entries(project.canvases ?? {})) {
+    if (key !== canvas?.id || !isValidId(canvas?.id) || canvas.page_id !== page?.id) pushUnique(errors, 'invalid_canvas_index')
+    if (!isValidId(canvas?.document_id) || !project.sprite_documents?.[canvas.document_id]) {
+      pushUnique(errors, 'invalid_canvas_document')
+    }
+    if (!Number.isInteger(canvas?.x) || !Number.isInteger(canvas?.y)) pushUnique(errors, 'invalid_canvas_index')
+    if (Object.hasOwn(canvas ?? {}, 'display_name')) {
+      const displayName = canvas.display_name
+      if (displayName == null
+        || typeof displayName !== 'string'
+        || displayName !== displayName.trim()
+        || !displayName
+        || displayName.length > SPRITE_DOCUMENT_LIMITS.maxNameLength
+        || /[\u0000-\u001f]/.test(displayName)) {
+        pushUnique(errors, 'invalid_canvas_display_name')
+      }
+    }
+  }
+  for (const canvasId of page?.canvas_order ?? []) {
+    if (!project.canvases?.[canvasId]) pushUnique(errors, 'canvas_order_mismatch')
+  }
+  for (const [key, document] of Object.entries(project.sprite_documents ?? {})) {
+    if (key !== document?.id || !isValidId(document?.id)) pushUnique(errors, 'invalid_sprite_document_index')
+    if (!isPositiveInteger(document?.working_revision)) pushUnique(errors, 'invalid_working_revision')
+    if (document?.accepted_revision != null && !isPositiveInteger(document.accepted_revision)) {
+      pushUnique(errors, 'invalid_accepted_revision')
+    }
+    if (!isObjectMap(document?.revisions) || !document.revisions?.[document.working_revision]) {
+      pushUnique(errors, 'missing_working_revision')
+    }
+    if (document?.accepted_revision != null && !document.revisions?.[document.accepted_revision]) {
+      pushUnique(errors, 'missing_accepted_revision')
+    }
+    for (const [revisionKey, revision] of Object.entries(document?.revisions ?? {})) {
+      const revisionNumber = Number(revisionKey)
+      if (!isPositiveInteger(revisionNumber) || String(revisionNumber) !== revisionKey) {
+        pushUnique(errors, 'invalid_document_revision_index')
+      }
+      if (!isSha256Hex(revision?.manifest_sha256) || !isIsoTimestamp(revision?.created_at)) {
+        pushUnique(errors, 'invalid_document_revision_index')
+      }
+      if (revision?.parent_revision != null && !isPositiveInteger(revision.parent_revision)) {
+        pushUnique(errors, 'invalid_document_revision_index')
+      }
+    }
+  }
+  for (const [key, receipt] of Object.entries(project.operation_receipts ?? {})) {
+    if (key !== receipt?.operation_id) pushUnique(errors, 'receipt_key_mismatch')
+    validateV1Receipt(receipt, project, errors)
+  }
+  if (Object.hasOwn(project, 'references')) {
+    if (!Array.isArray(project.references)) {
+      pushUnique(errors, 'invalid_project_reference')
+    } else {
+      const maxReferences = SPRITE_DOCUMENT_LIMITS.maxProjectReferences ?? 64
+      if (project.references.length > maxReferences) {
+        pushUnique(errors, 'project_resource_limit')
+      }
+      const seenReferenceIds = new Set()
+      for (const ref of project.references) {
+        validateV1Reference(ref, project, seenReferenceIds, errors)
+      }
+    }
+  }
+  if (projectJsonBytes(project) > SPRITE_DOCUMENT_LIMITS.maxProjectJsonBytes) {
+    pushUnique(errors, 'project_resource_limit')
+  }
+}
+
+export function collectEditorProjectV2Errors(project, errors) {
+  if (!Number.isSafeInteger(project.revision)) pushUnique(errors, 'invalid_project_revision')
+  if (unknownV1Keys(project, [...V1_PROJECT_KEYS.filter(key => key !== 'operation_receipts'), 'history']).length) {
+    pushUnique(errors, 'unknown_project_field')
+  }
+  const history = project.history
+  if (!isPlainObject(history) || history.version !== 'editor_history_v1'
+    || unknownV1Keys(history, ['version', 'revisions', 'receipts', 'legacy_backup']).length
+    || !['revisions', 'receipts', 'legacy_backup'].every(key => history[key] === null || isSha256Hex(history[key]))) {
+    pushUnique(errors, 'invalid_history_root')
+  }
+  const documents = {}
+  for (const [id, document] of Object.entries(project.sprite_documents ?? {})) {
+    if (!isPlainObject(document)) { pushUnique(errors, 'invalid_sprite_document_head'); continue }
+    if (!isPlainObject(document)
+      || unknownV1Keys(document, ['id', 'working_revision', 'accepted_revision', 'max_revision', 'working', 'accepted']).length
+      || !Number.isSafeInteger(document.max_revision) || document.max_revision < document.working_revision
+      || !Number.isSafeInteger(document.working_revision)
+      || (document.accepted_revision !== null && !Number.isSafeInteger(document.accepted_revision))
+      || document.max_revision < (document.accepted_revision ?? 0)
+      || !isPlainObject(document.working)
+      || (document.accepted_revision === null ? document.accepted !== null : !isPlainObject(document.accepted))) {
+      pushUnique(errors, 'invalid_sprite_document_head')
+    }
+    if (document.working_revision === document.accepted_revision
+      && JSON.stringify(document.working) !== JSON.stringify(document.accepted)) pushUnique(errors, 'invalid_sprite_document_head')
+    const revisions = { [document.working_revision]: document.working }
+    if (document.accepted_revision !== null) revisions[document.accepted_revision] = document.accepted
+    documents[id] = { id: document.id, working_revision: document.working_revision,
+      accepted_revision: document.accepted_revision, revisions }
+  }
+  const { history: ignored, ...current } = project
+  collectEditorProjectV1Errors({ ...current, version: EDITOR_PROJECT_V1_VERSION,
+    sprite_documents: documents, operation_receipts: {} }, errors)
+  if (projectJsonBytes(project) > SPRITE_DOCUMENT_LIMITS.maxProjectJsonBytes) pushUnique(errors, 'project_resource_limit')
+}
+
 export function validateEditorProject(project) {
   const errors = []
   const warnings = []
@@ -475,7 +745,9 @@ export function validateEditorProject(project) {
     return makeResult(errors, warnings)
   }
 
-  if (project.version !== EDITOR_PROJECT_VERSION) pushUnique(errors, 'unknown_project_version')
+  if (![EDITOR_PROJECT_VERSION, EDITOR_PROJECT_V1_VERSION, EDITOR_PROJECT_V2_VERSION].includes(project.version)) {
+    pushUnique(errors, 'unknown_project_version')
+  }
   if (!isValidId(project.id)) pushUnique(errors, 'malformed_project_id')
   if (!project.name) pushUnique(errors, 'missing_project_name')
   if (!isPositiveInteger(project.revision)) pushUnique(errors, 'invalid_project_revision')
@@ -486,6 +758,11 @@ export function validateEditorProject(project) {
   if (!project.scenes?.[project.active_scene_id]) pushUnique(errors, 'missing_active_scene')
   if (!isPositiveInteger(project.settings?.default_snap)) pushUnique(errors, 'invalid_default_snap')
   validatePositiveDimensions(project.settings?.default_viewport, errors, 'invalid_default_viewport')
+  if ([EDITOR_PROJECT_V1_VERSION, EDITOR_PROJECT_V2_VERSION].includes(project.version) && Object.hasOwn(project.settings ?? {}, 'palette')) {
+    if (!validProjectPalette(project.settings.palette)) {
+      pushUnique(errors, 'invalid_project_palette')
+    }
+  }
 
   for (const [key, asset] of Object.entries(project.assets ?? {})) {
     if (key !== asset?.id) pushUnique(errors, 'asset_key_id_mismatch')
@@ -500,6 +777,8 @@ export function validateEditorProject(project) {
   }
 
   validateSceneFlow(project.scene_flow, project.scenes ?? {}, errors)
+  if (project.version === EDITOR_PROJECT_V1_VERSION) collectEditorProjectV1Errors(project, errors)
+  if (project.version === EDITOR_PROJECT_V2_VERSION) collectEditorProjectV2Errors(project, errors)
 
   const layer_count = Object.values(project.scenes ?? {}).reduce((sum, scene) => sum + (scene.layers?.length ?? 0), 0)
   return makeResult(errors, warnings, {
@@ -507,6 +786,37 @@ export function validateEditorProject(project) {
     scene_count: Object.keys(project.scenes ?? {}).length,
     layer_count,
   })
+}
+
+export function validPaletteColors(colors) {
+  return Array.isArray(colors) && colors.length <= 256 && colors.every(color =>
+    Array.isArray(color) && color.length === 4 && color.every(value => Number.isInteger(value) && value >= 0 && value <= 255))
+}
+
+export function validProjectPalette(palette) {
+  if (!isPlainObject(palette) || !validPaletteColors(palette.colors)) return false
+  const keys = Object.keys(palette)
+  if (keys.length === 1 && keys[0] === 'colors') return true
+  if (keys.length !== 3 || !keys.every(k => ['colors', 'active_id', 'items'].includes(k))) return false
+  if (!isValidId(palette.active_id) || !Array.isArray(palette.items) || palette.items.length < 1 || palette.items.length > 16) return false
+  const seen = new Set()
+  let activeItem = null
+  for (const item of palette.items) {
+    if (!isPlainObject(item) || Object.keys(item).length !== 3 || !['id', 'name', 'colors'].every(k => Object.hasOwn(item, k))) return false
+    if (!isValidId(item.id) || seen.has(item.id)) return false
+    seen.add(item.id)
+    if (typeof item.name !== 'string' || !item.name.trim() || item.name !== item.name.trim() || item.name.length > 64 || /[\u0000-\u001f\u007f]/.test(item.name)) return false
+    if (!validPaletteColors(item.colors)) return false
+    if (item.id === palette.active_id) activeItem = item
+  }
+  if (!activeItem) return false
+  if (activeItem.colors.length !== palette.colors.length) return false
+  for (let i = 0; i < palette.colors.length; i += 1) {
+    for (let c = 0; c < 4; c += 1) {
+      if (palette.colors[i][c] !== activeItem.colors[i][c]) return false
+    }
+  }
+  return true
 }
 
 function allNestedNumbersFinite(value) {

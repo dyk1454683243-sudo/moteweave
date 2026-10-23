@@ -1,5 +1,4 @@
 import {
-  CHARACTER_PRESETS,
   SCENE_PRESETS,
   buildCharacterPrompt,
   buildScenePrompt,
@@ -23,15 +22,9 @@ export const PROMPT_ASSISTANT_DEFAULTS = Object.freeze({
 export const PROMPT_ASSISTANT_COPY = Object.freeze({
   en: Object.freeze({
     entry: 'Prompt helper',
-    characterTitle: 'Character prompt helper',
     sceneTitle: 'Scene prompt helper',
     deterministic: 'DETERMINISTIC LOCAL TEXT · 0 FETCH / 0 STORAGE',
-    characterHelp: 'Uses the existing buildCharacterPrompt directly; it never fills the generation form automatically.',
     sceneHelp: 'Uses the existing buildScenePrompt directly; it never fills the import or online-generation form automatically.',
-    preset: 'Character preset',
-    character: 'Character description',
-    reference: 'Reference image is present',
-    referenceHelp: 'Only changes the deterministic reference instruction',
     view: 'View preset',
     theme: 'Theme',
     composition: 'Composition',
@@ -44,21 +37,14 @@ export const PROMPT_ASSISTANT_COPY = Object.freeze({
     reset: 'Reset',
     close: 'Close',
     closeAria: 'Close prompt helper',
-    goCharacter: 'Go to Character helper',
     copied: 'Prompt copied.',
     copyFailed: 'Clipboard access failed. Select and copy the prompt manually.',
   }),
   zh: Object.freeze({
     entry: '提示词助手',
-    characterTitle: '角色提示词助手',
     sceneTitle: '场景提示词助手',
     deterministic: '确定性本地文本 · 0 fetch / 0 storage',
-    characterHelp: '直接使用现有 buildCharacterPrompt；不会自动填充生成表单。',
     sceneHelp: '直接使用现有 buildScenePrompt；不会自动填充导入或在线生成表单。',
-    preset: '角色预设',
-    character: '角色描述',
-    reference: '存在参考图',
-    referenceHelp: '只影响确定性提示词中的参考说明',
     view: '视角预设',
     theme: '主题',
     composition: '构图',
@@ -71,7 +57,6 @@ export const PROMPT_ASSISTANT_COPY = Object.freeze({
     reset: '重置',
     close: '关闭',
     closeAria: '关闭提示词助手',
-    goCharacter: '前往角色助手',
     copied: '提示词已复制。',
     copyFailed: '无法访问剪贴板，请手动选择并复制提示词。',
   }),
@@ -79,20 +64,6 @@ export const PROMPT_ASSISTANT_COPY = Object.freeze({
 
 const PROMPT_ASSISTANT_OPTION_COPY = Object.freeze({
   en: Object.freeze({
-    character: Object.freeze({
-      'rpgmaker-v1': 'RPG Maker V1',
-      'rpgmaker-v3': 'RPG Maker V3',
-      'character-v2': 'Character V2',
-      'character-v2-2': 'Character V2.2',
-      'character-v3': 'Character V3',
-      'character-v2-3ot': 'V2.3OT',
-      monster: 'Monster',
-      animal: 'Animal',
-      'horizontal-character': 'Side-view character',
-      'topdown-8dir': '8-direction TopDown',
-      'horse-riding': 'Horse riding',
-      'one-image-all-actions': 'One image · all actions',
-    }),
     scene: Object.freeze({
       'topdown-front': 'TopDown front',
       'topdown-45': 'TopDown 45°',
@@ -101,7 +72,6 @@ const PROMPT_ASSISTANT_OPTION_COPY = Object.freeze({
     }),
   }),
   zh: Object.freeze({
-    character: Object.freeze({ ...CHARACTER_PRESETS }),
     scene: Object.freeze(Object.fromEntries(
       Object.entries(SCENE_PRESETS).map(([key, value]) => [key, value.label]),
     )),
@@ -109,13 +79,6 @@ const PROMPT_ASSISTANT_OPTION_COPY = Object.freeze({
 })
 
 const ASSISTANTS = Object.freeze({
-  character: Object.freeze({
-    rootId: 'studio-character-view',
-    drawerId: 'studio-character-prompt-drawer',
-    shadeId: 'studio-character-prompt-shade',
-    openerId: 'studio-character-prompt-open',
-    titleId: 'studio-character-prompt-title',
-  }),
   scene: Object.freeze({
     rootId: 'studio-scene-view',
     drawerId: 'studio-scene-prompt-drawer',
@@ -180,14 +143,6 @@ function fillSelect(select, entries) {
   }
 }
 
-function characterValues() {
-  return {
-    preset: byId('studio-character-prompt-preset')?.value,
-    character: byId('studio-character-prompt-character')?.value,
-    hasReferenceImage: byId('studio-character-prompt-reference')?.checked,
-  }
-}
-
 function sceneValues() {
   return {
     view: byId('studio-scene-prompt-view')?.value,
@@ -203,24 +158,17 @@ function setOutput(kind, value) {
 }
 
 function generate(kind) {
-  setOutput(kind, kind === 'character'
-    ? buildCharacterAssistantPrompt(characterValues())
-    : buildSceneAssistantPrompt(sceneValues()))
+  if (kind !== 'scene') return
+  setOutput(kind, buildSceneAssistantPrompt(sceneValues()))
 }
 
 function reset(kind) {
-  if (kind === 'character') {
-    const defaults = PROMPT_ASSISTANT_DEFAULTS.character
-    byId('studio-character-prompt-preset').value = defaults.preset
-    byId('studio-character-prompt-character').value = defaults.character
-    byId('studio-character-prompt-reference').checked = defaults.hasReferenceImage
-  } else {
-    const defaults = PROMPT_ASSISTANT_DEFAULTS.scene
-    byId('studio-scene-prompt-view').value = defaults.view
-    byId('studio-scene-prompt-theme').value = defaults.theme
-    byId('studio-scene-prompt-composition').value = defaults.composition
-    byId('studio-scene-prompt-style').value = defaults.style
-  }
+  if (kind !== 'scene') return
+  const defaults = PROMPT_ASSISTANT_DEFAULTS.scene
+  byId('studio-scene-prompt-view').value = defaults.view
+  byId('studio-scene-prompt-theme').value = defaults.theme
+  byId('studio-scene-prompt-composition').value = defaults.composition
+  byId('studio-scene-prompt-style').value = defaults.style
   generate(kind)
   const live = byId(`studio-${kind}-prompt-live`)
   if (live) {
@@ -309,18 +257,6 @@ export function openStudioPromptAssistant(kind, { focusTarget = null } = {}) {
   return true
 }
 
-function goToCharacterAssistant() {
-  closeStudioPromptAssistant({ restoreFocus: false })
-  if (globalThis.location.hash === '#character') {
-    openStudioPromptAssistant('character')
-    return
-  }
-  globalThis.location.hash = 'character'
-  globalThis.addEventListener('hashchange', () => {
-    openStudioPromptAssistant('character')
-  }, { once: true })
-}
-
 export function renderStudioPromptAssistantsLanguage() {
   document.querySelectorAll('[data-prompt-copy]').forEach((element) => {
     element.textContent = promptT(element.dataset.promptCopy)
@@ -328,9 +264,9 @@ export function renderStudioPromptAssistantsLanguage() {
   document.querySelectorAll('[data-prompt-copy-aria]').forEach((element) => {
     element.setAttribute('aria-label', promptT(element.dataset.promptCopyAria))
   })
-  for (const kind of ['character', 'scene']) {
+  for (const kind of ['scene']) {
     const labels = PROMPT_ASSISTANT_OPTION_COPY[languageCode()][kind]
-    const select = byId(`studio-${kind}-prompt-${kind === 'character' ? 'preset' : 'view'}`)
+    const select = byId(`studio-${kind}-prompt-view`)
     for (const option of select?.options ?? []) option.textContent = labels[option.value] ?? option.textContent
     const live = byId(`studio-${kind}-prompt-live`)
     if (live?.dataset.promptStatus) live.textContent = promptT(live.dataset.promptStatus)
@@ -362,24 +298,14 @@ function openRequestedAssistant() {
   const requested = promptAssistantRequest(globalThis.location.search)
   if (!requested) return
   globalThis.history.replaceState(null, '', promptAssistantUrlWithoutRequest(globalThis.location))
-  if (globalThis.location.hash !== '#scene') {
-    globalThis.location.hash = 'scene'
-    globalThis.addEventListener('hashchange', () => openStudioPromptAssistant('scene'), { once: true })
-    return
-  }
-  openStudioPromptAssistant('scene')
 }
 
 export function initStudioPromptAssistants() {
   if (initialized) return
   initialized = true
-  fillSelect(byId('studio-character-prompt-preset'), CHARACTER_PRESETS)
   fillSelect(byId('studio-scene-prompt-view'), SCENE_PRESETS)
-  reset('character')
   reset('scene')
-  bindAssistant('character')
   bindAssistant('scene')
-  byId('studio-scene-prompt-character')?.addEventListener('click', goToCharacterAssistant)
   globalThis.addEventListener?.('hashchange', handleRouteChange)
   document.addEventListener('click', (event) => {
     if (event.target.closest('[data-character-language],[data-scene-language]')) {

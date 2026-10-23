@@ -482,14 +482,22 @@ export async function checkPublicRelease({
     }
     const buffer = await readFile(path.join(root, filePath))
     if (asset.sha256 !== sha256(buffer)) issues.push(issue('asset.sha256_mismatch', 'binary asset hash does not match provenance', { file: filePath }))
-    if (asset.release_status !== 'approved' || asset.source_rights !== 'repository_owned' || !asset.generator) {
+    const repositoryOwned = asset.source_rights === 'repository_owned' && Boolean(asset.generator)
+    const licensedFont = asset.source_rights === 'licensed_third_party'
+      && filePath.endsWith('.woff2') && asset.kind === 'font' && asset.license === 'OFL-1.1'
+      && /^https:\/\/[^\s]+$/.test(asset.source_url ?? '')
+      && /^[a-f0-9]{64}$/.test(asset.source_archive_sha256 ?? '')
+      && files.includes(asset.license_path) && isIncluded(asset.license_path, snapshotManifest)
+      && asset.license_sha256 === sha256(await readFile(path.join(root, asset.license_path)))
+    if (asset.release_status !== 'approved' || (!repositoryOwned && !licensedFont)) {
       issues.push(issue('asset.not_release_approved', 'binary asset is not approved for the public snapshot', { file: filePath }))
     }
     if (asset.generator && (!files.includes(asset.generator) || !isIncluded(asset.generator, snapshotManifest))) {
       issues.push(issue('asset.generator_missing', 'asset generator is not an included tracked file', { file: filePath, generator: asset.generator }))
     }
-    if (!attributions.includes(filePath) || (asset.generator && !attributions.includes(asset.generator))) {
-      issues.push(issue('asset.attribution_missing', 'ATTRIBUTIONS does not name the asset and generator', { file: filePath }))
+    if (!attributions.includes(filePath) || (asset.generator && !attributions.includes(asset.generator))
+      || (licensedFont && (!attributions.includes(asset.license_path) || !attributions.includes(asset.source_url)))) {
+      issues.push(issue('asset.attribution_missing', 'ATTRIBUTIONS does not name the asset and its provenance', { file: filePath }))
     }
   }
   for (const asset of assetProvenance.assets ?? []) {

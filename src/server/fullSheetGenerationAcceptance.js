@@ -97,7 +97,12 @@ const ACCEPT_REQUEST_FIELDS = new Set([
   'expectedSourceSha256',
   'expectedNormalizedSheetSha256',
   'humanReviewedIssueCount',
+  'acceptanceBasis',
 ])
+// Why the result was accepted. Optional and additive: requests and records without it keep their
+// historical meaning; 'user_request' (accepted because the user asked for this result, nobody
+// inspected it) can claim no reviewed issues.
+export const FULL_SHEET_ACCEPTANCE_BASES = Object.freeze(['user_request', 'visual_inspection'])
 const publicationLocks = new Map()
 
 async function withPublicationLock(publicationId, task) {
@@ -310,6 +315,13 @@ export function parseFullSheetManualAcceptanceRequest(input) {
   if (!Number.isInteger(humanReviewedIssueCount) || humanReviewedIssueCount < 0) {
     throw acceptanceError('invalid_acceptance_request', 'humanReviewedIssueCount must be a non-negative integer')
   }
+  const acceptanceBasis = input.acceptanceBasis ?? null
+  if (acceptanceBasis !== null && !FULL_SHEET_ACCEPTANCE_BASES.includes(acceptanceBasis)) {
+    throw acceptanceError('invalid_acceptance_request', 'acceptanceBasis must be user_request or visual_inspection')
+  }
+  if (acceptanceBasis === 'user_request' && humanReviewedIssueCount !== 0) {
+    throw acceptanceError('invalid_acceptance_request', 'a user_request acceptance cannot claim reviewed issues')
+  }
   return Object.freeze({
     confirmManualAcceptance: true,
     expectedPlanHash: assertHash(input.expectedPlanHash, 'expectedPlanHash'),
@@ -334,6 +346,7 @@ export function parseFullSheetManualAcceptanceRequest(input) {
       'expectedNormalizedSheetSha256',
     ),
     humanReviewedIssueCount,
+    ...(acceptanceBasis ? { acceptanceBasis } : {}),
   })
 }
 
@@ -660,6 +673,7 @@ function publicationUrls(
     source_url: url('source.png'),
     normalized_sheet_url: url('normalized_sheet.png'),
     animations_url: url('animations.json'),
+    debug_report_url: url('debug_report.json'),
     metadata_url: url('metadata.json'),
     editor_metadata_url: url('editor_metadata.json'),
     generation_release_gate_url: url('generation_release_gate.json'),
@@ -978,6 +992,10 @@ async function loadExistingPublication({ generatedDir, publicationId, sourceJobI
     acceptance.source_job_id !== sourceJobId ||
     acceptance.published_job_id !== publicationId ||
     acceptance.human_reviewed_issue_count !== request.humanReviewedIssueCount ||
+    // A recorded basis must match a request that states one; a record from before the basis
+    // existed is returned unchanged (never rewritten to claim a basis it did not record).
+    (acceptance.acceptance_basis != null && request.acceptanceBasis != null &&
+      acceptance.acceptance_basis !== request.acceptanceBasis) ||
     acceptance.generation_review.plan_hash !== request.expectedPlanHash ||
     acceptance.generation_review.reference_manifest_sha256 !== request.expectedReferenceManifestSha256 ||
     acceptance.generation_review.reviewed_run_id !== sealedReview.reviewedRunId ||
@@ -1467,6 +1485,7 @@ async function acceptFullSheetGenerationLocked({
     prompt_contract_version: generationArtifact.value.prompt_contract.contract_version,
     accepted_at: acceptedAt,
     human_reviewed_issue_count: request.humanReviewedIssueCount,
+    ...(request.acceptanceBasis ? { acceptance_basis: request.acceptanceBasis } : {}),
     provider_calls_used: 0,
     generation_review: {
       reviewed_run_id: generationArtifact.value.generation_review.reviewed_run_id,

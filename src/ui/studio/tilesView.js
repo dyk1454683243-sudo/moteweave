@@ -218,7 +218,7 @@ function localizedJobStatus(status) {
   const raw = String(status ?? '—')
   const key = `tiles.jobStatus.${raw}`
   const translated = studioT(key)
-  return translated === key ? raw : `${raw} · ${translated}`
+  return translated === key ? studioT('tiles.jobStatus.unknown') : translated
 }
 
 function providerBudget(job) {
@@ -268,17 +268,17 @@ function renderTopStatus(state) {
       })
     } else if (phase === 'building') {
       const jobStatus = state.job?.status ?? 'queued'
-      top = `${jobStatus} · 0 Provider`
-      metricsText = studioT('tiles.stageMetrics.localBuilding', { status: jobStatus, job: state.job?.id ?? '—' })
+      top = studioT('tiles.status.building')
+      metricsText = studioT('tiles.stageMetrics.localBuilding', { status: localizedJobStatus(jobStatus), job: state.job?.id ?? '—' })
       runtimeText = studioT('tiles.runtime.localBuilding')
     } else if (phase === 'complete') {
-      top = 'done · 0 Provider'
+      top = studioT('tiles.status.complete')
       metricsText = studioT('tiles.stageMetrics.localComplete')
       runtimeText = studioT('tiles.runtime.localComplete')
     } else if (phase === 'failed') {
       const failure = localFailureStatus(state)
-      top = `${failure} · 0 Provider`
-      metricsText = studioT('tiles.stageMetrics.localFailed', { status: failure, job: state.job?.id ?? state.resultJob?.id ?? '—' })
+      top = studioT('tiles.status.failed')
+      metricsText = studioT('tiles.stageMetrics.localFailed', { status: localizedJobStatus(failure), job: state.job?.id ?? state.resultJob?.id ?? '—' })
       runtimeText = studioT('tiles.runtime.localFailed')
     } else if (phase === 'stale') {
       metricsText = studioT('tiles.stageMetrics.localStale')
@@ -336,6 +336,19 @@ function sourceLabel(state) {
   return state.sourceFile?.name || studioT('tiles.sourceChoose')
 }
 
+function renderSourceControls(state) {
+  const usingDefault = !state.sourceFile
+  const defaultButton = byId('studio-tiles-use-default')
+  if (defaultButton) {
+    defaultButton.classList.toggle('is-active', usingDefault)
+    defaultButton.setAttribute('aria-pressed', String(usingDefault))
+    defaultButton.disabled = state.busy !== null || state.phase === 'building'
+  }
+  setText('studio-tiles-source-name', usingDefault ? studioT('tiles.sourceChoose') : state.sourceFile.name)
+  setText('studio-tiles-source-help', usingDefault ? studioT('tiles.sourceHelp') : studioT('tiles.sourceReplace'))
+  setText('studio-tiles-source-status', usingDefault ? studioT('tiles.sourceDefaultActive') : studioT('tiles.sourceCustomActive'))
+}
+
 function optionSummary(state) {
   const { mapWidth, mapHeight, editorOperations } = state.options
   const source = state.sourceFile ? state.sourceFile.name : studioT('tiles.source.procedural')
@@ -348,30 +361,35 @@ function renderLocalBinding(state) {
   const failureJobId = state.job?.id ?? state.resultJob?.id ?? '—'
   setText('studio-tiles-binding-empty', `${summary}\n${studioT('tiles.binding.zeroRequests')}`)
   setText('studio-tiles-binding-ready', `${summary}\n${studioT('tiles.binding.notSubmitted')}`)
-  setText('studio-tiles-binding-building', `${studioT('tiles.jobLabel')}: ${state.job?.id ?? '—'}\n${summary} · 0 Provider`)
+  setText('studio-tiles-binding-building', `${studioT('tiles.jobLabel')}: ${state.job?.id ?? '—'}\n${summary}`)
   setText('studio-tiles-binding-complete', `Validation · ${state.resultJob?.validation_status ?? '—'}\nLDtk · ${state.resultJob?.ldtk_workflow_validation_status ?? state.resultJob?.ldtk_project_status ?? '—'} · Import · ${state.resultJob?.import_validation_status ?? '—'} · Round-trip · ${state.resultJob?.external_roundtrip_validation_status ?? '—'}`)
   setText('studio-tiles-binding-failed', `${studioT('tiles.jobLabel')}: ${state.job?.id ?? '—'}\n${studioT('tiles.binding.failedDetail')}`)
   setText('studio-tiles-binding-stale', `${studioT('tiles.binding.oldKey')}: ${state.binding?.optionsKey?.slice(0, 30) ?? '—'}\n${studioT('tiles.binding.newKey')}: ${state.optionsKey.slice(0, 30)}`)
   setText('studio-tiles-source-name', sourceLabel(state))
   setText('studio-tiles-map-meta', `${state.options.mapWidth}×${state.options.mapHeight} · corner_mask_16 · ${studioT('tiles.editsCount', { count: state.options.editorOperations.length })}`)
-  setText('studio-tiles-job-pill-building', String(state.job?.status ?? 'post_processing').toUpperCase())
-  setText('studio-tiles-job-pill-complete', 'DONE · PASS')
-  setText('studio-tiles-job-building', `${studioT('tiles.jobLabel')}: ${state.job?.id ?? '—'}\n${studioT('tiles.stateLabel')}: ${localizedJobStatus(state.job?.status)}\nProvider: 0`)
+  setText('studio-tiles-job-pill-building', studioT('tiles.job.pill.building'))
+  setText('studio-tiles-job-pill-complete', studioT('tiles.job.pill.complete'))
+  setText('studio-tiles-job-pill-stale', studioT('tiles.job.pill.stale'))
+  setText('studio-tiles-job-building', `${studioT('tiles.jobLabel')}: ${state.job?.id ?? '—'}\n${studioT('tiles.stateLabel')}: ${localizedJobStatus(state.job?.status)}`)
   setText('studio-tiles-job-complete', `Validation: ${state.resultJob?.validation_status ?? '—'}\nLDtk: ${state.resultJob?.ldtk_workflow_validation_status ?? state.resultJob?.ldtk_project_status ?? '—'}\nImport: ${state.resultJob?.import_validation_status ?? '—'}\nRound-trip: ${state.resultJob?.external_roundtrip_validation_status ?? '—'}`)
   setText('studio-tiles-job-stale', `${studioT('tiles.binding.oldKey')}: ${state.binding?.optionsKey?.slice(0, 34) ?? '—'}\n${studioT('tiles.binding.newKey')}: ${state.optionsKey.slice(0, 34)}`)
-  setText('studio-tiles-failed-status', failureStatus.toUpperCase())
-  setText('studio-tiles-failed-reason', `${studioT('tiles.error.originalReason')}: ${errorText(state.localError ?? state.job?.reason)}\n${studioT('tiles.jobLabel')}: ${failureJobId} · Provider: 0`)
+  setText('studio-tiles-failed-status', studioT('tiles.job.pill.failed'))
+  setText('studio-tiles-failed-reason', `${studioT('tiles.error.originalReason')}: ${errorText(state.localError ?? state.job?.reason)}\n${studioT('tiles.jobLabel')}: ${failureJobId}`)
 }
 
 function renderOutputState(state) {
   const enabled = state.mode === 'local' && state.phase === 'complete' && localTilesResultIsCurrent(state)
   const localStatusKey = enabled
-    ? 'tiles.output.downloadable'
+    ? 'tiles.output.state.complete'
     : state.phase === 'building'
-      ? 'tiles.output.generating'
-      : ['failed', 'stale'].includes(state.phase)
-        ? 'tiles.output.locked'
-        : 'tiles.output.waiting'
+      ? 'tiles.output.state.building'
+      : state.phase === 'failed'
+        ? 'tiles.output.state.failed'
+        : state.phase === 'stale'
+          ? 'tiles.output.state.stale'
+          : state.phase === 'ready'
+            ? 'tiles.output.state.ready'
+            : 'tiles.output.state.empty'
   for (const [id, output] of Object.entries(LOCAL_OUTPUTS)) {
     setLink(id, state.resultJob?.[output.field], enabled, output.file)
     const link = byId(id)
@@ -426,6 +444,8 @@ function setInputsDisabled(state) {
   }
   const source = byId('studio-tiles-source-file')
   if (source) source.disabled = localLocked
+  const defaultSource = byId('studio-tiles-use-default')
+  if (defaultSource) defaultSource.disabled = localLocked
   document.querySelectorAll('[data-tiles-tool], #studio-tiles-clear-edits').forEach((button) => {
     button.disabled = localLocked || state.phase !== 'ready'
   })
@@ -536,6 +556,7 @@ export function renderStudioTiles(state = tilesState) {
   if (!state) return
   const root = byId('studio-tiles-view')
   if (!root) return
+  if (state.mode !== 'local') state.mode = 'local'
   state.phase = exactPhase(phaseForMode(state))
   translateStudioDocument(root)
   root.dataset.tilesPhase = state.phase
@@ -552,6 +573,7 @@ export function renderStudioTiles(state = tilesState) {
   renderLanguageButtons()
   renderTopStatus(state)
   renderLocalBinding(state)
+  renderSourceControls(state)
   renderAi(state)
   renderOutputState(state)
   renderResultImage(state)
@@ -1020,11 +1042,10 @@ async function resumeLocalJob() {
 
 function switchMode(mode) {
   const state = tilesState
-  if (!state || !['local', 'ai'].includes(mode) || state.busy) return
-  state.mode = mode
-  state.phase = phaseForMode(state, mode)
+  if (!state || mode !== 'local' || state.busy) return
+  state.mode = 'local'
+  state.phase = phaseForMode(state, 'local')
   renderStudioTiles(state)
-  if (mode === 'ai') void ensureGeminiPreset(state)
 }
 
 function triggerTilesDownload(url, file) {
@@ -1070,6 +1091,14 @@ function bindEvents() {
       commitOptions(tilesState, options)
     })
   }
+  byId('studio-tiles-use-default')?.addEventListener('click', () => {
+    if (!tilesState.sourceFile || tilesState.busy || tilesState.phase === 'building') return
+    tilesState.sourceFile = null
+    tilesState.sourceEpoch += 1
+    tilesState.localError = null
+    invalidateLocalResult(tilesState)
+    renderStudioTiles(tilesState)
+  })
   byId('studio-tiles-source-file')?.addEventListener('change', (event) => {
     const file = event.currentTarget.files?.[0] ?? null
     event.currentTarget.value = ''
@@ -1086,6 +1115,7 @@ function bindEvents() {
     }
     tilesState.sourceFile = file
     tilesState.sourceEpoch += 1
+    tilesState.localError = null
     invalidateLocalResult(tilesState)
     renderStudioTiles(tilesState)
   })

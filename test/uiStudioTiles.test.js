@@ -22,24 +22,31 @@ import { buildTwoPointFiveDAtlasPlan } from '../src/two-point-five-d/terrainAuto
 import { solveTwoPointFiveDConstraintMap } from '../src/two-point-five-d/terrainRuleMapBuilder.js'
 import { DEFAULT_TWO_POINT_FIVE_D_TILESET_CONTRACT } from '../src/two-point-five-d/tilesetContract.js'
 
-const FIGMA_TILE_NODE_IDS = Object.freeze([
+const FIGMA_TILE_CURRENT_NODE_IDS = Object.freeze([
   '603:4360',
   '909:6025',
   '909:7644',
   '910:4970',
   '911:4977',
   '911:6385',
+])
+
+const FIGMA_TILE_CURRENT_OVERRIDE_NODE_IDS = Object.freeze([
+  '997:5491',
+])
+
+const FIGMA_TILE_ARCHIVE_NODE_IDS = Object.freeze([
   '912:5088',
   '913:5095',
   '913:5234',
   '914:5109',
   '918:5310',
+  '997:6498',
 ])
 
-const TILE_PHASES = Object.freeze([
-  'empty', 'ready', 'building', 'complete', 'failed', 'stale',
-  'ai_setup', 'ai_plan_ready', 'ai_running', 'ai_review', 'ai_failed',
-])
+const TILE_CURRENT_LOCAL_PHASES = Object.freeze(['empty', 'ready', 'building', 'complete', 'failed', 'stale'])
+const TILE_ARCHIVE_AI_PHASES = Object.freeze(['ai_setup', 'ai_plan_ready', 'ai_running', 'ai_review', 'ai_failed'])
+const TILE_PHASES = Object.freeze([...TILE_CURRENT_LOCAL_PHASES, ...TILE_ARCHIVE_AI_PHASES])
 
 function verifiedLocalTilesJob(id = 'job_tiles_1') {
   return {
@@ -68,6 +75,10 @@ function openingTagForId(html, id) {
   return html.match(new RegExp(`<[^>]+\\bid="${id}"[^>]*>`))?.[0] ?? ''
 }
 
+function attributeValue(tag, name) {
+  return tag.match(new RegExp(`\\b${name}="([^"]*)"`))?.[1] ?? ''
+}
+
 function tilesHtml(html) {
   const start = html.indexOf('id="studio-tiles-view"')
   const end = html.indexOf('id="studio-scene-view"', start)
@@ -85,15 +96,33 @@ test('Tiles Studio is the sole internal Figma-backed Tiles route', async () => {
   assert.match(html, /href="#tiles" data-studio-route="tiles"/)
   assert.match(app, /import \{ initStudioTiles, renderStudioTilesLanguage \} from '\.\/tilesView\.js'/)
   assert.match(app, /const STUDIO_ROUTES = Object\.freeze\(\['character', 'action', 'sequence', 'tiles', 'scene', 'project', 'qa', 'settings'\]\)/)
-  assert.match(app, /tiles: 'MoteWeave · 图块工作室'/)
-  assert.match(app, /tiles: 'MoteWeave · Tiles Studio'/)
+  assert.match(app, /if \(route === 'scene'\) return 'tiles'/)
+  assert.match(app, /tiles: 'MoteWeave · 地图工作室'/)
+  assert.match(app, /tiles: 'MoteWeave · Map Studio'/)
   assert.match(app, /else if \(activeRoute === 'tiles'\) renderStudioTilesLanguage\(\)/)
   assert.match(app, /tilesInitializationPromise = Promise\.resolve\(initStudioTiles\(\{ serviceAvailable \}\)\)/)
   assert.match(html, /\['character', 'action', 'sequence', 'tiles', 'scene', 'project', 'qa', 'settings'\]\.includes\(requestedRoute\)/)
   assert.doesNotMatch(tilesHtml(html), /tiles-legacy-link|\?tab=two-point-five-d|tiles\.legacy/)
 
-  for (const nodeId of FIGMA_TILE_NODE_IDS) {
-    assert.match(opening, new RegExp(nodeId.replace(':', '\\:')))
+  const currentSource = attributeValue(opening, 'data-design-source')
+  const currentOverrideSource = attributeValue(opening, 'data-ux-design-source')
+  const archiveInventory = attributeValue(opening, 'data-design-archive-inventory')
+  const figmaPrefix = 'figma:ro8w6TKkpd969zW2V5bmkx/'
+
+  assert.equal(currentSource, `${figmaPrefix}${FIGMA_TILE_CURRENT_NODE_IDS.join(',')}`)
+  assert.equal(currentOverrideSource, `${figmaPrefix}${FIGMA_TILE_CURRENT_OVERRIDE_NODE_IDS.join(',')}`)
+  assert.equal(archiveInventory, `${figmaPrefix}${FIGMA_TILE_ARCHIVE_NODE_IDS.join(',')}`)
+
+  for (const nodeId of FIGMA_TILE_CURRENT_NODE_IDS) {
+    assert.match(currentSource, new RegExp(nodeId.replace(':', '\\:')))
+  }
+  for (const nodeId of FIGMA_TILE_CURRENT_OVERRIDE_NODE_IDS) {
+    assert.match(currentOverrideSource, new RegExp(nodeId.replace(':', '\\:')))
+  }
+  for (const nodeId of FIGMA_TILE_ARCHIVE_NODE_IDS) {
+    assert.doesNotMatch(currentSource, new RegExp(nodeId.replace(':', '\\:')))
+    assert.doesNotMatch(currentOverrideSource, new RegExp(nodeId.replace(':', '\\:')))
+    assert.match(archiveInventory, new RegExp(nodeId.replace(':', '\\:')))
   }
   assert.doesNotMatch(opening, /54:1883/, 'Archive is reference-only, not a live Studio phase')
 })
@@ -113,14 +142,19 @@ test('legacy root shell is retired while maintained Tiles core and APIs stay rea
   assert.match(api, /\/api\/build-two-point-five-d-tileset/)
   assert.match(api, /\/api\/two-point-five-d-material-source-benchmark/)
 })
-test('Tiles Studio exposes exactly the eleven Current Figma phases without fake capabilities', async () => {
-  const [html, view, api] = await Promise.all([
+test('Tiles Current exposes six local phases and retains five AI phases as hidden inventory', async () => {
+  const [html, view, api, cli] = await Promise.all([
     readFile('src/ui/studio/studio.html', 'utf8'),
     readFile('src/ui/studio/tilesView.js', 'utf8'),
     readFile('src/ui/studio/tilesApi.js', 'utf8'),
+    readFile('scripts/character-pack-cli.mjs', 'utf8'),
   ])
   const tiles = tilesHtml(html)
-  for (const phase of TILE_PHASES) {
+  for (const phase of TILE_CURRENT_LOCAL_PHASES) {
+    assert.match(tiles, new RegExp(`data-tiles-copy-phase="[^"]*\\b${phase}\\b`))
+    assert.match(tiles, new RegExp(`data-tiles-panel="[^"]*\\b${phase}\\b`))
+  }
+  for (const phase of TILE_ARCHIVE_AI_PHASES) {
     assert.match(tiles, new RegExp(`data-tiles-copy-phase="[^"]*\\b${phase}\\b`))
     assert.match(tiles, new RegExp(`data-tiles-panel="[^"]*\\b${phase}\\b`))
   }
@@ -137,6 +171,101 @@ test('Tiles Studio exposes exactly the eleven Current Figma phases without fake 
   assert.equal((api.match(/confirm_live_generation:\s*true/g) ?? []).length, 1)
   assert.match(api, /dryRunPlan:\s*true/)
   assert.match(view, /buildTwoPointFiveDMaterialSourceBenchmarkReview\(report\)/)
+  assert.match(cli, /positional\[1\] === 'material-source-benchmark'/)
+  assert.match(cli, /positional\[1\] === 'material-source-benchmark-review'/)
+})
+
+test('Tiles Current uses natural bilingual task copy without local Provider noise', async () => {
+  const [html, view] = await Promise.all([
+    readFile('src/ui/studio/studio.html', 'utf8'),
+    readFile('src/ui/studio/tilesView.js', 'utf8'),
+  ])
+  const tiles = tilesHtml(html)
+  const expected = {
+    en: {
+      'tiles.status.empty': 'Ready to edit',
+      'tiles.status.ready': 'Edits ready',
+      'tiles.status.building': 'Building tileset',
+      'tiles.status.complete': 'Verified · download ready',
+      'tiles.status.failed': 'Build did not complete',
+      'tiles.status.stale': 'Input changed · rebuild required',
+      'tiles.job.pill.building': 'Building',
+      'tiles.job.pill.complete': 'Verified',
+      'tiles.job.pill.stale': 'Rebuild required',
+      'tiles.job.pill.failed': 'Build failed',
+      'tiles.runtime.localPreview': 'Local preview',
+      'tiles.runtime.localBuilding': 'Current build in progress',
+      'tiles.runtime.localComplete': 'Verified outputs ready',
+      'tiles.runtime.localFailed': 'Build did not complete',
+      'tiles.runtime.localStale': 'Old result locked',
+      'tiles.stageMetrics.localBuilding': '{status} · task {job}',
+      'tiles.stageMetrics.localComplete': '18 artifact classes verified',
+      'tiles.stageMetrics.localFailed': '{status} · task {job}',
+      'tiles.stageMetrics.localStale': 'Current input needs a new build',
+      'tiles.binding.zeroRequests': 'Procedural/local source · not submitted',
+      'tiles.binding.notSubmitted': 'Build not started',
+      'tiles.jobStatus.done': 'Complete',
+      'tiles.jobStatus.post_processing': 'Post-processing',
+      'tiles.jobStatus.failed_post_processing': 'Post-processing failed',
+      'tiles.jobStatus.failed_model_error': 'Model failed',
+      'tiles.jobStatus.failed_safety_filter': 'Safety filter blocked',
+      'tiles.jobStatus.unknown': 'Status unavailable',
+    },
+    zh: {
+      'tiles.status.empty': '等待编辑',
+      'tiles.status.ready': '编辑已就绪',
+      'tiles.status.building': '正在构建图块集',
+      'tiles.status.complete': '验证通过 · 可下载',
+      'tiles.status.failed': '构建未完成',
+      'tiles.status.stale': '输入已变更 · 需要重建',
+      'tiles.job.pill.building': '构建中',
+      'tiles.job.pill.complete': '已验证',
+      'tiles.job.pill.stale': '需要重建',
+      'tiles.job.pill.failed': '构建失败',
+      'tiles.runtime.localPreview': '本地预览',
+      'tiles.runtime.localBuilding': '当前构建正在进行',
+      'tiles.runtime.localComplete': '已验证产物可下载',
+      'tiles.runtime.localFailed': '构建未完成',
+      'tiles.runtime.localStale': '旧结果已锁定',
+      'tiles.stageMetrics.localBuilding': '{status} · 任务 {job}',
+      'tiles.stageMetrics.localComplete': '18 类产物已验证',
+      'tiles.stageMetrics.localFailed': '{status} · 任务 {job}',
+      'tiles.stageMetrics.localStale': '当前输入需要重新构建',
+      'tiles.binding.zeroRequests': '程序化/本地来源 · 尚未提交',
+      'tiles.binding.notSubmitted': '尚未开始构建',
+      'tiles.jobStatus.done': '已完成',
+      'tiles.jobStatus.post_processing': '后处理中',
+      'tiles.jobStatus.failed_post_processing': '后处理失败',
+      'tiles.jobStatus.failed_model_error': '模型失败',
+      'tiles.jobStatus.failed_safety_filter': '安全过滤阻断',
+      'tiles.jobStatus.unknown': '状态不可用',
+    },
+  }
+
+  for (const language of ['en', 'zh']) {
+    const actual = Object.fromEntries(Object.keys(expected[language]).map((key) => [key, STUDIO_TRANSLATIONS[language][key]]))
+    assert.deepEqual(actual, expected[language])
+    const visibleCopy = Object.values(actual).join('\n')
+    assert.doesNotMatch(visibleCopy, /\b(?:empty|done|post_processing|failed_[a-z_]+)\b/i)
+    assert.doesNotMatch(visibleCopy, /Provider/i)
+  }
+
+  assert.match(tiles, /<option value="empty" data-studio-i18n="tiles\.field\.borderEmpty">空白边界<\/option>/)
+  assert.match(tiles, /<option value="none" data-studio-i18n="tiles\.field\.borderNone">不限制边界<\/option>/)
+  assert.match(tiles, /<option value="constraint" data-studio-i18n="tiles\.field\.solverConstraint">约束求解<\/option>/)
+  assert.match(tiles, /<option value="seeded" data-studio-i18n="tiles\.field\.solverSeeded">种子生成<\/option>/)
+  assert.equal(STUDIO_TRANSLATIONS.en['tiles.field.borderEmpty'], 'Empty border')
+  assert.equal(STUDIO_TRANSLATIONS.en['tiles.field.borderNone'], 'Unconstrained border')
+  assert.equal(STUDIO_TRANSLATIONS.zh['tiles.field.borderEmpty'], '空白边界')
+  assert.equal(STUDIO_TRANSLATIONS.zh['tiles.field.borderNone'], '不限制边界')
+  assert.equal(STUDIO_TRANSLATIONS.en['tiles.field.solverConstraint'], 'Constraint solver')
+  assert.equal(STUDIO_TRANSLATIONS.en['tiles.field.solverSeeded'], 'Seeded generation')
+  assert.equal(STUDIO_TRANSLATIONS.zh['tiles.field.solverConstraint'], '约束求解')
+  assert.equal(STUDIO_TRANSLATIONS.zh['tiles.field.solverSeeded'], '种子生成')
+
+  const localBindingWriter = view.match(/function renderLocalBinding\(state\) \{[\s\S]*?\n\}/)?.[0] ?? ''
+  assert.doesNotMatch(localBindingWriter, /Provider|0 Provider/)
+  assert.doesNotMatch(localBindingWriter, /toUpperCase\(\)/)
 })
 
 test('Tiles Figma geometry and empty-media boundaries are preserved in HTML/CSS', async () => {
@@ -146,12 +275,15 @@ test('Tiles Figma geometry and empty-media boundaries are preserved in HTML/CSS'
   ])
   const tiles = tilesHtml(html)
   assert.match(css, /\.tiles-workspace\s*\{[^}]*grid-template-columns:\s*280px minmax\(0, 1fr\)/)
-  assert.match(css, /\.tiles-stage\s*\{[^}]*grid-template-rows:\s*36px minmax\(0, 896px\) 104px/)
-  assert.match(css, /\.tiles-file-picker\s*\{[^}]*height:\s*76px/)
+  assert.match(css, /\.tiles-stage\s*\{[^}]*grid-template-rows:\s*36px minmax\(0, 1fr\) auto/)
+  assert.match(css, /\.tiles-file-picker\s*\{[^}]*height:\s*52px/)
   assert.match(css, /\.tiles-field-grid :is\(input, select, output\)\s*\{[^}]*height:\s*32px/)
-  assert.match(css, /\.tiles-binding-summary,[^}]*width:\s*248px[^}]*min-height:\s*132px/)
-  assert.match(css, /\.tiles-primary\s*\{[^}]*width:\s*248px[^}]*height:\s*48px/)
-  assert.match(css, /\.tiles-output-card\s*\{[^}]*width:\s*178px[^}]*height:\s*72px/)
+  assert.match(css, /\.tiles-ai-binding \{[^}]*width:\s*248px[^}]*min-height:\s*132px/)
+  assert.match(css, /\.tiles-primary\s*\{[^}]*left:\s*0[^}]*right:\s*0[^}]*width:\s*auto\s*!important[^}]*min-height:\s*var\(--studio-module-cta-min-height\)/)
+  assert.match(css, /\.tiles-output-grid\s*\{[^}]*grid-template-columns:\s*repeat\(4, minmax\(0, 1fr\)\)/)
+  assert.match(css, /\.tiles-output-card\s*\{[^}]*height:\s*auto/)
+  assert.doesNotMatch(css, /\.tiles-output-card\s*\{[^}]*width:\s*178px[^}]*height:\s*72px/)
+  assert.doesNotMatch(css, /\.tiles-output-dock \{[^}]*overflow-x:\s*auto/)
   assert.match(css, /\.tiles-main\[data-tiles-phase="ready"\] \.tiles-editor-panel::before\s*\{[^}]*width:\s*940px[^}]*height:\s*650px/)
   assert.match(css, /\.tiles-main\[data-tiles-phase="ready"\] \.tiles-map-layout\s*\{[^}]*grid-template-columns:\s*520px 276px[^}]*gap:\s*30px/)
   assert.match(css, /\.tiles-main:is\(\[data-tiles-phase="building"\],\[data-tiles-phase="complete"\],\[data-tiles-phase="stale"\]\) \.tiles-job-card\s*\{[^}]*width:\s*400px[^}]*height:\s*310px/)
@@ -164,7 +296,7 @@ test('Tiles Figma geometry and empty-media boundaries are preserved in HTML/CSS'
   assert.match(css, /@media \(max-width: 1771px\)/)
   assert.match(css, /@media \(max-width: 1083px\)/)
   assert.match(css, /@media \(max-width: 860px\)/)
-  assert.match(css, /@media \(max-width: 860px\)\s*\{[\s\S]*?\.tiles-topbar\s*\{[^}]*height:\s*76px[\s\S]*?#studio-tiles-mode-local\s*\{[^}]*top:\s*44px[\s\S]*?#studio-tiles-mode-ai\s*\{[^}]*top:\s*44px/)
+  assert.match(css, /@media \(max-width: 860px\)\s*\{[\s\S]*?\.tiles-topbar\s*\{[^}]*height:\s*76px[\s\S]*?#studio-tiles-mode-local\s*\{[^}]*top:\s*auto[\s\S]*?#studio-tiles-mode-ai\s*\{[^}]*top:\s*auto/)
 
   const preview = openingTagForId(tiles, 'studio-tiles-result-preview')
   assert.match(preview, /\bhidden\b/)
@@ -180,6 +312,134 @@ test('Tiles Figma geometry and empty-media boundaries are preserved in HTML/CSS'
   }
   assert.match(css, /\.tiles-binding-copy > span\s*\{(?![^}]*display:\s*flex\s*!important)/)
   assert.match(css, /\.tiles-main\[data-tiles-phase="empty"\] \.tiles-binding-copy/)
+})
+
+test('Tiles empty copy no longer uses a decorative person and outputs use human labels', async () => {
+  const [html, css, view] = await Promise.all([
+    readFile('src/ui/studio/studio.html', 'utf8'),
+    readFile('src/ui/studio/studio.css', 'utf8'),
+    readFile('src/ui/studio/tilesView.js', 'utf8'),
+  ])
+  const tiles = tilesHtml(html)
+  assert.doesNotMatch(tiles, /tiles-pixel-person/)
+  assert.doesNotMatch(css, /tiles-pixel-person/)
+  assert.match(tiles, /class="tiles-empty-copy"/)
+  assert.doesNotMatch(css, /\.tiles-empty-panel > div:last-child/)
+  assert.match(tiles, /data-studio-i18n="tiles\.empty\.title">把地形素材变成可编辑的地图/)
+  assert.match(tiles, /data-studio-i18n="tiles\.empty\.body">确认地形素材和地图大小/)
+  assert.match(tiles, /data-studio-i18n="tiles\.empty\.truth">图块结构由本地规则生成，不会自动调用 AI。/)
+  assert.match(tiles, /data-studio-i18n="tiles\.contractTitle">地图设置/)
+  assert.match(tiles, /data-studio-i18n="tiles\.field\.width">宽度（格）/)
+  assert.match(tiles, /data-studio-i18n="tiles\.field\.height">高度（格）/)
+  assert.match(tiles, /data-studio-i18n="tiles\.field\.densityHelp">控制地图中地形的覆盖程度/)
+  assert.match(tiles, /data-studio-i18n="tiles\.primary\.empty">开始编辑地图/)
+  assert.equal(STUDIO_TRANSLATIONS.en['tiles.empty.title'], 'Turn terrain material into an editable map')
+  assert.equal(STUDIO_TRANSLATIONS.en['tiles.empty.body'], 'Confirm the terrain material and map size, then start editing. The built-in default material is used when no image is uploaded.')
+  assert.equal(STUDIO_TRANSLATIONS.en['tiles.empty.truth'], 'Tile structure is generated by local rules. AI is not called automatically.')
+  assert.equal(STUDIO_TRANSLATIONS.en['tiles.contractTitle'], 'Map settings')
+  assert.equal(STUDIO_TRANSLATIONS.en['tiles.field.width'], 'Width (cells)')
+  assert.equal(STUDIO_TRANSLATIONS.en['tiles.field.height'], 'Height (cells)')
+  assert.equal(STUDIO_TRANSLATIONS.en['tiles.field.densityHelp'], 'Controls how much of the map is covered by terrain.')
+  assert.equal(STUDIO_TRANSLATIONS.en['tiles.primary.empty'], 'Start editing the map')
+  assert.equal(STUDIO_TRANSLATIONS.zh['tiles.empty.title'], '把地形素材变成可编辑的地图')
+  assert.equal(STUDIO_TRANSLATIONS.zh['tiles.contractTitle'], '地图设置')
+  assert.equal(STUDIO_TRANSLATIONS.zh['tiles.primary.empty'], '开始编辑地图')
+  assert.match(tiles, /data-studio-i18n="tiles\.output\.localTitle">构建产物/)
+  assert.match(tiles, /data-studio-i18n="tiles\.output\.localLede"/)
+  assert.doesNotMatch(tilesHtml(html).split('data-tiles-output-mode="local"')[1].split('data-tiles-output-mode="ai"')[0], />\s*ATLAS\s*</)
+  assert.match(tiles, /data-studio-i18n="tiles\.output\.atlas\.name">图块集/)
+  assert.match(tiles, /data-studio-i18n="tiles\.output\.atlas\.purpose">游戏地图使用的图块图片/)
+  assert.match(tiles, /<code class="tiles-output-file">strict_atlas\.png<\/code>/)
+  assert.match(tiles, /data-studio-i18n="tiles\.output\.map\.name">地图预览/)
+  assert.match(tiles, /data-studio-i18n="tiles\.output\.map\.purpose">查看本次地图拼接效果/)
+  assert.match(tiles, /<code class="tiles-output-file">map_editor_preview\.png<\/code>/)
+  assert.match(tiles, /data-studio-i18n="tiles\.output\.tiled\.name">地图工程文件/)
+  assert.match(tiles, /data-studio-i18n="tiles\.output\.tiled\.purpose">可在 Tiled 中继续编辑（两个文件）/)
+  assert.match(tiles, /<code class="tiles-output-file">tileset\.tiled\.json \+ tileset\.tsx<\/code>/)
+  assert.match(tiles, /data-studio-i18n="tiles\.output\.pack\.name">完整导出包/)
+  assert.match(tiles, /data-studio-i18n="tiles\.output\.pack\.purpose">汇总本次构建的可交付结果/)
+  assert.match(tiles, /<code class="tiles-output-file">release_demo_pack\.zip<\/code>/)
+  assert.equal(STUDIO_TRANSLATIONS.en['tiles.output.localTitle'], 'Build outputs')
+  assert.equal(STUDIO_TRANSLATIONS.zh['tiles.output.localTitle'], '构建产物')
+  assert.equal(STUDIO_TRANSLATIONS.en['tiles.output.atlas.name'], 'Tileset image')
+  assert.equal(STUDIO_TRANSLATIONS.en['tiles.output.state.empty'], 'Not built yet')
+  assert.equal(STUDIO_TRANSLATIONS.en['tiles.output.state.ready'], 'Ready to build')
+  assert.equal(STUDIO_TRANSLATIONS.en['tiles.output.state.building'], 'Generating')
+  assert.equal(STUDIO_TRANSLATIONS.en['tiles.output.state.complete'], 'Download')
+  assert.equal(STUDIO_TRANSLATIONS.en['tiles.output.state.failed'], 'Not generated')
+  assert.equal(STUDIO_TRANSLATIONS.en['tiles.output.state.stale'], 'Rebuild required')
+  assert.equal(STUDIO_TRANSLATIONS.zh['tiles.output.state.empty'], '尚未构建')
+  assert.equal(STUDIO_TRANSLATIONS.zh['tiles.output.state.ready'], '等待构建')
+  assert.equal(STUDIO_TRANSLATIONS.zh['tiles.output.state.building'], '正在生成')
+  assert.equal(STUDIO_TRANSLATIONS.zh['tiles.output.state.complete'], '可下载')
+  assert.equal(STUDIO_TRANSLATIONS.zh['tiles.output.state.failed'], '未生成')
+  assert.equal(STUDIO_TRANSLATIONS.zh['tiles.output.state.stale'], '需重新构建')
+  assert.match(view, /tiles\.output\.state\.complete/)
+  assert.match(view, /tiles\.output\.state\.building/)
+  assert.match(view, /tiles\.output\.state\.failed/)
+  assert.match(view, /tiles\.output\.state\.stale/)
+  assert.match(view, /tiles\.output\.state\.ready/)
+  assert.match(view, /tiles\.output\.state\.empty/)
+  assert.match(view, /state\.mode === 'local' && state\.phase === 'complete' && localTilesResultIsCurrent\(state\)/)
+  assert.match(css, /@media \(max-width: 1771px\)[\s\S]*?\.tiles-output-grid \{[^}]*grid-template-columns:\s*1fr 1fr/)
+  assert.match(css, /@media \(max-width: 860px\)[\s\S]*?\.tiles-output-grid,[\s\S]*?grid-template-columns:\s*1fr/)
+})
+
+test('Tiles Current clips the left flow explainer and keeps phase copy inventory', async () => {
+  const [html, css] = await Promise.all([
+    readFile('src/ui/studio/studio.html', 'utf8'),
+    readFile('src/ui/studio/studio.css', 'utf8'),
+  ])
+  const tiles = tilesHtml(html)
+  assert.match(tiles, /class="tiles-flow-header tiles-phase-copy"/)
+  assert.match(tiles, /id="studio-tiles-phase-title"/)
+  assert.match(tiles, /id="studio-tiles-phase-label"/)
+  assert.match(tiles, /id="studio-tiles-phase-summary"/)
+  assert.match(tiles, /aria-labelledby="studio-tiles-phase-title"/)
+  assert.match(css, /\.tiles-flow-header \{[^}]*clip:\s*rect\(0,\s*0,\s*0,\s*0\)/)
+  assert.match(css, /\.tiles-source-section \{ top: 16px;/)
+  assert.match(css, /\.tiles-contract-section \{ top: 176px;/)
+  assert.match(css, /\.tiles-ai-binding \{[^}]*top:\s*304px;/)
+  assert.match(css, /\.tiles-ai-brief \{ top: 24px;/)
+})
+
+test('Tiles Current clips the local binding summary and keeps writers', async () => {
+  const [html, css] = await Promise.all([
+    readFile('src/ui/studio/studio.html', 'utf8'),
+    readFile('src/ui/studio/studio.css', 'utf8'),
+  ])
+  const tiles = tilesHtml(html)
+  assert.match(tiles, /class="tiles-binding-summary"/)
+  assert.match(tiles, /id="studio-tiles-binding-title"/)
+  assert.match(tiles, /aria-labelledby="studio-tiles-binding-title"/)
+  assert.match(tiles, /id="studio-tiles-binding-empty"/)
+  assert.match(tiles, /id="studio-tiles-binding-ready"/)
+  assert.match(tiles, /id="studio-tiles-binding-building"/)
+  assert.match(tiles, /id="studio-tiles-binding-complete"/)
+  assert.match(tiles, /id="studio-tiles-binding-failed"/)
+  assert.match(tiles, /id="studio-tiles-binding-stale"/)
+  assert.match(css, /\.tiles-binding-summary \{[^}]*clip:\s*rect\(0,\s*0,\s*0,\s*0\)/)
+})
+
+test('Tiles Current hides Provider material evaluation and keeps APIs as inventory', async () => {
+  const [html, css, view, api] = await Promise.all([
+    readFile('src/ui/studio/studio.html', 'utf8'),
+    readFile('src/ui/studio/studio.css', 'utf8'),
+    readFile('src/ui/studio/tilesView.js', 'utf8'),
+    readFile('src/ui/studio/tilesApi.js', 'utf8'),
+  ])
+  const tiles = tilesHtml(html)
+  assert.match(tiles, /id="studio-tiles-mode-ai"/)
+  assert.match(tiles, /data-tiles-mode-panel="ai"/)
+  assert.match(tiles, /class="tiles-ai-controls"/)
+  assert.match(tiles, /class="tiles-ai-plan-panel"/)
+  assert.match(tiles, /class="tiles-ai-review-panel"/)
+  assert.match(tiles, /class="tiles-ai-failed-panel"/)
+  assert.match(css, /#studio-tiles-mode-local,\s*#studio-tiles-mode-ai,\s*\.tiles-ai-controls,\s*\.tiles-ai-plan-panel,\s*\.tiles-ai-review-panel,\s*\.tiles-ai-failed-panel,\s*\.tiles-main \[data-tiles-output-mode="ai"\] \{[^}]*display:\s*none !important/)
+  assert.match(view, /if \(state\.mode !== 'local'\) state\.mode = 'local'/)
+  assert.match(view, /if \(!state \|\| mode !== 'local' \|\| state\.busy\) return/)
+  assert.match(api, /\/api\/two-point-five-d-material-source-benchmark/)
+  assert.match(api, /\/api\/build-two-point-five-d-tileset/)
 })
 
 test('the maintained map options and corner editor have zero silent bindings', () => {
@@ -338,4 +598,42 @@ test('Tiles visible and ARIA copy is fully bilingual', async () => {
     assert.equal(typeof STUDIO_TRANSLATIONS.en[key], 'string')
     assert.equal(typeof STUDIO_TRANSLATIONS.zh[key], 'string')
   }
+})
+
+test('Tiles and Scene unify into one Map workspace without fake AI generation', async () => {
+  const [html, css, view, app] = await Promise.all([
+    readFile('src/ui/studio/studio.html', 'utf8'),
+    readFile('src/ui/studio/studio.css', 'utf8'),
+    readFile('src/ui/studio/tilesView.js', 'utf8'),
+    readFile('src/ui/studio/app.js', 'utf8'),
+  ])
+  const tiles = tilesHtml(html)
+  const railStart = html.indexOf('<aside class="icon-rail"')
+  const railEnd = html.indexOf('</aside>', railStart)
+  const rail = html.slice(railStart, railEnd)
+  assert.match(rail, /data-studio-i18n="nav\.tiles">地图</)
+  assert.match(rail, /href="#scene"[^>]*hidden/)
+  assert.match(css, /\.rail-item\[data-studio-route="scene"\] \{ display: none !important; \}/)
+  assert.match(app, /if \(route === 'scene'\) return 'tiles'/)
+  assert.equal(STUDIO_TRANSLATIONS.zh['nav.tiles'], '地图')
+  assert.equal(STUDIO_TRANSLATIONS.en['nav.tiles'], 'Map')
+  assert.equal(STUDIO_TRANSLATIONS.zh['tiles.headerTitle'], '地图工作室')
+  assert.equal(STUDIO_TRANSLATIONS.en['tiles.headerTitle'], 'Map Studio')
+  assert.match(tiles, /data-studio-i18n="tiles\.sourceTitle">地形素材/)
+  assert.match(tiles, /id="studio-tiles-use-default"/)
+  assert.match(tiles, /data-studio-i18n="tiles\.sourceDefault">使用默认素材/)
+  assert.match(tiles, /class="tiles-advanced-settings"/)
+  assert.match(tiles, /data-studio-i18n="tiles\.field\.seedHelp">用于复现相同自动布局/)
+  assert.match(css, /\.tiles-main:not\(\[data-tiles-phase="complete"\]\) \.tiles-output-grid\[data-tiles-output-mode="local"\] \{[^}]*display:\s*none/)
+  assert.match(view, /function renderSourceControls\(state\)/)
+  assert.match(view, /studio-tiles-use-default/)
+  assert.match(view, /tilesState\.sourceFile = null/)
+  assert.match(view, /if \(!\['image\/png', 'image\/jpeg', 'image\/webp'\]\.includes\(file\.type\)\)[\s\S]*return/)
+  assert.doesNotMatch(view, /fetch\s*\(/)
+  assert.match(view, /if \(!state \|\| mode !== 'local' \|\| state\.busy\) return/)
+  assert.equal(STUDIO_TRANSLATIONS.zh['tiles.sourceDefault'], '使用默认素材')
+  assert.equal(STUDIO_TRANSLATIONS.en['tiles.sourceDefault'], 'Use default material')
+  assert.equal(STUDIO_TRANSLATIONS.zh['tiles.field.seedHelp'], '用于复现相同自动布局')
+  assert.equal(STUDIO_TRANSLATIONS.en['tiles.field.seedHelp'], 'Reproduces the same automatic layout')
+  assert.doesNotMatch(tiles, /可选：选择材质源图片/)
 })

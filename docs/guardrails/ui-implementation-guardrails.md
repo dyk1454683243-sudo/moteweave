@@ -29,7 +29,8 @@ phase-appropriate migration structure described below. Both must hold.
    - existing `server.js` API endpoint behavior and the job-state enum
    - `src/character-pack/profile.js`, `generationDefaults.js`
    The maintained application UI lives in `src/ui/studio/studio.html` and
-   `src/ui/studio/*`.
+   `src/ui/studio/*`. Studio topbars follow
+   `docs/guardrails/studio-topbar-convention.md`: no visible breadcrumb.
    Editor Workspace UI may additionally use `editor.html`,
    `src/editor-app.js`, and `src/ui/editor/*` under
    `docs/guardrails/editor-workspace-guardrails.md`.
@@ -87,6 +88,14 @@ phase-appropriate migration structure described below. Both must hold.
 10. Small, reviewable changes. Stop after each major section (left panel,
     workspace, gallery, export). Do NOT perform one large uncontrolled refactor.
 
+11. FIGMA CURRENT AND RUNTIME MOVE TOGETHER. For every user-visible UI/design
+    change, update the maintained runtime and its matching Figma Current frames
+    in the same coherent task unless the human explicitly limits scope. Preserve
+    superseded designs in Archive / Historical, keep Current prototype entry
+    points on the maintained flow, and record Current node IDs, Archive evidence,
+    screenshots, and justified deviations. Runtime-only and Figma-only delivery
+    are both incomplete.
+
 ## Definition of Done
 
 "It renders" is not done. Done requires ALL of:
@@ -99,6 +108,8 @@ phase-appropriate migration structure described below. Both must hold.
 - [ ] `npm test` green
 - [ ] prior UI remains reachable during migration; an approved retirement
       phase instead proves fixed redirects and the exact exclusive-file boundary
+- [ ] matching Figma Current frames are synchronized with the verified runtime;
+      superseded design evidence is archived and node IDs / deviations recorded
 - [ ] summary provided: files changed, whether any contract file was touched,
       which sections use real data, which use fallback, how to verify the
       live API is still connected

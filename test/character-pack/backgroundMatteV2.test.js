@@ -140,6 +140,42 @@ for (const [name, background] of [
   })
 }
 
+test('opt-in near-black quantization removes one-code-value noise while preserving enclosed dark details', () => {
+  const source = flatCharacter([0, 0, 0])
+  // This fixture isolates background noise; no detached one-pixel foreground.
+  setPixel(source, 27, 18, [0, 0, 0, 255])
+  for (let y = 0; y < source.height; y += 1) {
+    for (let x = 0; x < source.width; x += 1) {
+      if (pixel(source, x, y).slice(0, 3).every(value => value === 0) && (x + y) % 2) {
+        setPixel(source, x, y, [1, 1, 1, 255])
+      }
+    }
+  }
+  setPixel(source, 15, 17, [0, 0, 0, 255])
+  setPixel(source, 16, 17, [1, 1, 1, 255])
+  const original = source.data.slice()
+  assert.equal(analyzeFlatBackgroundV2(source).analysis.eligible, false)
+
+  const result = applyDeterministicPixelMatteV2(source, { quantized_black_background: true })
+  assert.equal(result.analysis.eligible, true)
+  assert.equal(result.analysis.quantized_black_background, true)
+  assert.equal(result.scope.status, 'pass')
+  assert.equal(result.analysis.dominant_cluster_share, 1)
+  assert.equal(result.analysis.corner_agreement_count, 4)
+  // Background eligibility does not waive independent edge/alpha review.
+  assert.equal(result.quality.status, 'needs_review')
+  assert.deepEqual(pixel(result.image, 0, 0), [0, 0, 0, 0])
+  assert.deepEqual(pixel(result.image, 1, 0), [0, 0, 0, 0])
+  assert.deepEqual(pixel(result.image, 15, 17), [0, 0, 0, 255])
+  assert.deepEqual(pixel(result.image, 16, 17), [1, 1, 1, 255])
+  assert.deepEqual(source.data, original)
+  assert.equal(assertFrozenBackgroundContractMasks(source, result.masks), true)
+
+  const nonuniform = solid(32, 32, [0, 0, 0, 255])
+  paintRect(nonuniform, { x: 16, y: 0, w: 16, h: 32 }, [40, 70, 120, 255])
+  assert.equal(analyzeFlatBackgroundV2(nonuniform, { quantized_black_background: true }).analysis.eligible, false)
+})
+
 test('contract masks are a frozen complete partition with stable dimension-bound hashes', () => {
   const source = flatCharacter([255, 255, 255])
   const result = applyDeterministicPixelMatteV2(source)

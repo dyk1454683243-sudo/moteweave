@@ -8,6 +8,8 @@ import { buildFramePipeline } from './framePipeline.js'
 import { applyAnchorOffset, resolveAnchorOffset } from './processingOptions.js'
 import { buildDebugReport, buildValidationStage } from './processReport.js'
 import { prepareSourceForProcessing } from './sourcePreparation.js'
+import { prepareSourcePixelRecovery } from './sourcePixelRecovery.js'
+import { BACKGROUND_MATTE_V2_ARTIFACT_FILES, BACKGROUND_MATTE_V2_AUXILIARY_ARTIFACT_FILES, buildBackgroundMatteV2ArtifactBundle } from './backgroundMatteV2.js'
 import { applyPixelFinishing, buildPixelStyleReport } from './stylePipeline.js'
 import { TOPDOWN_RPG_V0 } from './profile.js'
 import {
@@ -89,8 +91,8 @@ function chooseBackgroundCandidate(candidates) {
   return baseline
 }
 
-async function buildProcessingStage(buffer, { sourceLayout, profile, options }) {
-  const source = await prepareSourceForProcessing(buffer, sourceLayout, options)
+async function buildProcessingStage(buffer, { sourceLayout, profile, options, pixelSource }) {
+  const source = await prepareSourceForProcessing(buffer, sourceLayout, options, pixelSource)
   const framesStage = buildFramePipeline({ transparent: source.transparent, profile, sourceLayout, options })
   const validationStage = buildValidationStage({
     frames: framesStage.frames,
@@ -98,13 +100,14 @@ async function buildProcessingStage(buffer, { sourceLayout, profile, options }) 
     sourceRegionEdgePressure: framesStage.sourceRegionEdgePressure,
     sourceQualityReport: framesStage.sourceQualityReport,
     backgroundWarnings: source.background.warnings,
+    backgroundQuality: pixelSource?.background?.quality,
   })
   return { source, framesStage, validationStage }
 }
 
-async function resolveBackgroundProcessingStage(buffer, { sourceLayout, profile, options }) {
+async function resolveBackgroundProcessingStage(buffer, { sourceLayout, profile, options, pixelSource }) {
   const requestedMode = options.backgroundMode ?? 'auto'
-  const baseline = await buildProcessingStage(buffer, { sourceLayout, profile, options })
+  const baseline = await buildProcessingStage(buffer, { sourceLayout, profile, options, pixelSource })
   if (requestedMode !== 'auto') return baseline
   if (baseline.source.background.mode === 'alpha_cleanup') {
     baseline.source.background.selection = {
@@ -128,6 +131,7 @@ async function resolveBackgroundProcessingStage(buffer, { sourceLayout, profile,
   const edgePalette = await buildProcessingStage(buffer, {
     sourceLayout,
     profile,
+    pixelSource,
     options: { ...options, backgroundMode: 'edge_palette' },
   })
   const candidates = [
@@ -196,7 +200,8 @@ export async function processSheetBuffer(buffer, options = {}) {
   const anchorOffset = resolveAnchorOffset(options)
   const profile = applyAnchorOffset(baseProfile, anchorOffset)
   const sourceLayout = resolveSourceLayout(options.sourceLayout ?? options.sourceProfile ?? profile.id)
-  const processingStage = await resolveBackgroundProcessingStage(buffer, { sourceLayout, profile, options })
+  const pixelSource = await prepareSourcePixelRecovery(buffer, options, sourceLayout)
+  const processingStage = await resolveBackgroundProcessingStage(buffer, { sourceLayout, profile, options, pixelSource })
   const source = processingStage.source
   const framesStage = processingStage.framesStage
   let frames = framesStage.frames
@@ -217,6 +222,7 @@ export async function processSheetBuffer(buffer, options = {}) {
       sourceRegionEdgePressure: framesStage.sourceRegionEdgePressure,
       sourceQualityReport: framesStage.sourceQualityReport,
       backgroundWarnings: source.background.warnings,
+      backgroundQuality: pixelSource?.background?.quality,
     })
     : processingStage.validationStage
   const validationWithBackground = validationStage.validation
@@ -310,6 +316,17 @@ export async function processSheetBuffer(buffer, options = {}) {
     pixelStyleReport,
     inspectionPreview: inspectionPreviewArtifacts.report,
   })
+  if (pixelSource) debugReport.source_pixel_recovery = pixelSource.report
+  const sourceBackgroundBundle = pixelSource?.background ? await buildBackgroundMatteV2ArtifactBundle(pixelSource.background, {
+    rawSource: pixelSource.image,
+    artifactUrlPrefix: options.backgroundMatteV2ArtifactUrlPrefix,
+  }) : null
+  if (sourceBackgroundBundle) debugReport.source_background = {
+    input: pixelSource.report.artifact ?? 'decoded_original',
+    quality: sourceBackgroundBundle.quality,
+    review: sourceBackgroundBundle.review,
+    metadata: sourceBackgroundBundle.metadata,
+  }
   if (subjectCountEnabled) {
     debugReport.generation_profile = options.generationProfile ?? options.generation_profile ?? null
     debugReport.subject_count = {
@@ -341,12 +358,15 @@ export async function processSheetBuffer(buffer, options = {}) {
     profile,
     sizes: options.outputFrameSizes,
   })
+  const engineExportSourcePng = sourceLayout?.kind === 'fixed_regions' && source.transparent
+    ? await encodeRgbaPng(source.transparent)
+    : source.sourcePng
   const exportArtifacts = await buildEngineExportArtifacts({
     metadataJson,
     frames,
     profile,
     normalizedSheetPng,
-    sourcePng: source.sourcePng,
+    sourcePng: engineExportSourcePng,
     sourceLayout,
   })
   const debugOverlayPng = await renderDebugOverlayPng({ profile, frames, baseSheet: normalizedSheetPng })
@@ -365,6 +385,8 @@ export async function processSheetBuffer(buffer, options = {}) {
     : null
   const zipBuffer = await buildCharacterPackZip({
     'source.png': source.sourcePng,
+    ...(pixelSource?.png ? { 'source_pixel_recovery.png': pixelSource.png } : {}),
+    ...(sourceBackgroundBundle?.files ?? {}),
     'source_layout_overlay.png': sourceLayoutOverlayPng,
     ...(sourceQualityReportJson ? { 'source_quality_report.json': sourceQualityReportJson } : {}),
     ...(sourceSubjectCountReportJson ? { 'source_subject_count_report.json': sourceSubjectCountReportJson } : {}),
@@ -401,6 +423,12 @@ export async function processSheetBuffer(buffer, options = {}) {
     inspectionPreviews: inspectionPreviewArtifacts.previews,
     files: {
       sourcePng: source.sourcePng,
+      ...(pixelSource?.png ? { sourcePixelRecoveryPng: pixelSource.png } : {}),
+      ...(sourceBackgroundBundle ? {
+        backgroundRemovedProviderOutputBuffer: sourceBackgroundBundle.files[BACKGROUND_MATTE_V2_ARTIFACT_FILES.OUTPUT],
+        backgroundRemovedProviderOutputFileName: BACKGROUND_MATTE_V2_ARTIFACT_FILES.OUTPUT,
+        backgroundMatteV2ArtifactBuffers: Object.fromEntries(BACKGROUND_MATTE_V2_AUXILIARY_ARTIFACT_FILES.map(name => [name, sourceBackgroundBundle.files[name]])),
+      } : {}),
       editorMetadataJson,
       sourceLayoutOverlayPng,
       sourceQualityReportJson,

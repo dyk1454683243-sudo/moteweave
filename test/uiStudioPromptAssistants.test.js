@@ -55,7 +55,7 @@ test('the one-shot Scene helper request is exact, singleton, and removed without
   )
 })
 
-test('Character and Scene drawers match the Current design entries and expose only deterministic local actions', async () => {
+test('Character retires its prompt helper while Scene keeps the deterministic Current drawer', async () => {
   const [html, css, view, app] = await Promise.all([
     readFile('src/ui/studio/studio.html', 'utf8'),
     readFile('src/ui/studio/studio.css', 'utf8'),
@@ -65,21 +65,21 @@ test('Character and Scene drawers match the Current design entries and expose on
   const character = viewHtml(html, 'studio-character-view', 'toast')
   const scene = viewHtml(html, 'studio-scene-view', 'studio-project-view')
 
-  assert.match(character, /id="studio-character-prompt-open"[^>]*975:5104/)
-  assert.match(character, /id="studio-character-prompt-drawer"[^>]*role="dialog"[^>]*aria-modal="true"[^>]*971:9023[^>]*hidden/)
+  assert.doesNotMatch(character, /studio-character-prompt/)
+  assert.doesNotMatch(html, /data-prompt-kind="character"/)
   assert.match(scene, /id="studio-scene-prompt-open"[^>]*977:5224/)
   assert.match(scene, /id="studio-scene-prompt-drawer"[^>]*role="dialog"[^>]*aria-modal="true"[^>]*977:5069[^>]*hidden/)
-  for (const kind of ['character', 'scene']) {
-    assert.match(html, new RegExp(`data-prompt-kind="${kind}" data-prompt-action="generate"`))
-    assert.match(html, new RegExp(`data-prompt-kind="${kind}" data-prompt-action="copy"`))
-    assert.match(html, new RegExp(`data-prompt-kind="${kind}" data-prompt-action="reset"`))
-    assert.match(html, new RegExp(`id="studio-${kind}-prompt-output"[^>]*readonly`))
-  }
-  assert.match(scene, /id="studio-scene-prompt-character"/)
+  assert.match(html, /data-prompt-kind="scene" data-prompt-action="generate"/)
+  assert.match(html, /data-prompt-kind="scene" data-prompt-action="copy"/)
+  assert.match(html, /data-prompt-kind="scene" data-prompt-action="reset"/)
+  assert.match(html, /id="studio-scene-prompt-output"[^>]*readonly/)
+  assert.doesNotMatch(scene, /id="studio-scene-prompt-character"/)
   assert.doesNotMatch(`${character}\n${scene}`, /data-prompt-action="(?:run|submit|save|fill|generate-image)"/)
   assert.doesNotMatch(view, /\bfetch\s*\(|localStorage|sessionStorage/)
   assert.match(view, /buildCharacterPrompt\(/)
   assert.match(view, /buildScenePrompt\(/)
+  assert.doesNotMatch(view, /openerId:\s*'studio-character-prompt-open'/)
+  assert.doesNotMatch(view, /bindAssistant\('character'\)/)
   assert.match(view, /navigator\.clipboard\.writeText/)
   assert.match(app, /initStudioPromptAssistants\(\)/)
   assert.match(css, /\.prompt-assistant-drawer\s*\{[^}]*width:\s*min\(520px,100%\)[^}]*height:\s*100%/)

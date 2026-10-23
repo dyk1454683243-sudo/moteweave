@@ -107,8 +107,13 @@ server source are not public paths. Provider keys remain server-side.
   - Repeating the same request returns the already-accepted publication only
     after revalidating the original Review, standalone/ZIP Prompt copies, every
     engine ZIP hash/length, its identity hashes, and any V2 standalone/ZIP
-    copies. This route has no UI and does not create
-    a rejection, retry, fallback, repair, or generation path.
+    copies. Studio's human Accept UI calls this route after the operator
+    confirms the sealed review evidence. The route does not create a
+    generation, retry, fallback, or repair path. Fresh `accepted` and
+    `already_accepted` replay both expose the shared Character result
+    fields in `STRICT_ACCEPT_URL_FIELDS`, including the already-published
+    `debug_report_url`. That is the required result-URL set for restore;
+    it is not a claim that every optional fresh-manifest URL is identical.
 - `POST /api/process-sheet`
   - Provider-free upload processing.
   - Routes uploaded source through `processSheetBuffer()`.

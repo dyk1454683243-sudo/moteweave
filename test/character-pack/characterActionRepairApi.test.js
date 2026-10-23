@@ -3,6 +3,8 @@ import { once } from 'node:events'
 import http from 'node:http'
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { mkdtemp } from 'node:fs/promises'
+import path from 'node:path'
 
 import { encodeRgbaPng } from '../../src/character-pack/imageCodec.js'
 import { OCAD_REGIONS } from '../../src/character-pack/exporters/ocadExport.js'
@@ -157,6 +159,7 @@ test('character action repair API runs the same sealed three-atlas workflow for 
 
   const appEnv = {
     ...process.env,
+    EDITOR_WORKSPACE_ROOT: path.join(await mkdtemp(path.join(process.cwd(), '.tmp-action-repair-')), 'workspace'),
     PORT: String(appPort),
     CHARACTER_JOB_CONCURRENCY: '1',
     KEY_A: 'alpha',

@@ -337,3 +337,49 @@ KiB. Guarded real-browser acceptance at 1920×1080 in Chinese and English plus
 overflow, the accepted evidence, and all four exact-publication downloads with
 no console or page errors. Independent read-only review reports no remaining
 P0, P1, or P2 issue.
+
+## Character Post-Accept Processing Supersession — 2026-08-27
+
+The 2026-08-27 human product decision supersedes the historical Phase 2 UI
+clauses that coupled manual Accept directly to final export and kept
+post-acquisition processing read-only. It does not weaken or replace the Strict
+AI acquisition safety workflow.
+
+Local and Strict AI now differ only in how they obtain the source image. Local
+selects a local file. Strict AI retains provider-free Review, explicit Confirm,
+sealed Plan and Reference hashes, at most one approved Live Provider call,
+persisted evidence, and human Accept. Review, Live, and Accept request bodies,
+the Provider-call budget, retry/fallback policy, generation pipeline, and
+acceptance-integrity contracts are unchanged. Strict generation Profile values
+remain locked during AI acquisition.
+
+After human Accept, Studio retrieves only the accepted publication's raw
+Provider output, verifies the exact bytes against the accepted SHA-256 binding,
+and transactionally adopts it into the same editable Character processing form
+used for a Local upload. The next explicit Build submits the maintained
+`POST /api/process-sheet` request contract. Running, validation, Quality,
+playable preview, Export, and Project derive from that downstream processing
+Job. The accepted publication records acquisition provenance and authorizes
+source handoff; it is not the final Export or Project artifact authority.
+
+The former Strict AI read-only processing summary and direct
+accepted-publication result/export presentation remain historical Figma and
+plan evidence, not the maintained runtime baseline. This is a recorded design
+deviation until Figma Current is synchronized; no Figma mutation is part of
+this change.
+
+Provider-free accepted-publication replay browser verification passed on
+2026-08-28 for `accepted_v1_job_mspepnxz_7s1elt`. AI and Local resolved to the
+same `#character-local-advanced-form` with identical 31-control signatures (29
+enabled), and real select and checkbox edits survived AI → Local → AI. Checks
+at 1280px and 390px in Chinese and English found no horizontal overflow,
+duplicate IDs, fake read-only summary, console errors, or page errors. The
+replay made zero Provider calls and kept Export locked before an explicit
+downstream Build. It did not submit `/api/process-sheet`; downstream Job,
+Quality, playable preview, Export, and Project behavior remain evidenced by the
+shared-processor regression tests and the verified Local end-to-end run.
+Guarded focused Character/API regression passed 49/49. After updating the
+Promotion source guard to the current option-bearing `selectSource(file, ...)`
+signature and abort condition, the guarded full suite passed 1258/1258 (TAP
+149030.765 ms; guard 149098 ms; peak RSS 810848 KiB; exit 0). Final human
+visual acceptance remains pending.

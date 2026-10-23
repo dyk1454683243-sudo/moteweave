@@ -6,6 +6,7 @@ import {
   createAssetRevision,
   createDefaultCharacterProcessingRecipe,
   createDefaultEditorProject,
+  createDefaultEditorProjectV1,
   createInteractionDocument,
   createLayerDocument,
   getActiveAssetRevision,
@@ -119,6 +120,19 @@ test('migration is an identity migration for editor_project_v0 with diagnostics'
   const unknown = migrateEditorProject({ version: 'future_project_v1' })
   assert.equal(unknown.project, null)
   assert.deepEqual(unknown.diagnostics.blocking_errors, ['unknown_project_version'])
+})
+
+test('editor_project_v1 validates and is an identity migration, not an in-place upgrade', () => {
+  const project = createDefaultEditorProjectV1({ createdAt: timestamp, updatedAt: timestamp })
+  const result = validateEditorProject(project)
+  assert.equal(result.status, 'pass')
+  assert.deepEqual(roundTripEditorProject(project), project)
+
+  const migrated = migrateEditorProject(project)
+  assert.equal(migrated.project.version, 'editor_project_v1')
+  assert.equal(migrated.diagnostics.migrated, false)
+  assert.equal(migrated.diagnostics.target_version, 'editor_project_v1')
+  assert.deepEqual(migrated.diagnostics.blocking_errors, [])
 })
 
 test('asset reference helpers resolve active revisions and clips', () => {

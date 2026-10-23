@@ -14,14 +14,12 @@ test('already-covered legacy tabs redirect through a fixed Studio whitelist', ()
     'project-pack': 'project',
     qa: 'qa',
     'character-pack': 'character',
-    prompts: 'scene',
+    prompts: 'tiles',
   })
   for (const [tab, route] of Object.entries(LEGACY_STUDIO_TAB_ROUTES)) {
     assert.equal(
       legacyStudioRedirectLocation(`?tab=${encodeURIComponent(tab)}`),
-      tab === 'prompts'
-        ? '/src/ui/studio/studio.html?open=scene-prompt#scene'
-        : `/src/ui/studio/studio.html#${route}`,
+      `/src/ui/studio/studio.html#${route}`,
     )
   }
 })
@@ -51,6 +49,6 @@ test('unrelated query parameters never participate in the fixed redirect locatio
   )
   assert.equal(
     legacyStudioRedirectLocation('?next=https%3A%2F%2Fexample.test&tab=prompts&open=anything'),
-    '/src/ui/studio/studio.html?open=scene-prompt#scene',
+    '/src/ui/studio/studio.html#tiles',
   )
 })

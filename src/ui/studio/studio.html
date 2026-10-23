@@ -11,15 +11,16 @@
         document.addEventListener('DOMContentLoaded', () => {
           const renderFilePreviewRoute = () => {
             const requestedRoute = location.hash.replace(/^#/, '')
-            const route = ['character', 'action', 'sequence', 'tiles', 'scene', 'project', 'qa', 'settings'].includes(requestedRoute)
+            const knownRoute = ['character', 'action', 'sequence', 'tiles', 'scene', 'project', 'qa', 'settings'].includes(requestedRoute)
               ? requestedRoute
               : 'character'
+            const route = knownRoute === 'scene' ? 'tiles' : knownRoute
             const titles = {
               character: 'MoteWeave · 角色工作室（文件预览）',
-              action: 'MoteWeave · 动作源（文件预览）',
+              action: 'MoteWeave · 动作取帧（文件预览）',
               sequence: 'MoteWeave · 序列工作室（文件预览）',
-              tiles: 'MoteWeave · 图块工作室（文件预览）',
-              scene: 'MoteWeave · 场景工坊（文件预览）',
+              tiles: 'MoteWeave · 地图工作室（文件预览）',
+              scene: 'MoteWeave · 地图工作室（文件预览）',
               project: 'MoteWeave · 项目包（文件预览）',
               qa: 'MoteWeave · 验收检查（文件预览）',
               settings: 'MoteWeave · 设置（文件预览）',
@@ -71,7 +72,7 @@
           </a>
           <a class="rail-item" href="#action" data-studio-route="action">
             <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 5v14m10-14v14M3 9h4m10 0h4M3 15h4m10 0h4"/></svg>
-            <span data-studio-i18n="nav.motion">动作</span>
+            <span data-studio-i18n="nav.motion">取帧</span>
           </a>
           <a class="rail-item" href="#sequence" data-studio-route="sequence">
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5M3 16l9 5 9-5"/></svg>
@@ -79,9 +80,9 @@
           </a>
           <a class="rail-item" href="#tiles" data-studio-route="tiles">
             <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="4" width="6" height="6"/><rect x="14" y="4" width="6" height="6"/><rect x="4" y="14" width="6" height="6"/><rect x="14" y="14" width="6" height="6"/></svg>
-            <span data-studio-i18n="nav.tiles">图块</span>
+            <span data-studio-i18n="nav.tiles">地图</span>
           </a>
-          <a class="rail-item" href="#scene" data-studio-route="scene">
+          <a class="rail-item" href="#scene" data-studio-route="scene" hidden>
             <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m3 6 6-3 6 3 6-3v15l-6 3-6-3-6 3V6Z"/><path d="M9 3v15m6-12v15"/></svg>
             <span data-studio-i18n="nav.scene">场景</span>
           </a>
@@ -107,7 +108,7 @@
         <code>http://127.0.0.1:4173/src/ui/studio/studio.html#action</code>
       </aside>
 
-      <div id="studio-settings-view" class="studio-main" data-studio-view="settings" data-design-source="figma:ro8w6TKkpd969zW2V5bmkx/749:4446,978:5077,978:5218,978:5359" data-ux-design-source="figma:ro8w6TKkpd969zW2V5bmkx/998:5548" hidden>
+      <div id="studio-settings-view" class="studio-main" data-studio-view="settings" data-design-source="figma:ro8w6TKkpd969zW2V5bmkx/749:4446,978:5077,978:5218,978:5359,1111:5317" data-ux-design-source="figma:ro8w6TKkpd969zW2V5bmkx/998:5548" hidden>
         <header class="topbar">
           <strong data-studio-i18n="settings.headerTitle">设置</strong>
           <span class="crumb" data-studio-i18n="settings.headerCrumb">· 应用</span>
@@ -147,7 +148,7 @@
               <header class="card-header">
                 <div>
                   <h2 id="studio-current-provider-title" data-studio-i18n="settings.currentRoute.title">当前会话 Provider 路由</h2>
-                  <p data-studio-i18n="settings.currentRoute.description">服务端同一时间只有一条共享路由；下方表单用于切换它；“已配置”不代表已实测连接。</p>
+                  <p data-studio-i18n="settings.currentRoute.description">服务端同一时间只有一条共享路由。保存其他 Provider 会替换服务会话配置，但当前 Studio 生成仍只使用原生 Gemini；“已配置”不代表已实测连接。</p>
                 </div>
                 <span id="studio-current-provider-badge" class="status-badge" data-state="loading" aria-live="polite" data-studio-i18n="settings.provider.loadingBadge">检查中</span>
               </header>
@@ -161,7 +162,7 @@
             <div class="settings-grid">
               <section class="card provider-card" aria-labelledby="provider-title">
                 <header class="card-header">
-                  <div><h2 id="provider-title" data-studio-i18n="settings.provider.title">切换到原生 Gemini</h2><p data-studio-i18n="settings.provider.description">Character Strict 与高级 Tiles 材质评测要求原生 Gemini；保存会替换当前会话路由。</p></div>
+                  <div><h2 id="provider-title" data-studio-i18n="settings.provider.title">切换到原生 Gemini</h2><p data-studio-i18n="settings.provider.description">Character Strict、Scene 在线生成与高级 Tiles 材质评测只接受原生 Gemini；保存会替换当前会话路由。</p></div>
                   <span id="studio-provider-state-badge" class="status-badge" data-state="loading" aria-busy="true">检查中</span>
                 </header>
 
@@ -188,6 +189,10 @@
                   <button id="studio-clear-provider-config" class="button secondary" type="button" disabled data-studio-i18n="settings.provider.clear" data-studio-server-required>清除会话配置</button>
                   <span id="studio-provider-config-status" class="provider-message" role="status" aria-live="polite" data-studio-i18n="settings.provider.loading">正在加载会话配置…</span>
                 </div>
+                <details id="studio-gemini-technical-details" class="boundary-panel technical-disclosure" hidden>
+                  <summary data-studio-i18n="settings.advancedProvider.technicalSummary" aria-controls="studio-gemini-technical-error">技术详情</summary>
+                  <pre id="studio-gemini-technical-error" class="provider-technical-error"></pre>
+                </details>
 
                 <details class="boundary-panel technical-disclosure">
                   <summary id="boundary-title" data-studio-i18n="settings.provider.boundaryTitle">会话边界</summary>
@@ -229,14 +234,14 @@
 
             <details id="studio-advanced-provider" class="card advanced-provider-card">
               <summary>
-                <span><strong data-studio-i18n="settings.advancedProvider.title">高级 Provider</strong><small data-studio-i18n="settings.advancedProvider.summary">OpenRouter 与兼容 Base URL · 仅服务会话</small></span>
-                <span id="studio-advanced-provider-badge" class="status-badge" data-state="idle" aria-busy="false" data-studio-i18n="settings.advancedProvider.collapsedBadge">高级配置</span>
+                <span><strong data-studio-i18n="settings.advancedProvider.title">其他 Provider 配置</strong><small data-studio-i18n="settings.advancedProvider.summary">OpenRouter 与兼容 Base URL · 仅服务会话配置</small></span>
+                <span id="studio-advanced-provider-badge" class="status-badge" data-state="idle" aria-busy="false" data-studio-i18n="settings.advancedProvider.collapsedBadge">其他配置</span>
               </summary>
               <div class="advanced-provider-layout">
                 <section class="advanced-provider-config" aria-labelledby="studio-advanced-provider-title">
                   <header class="card-header">
-                    <div><h2 id="studio-advanced-provider-title" data-studio-i18n="settings.advancedProvider.title">切换到高级 Provider</h2><p data-studio-i18n="settings.advancedProvider.description">仅供高级兼容 Character 与 Scene 在线生成；保存会替换当前会话路由。</p></div>
-                    <span id="studio-advanced-provider-state" class="status-badge" data-state="idle" aria-live="polite" data-studio-i18n="settings.advancedProvider.notActive">未激活</span>
+                    <div><h2 id="studio-advanced-provider-title" data-studio-i18n="settings.advancedProvider.configTitle">其他 Provider 配置</h2><p data-studio-i18n="settings.advancedProvider.description">OpenRouter / 兼容 Base URL 可保存为服务会话配置，但尚未接入当前 Studio 生成。保存会替换当前服务会话配置，当前 Studio 生成仍只使用原生 Gemini。</p></div>
+                    <span id="studio-advanced-provider-state" class="status-badge" data-state="idle" aria-live="polite" data-studio-i18n="settings.advancedProvider.generationDisabled">未启用生成</span>
                   </header>
 
                   <div class="provider-fields">
@@ -261,10 +266,14 @@
                   <div class="key-note"><p data-studio-i18n="settings.advancedProvider.keyNote">保存后清空输入、不回显，也不写入浏览器存储。</p><span class="condition-badge"><i></i><span data-studio-i18n="settings.provider.noEchoBadge">不回显</span></span></div>
 
                   <div class="provider-actions">
-                    <button id="studio-save-advanced-provider" class="button primary" type="button" disabled data-studio-server-required data-studio-i18n="settings.advancedProvider.save">保存并激活</button>
+                    <button id="studio-save-advanced-provider" class="button secondary" type="button" disabled data-studio-server-required data-studio-i18n="settings.advancedProvider.save">保存配置</button>
                     <button id="studio-clear-advanced-provider" class="button secondary" type="button" disabled data-studio-server-required data-studio-i18n="settings.provider.clear">清除会话配置</button>
-                    <span id="studio-advanced-provider-message" class="provider-message" role="status" aria-live="polite" data-studio-i18n="settings.advancedProvider.readyToConfigure">可配置 OpenRouter 或兼容 Base URL。</span>
+                    <span id="studio-advanced-provider-message" class="provider-message" role="status" aria-live="polite" data-studio-i18n="settings.advancedProvider.readyToConfigure">可保存 OpenRouter 或兼容 Base URL 配置，不会启用当前 Studio 生成。</span>
                   </div>
+                  <details id="studio-advanced-technical-details" class="boundary-panel technical-disclosure" hidden>
+                    <summary id="studio-advanced-technical-summary" data-studio-i18n="settings.advancedProvider.technicalSummary" aria-controls="studio-advanced-technical-error">技术详情</summary>
+                    <pre id="studio-advanced-technical-error" class="provider-technical-error"></pre>
+                  </details>
 
                   <details class="boundary-panel technical-disclosure">
                     <summary id="studio-advanced-boundary-title" data-studio-i18n="settings.provider.boundaryTitle">会话边界</summary>
@@ -277,10 +286,10 @@
                 </section>
 
                 <aside class="advanced-provider-matrix" aria-labelledby="studio-provider-matrix-title">
-                  <h2 id="studio-provider-matrix-title" data-studio-i18n="settings.advancedProvider.matrixTitle">兼容矩阵</h2>
+                  <h2 id="studio-provider-matrix-title" data-studio-i18n="settings.advancedProvider.matrixTitle">统一生成流程</h2>
                   <dl>
-                    <div><dt data-studio-i18n="settings.advancedProvider.compatCharacter">高级兼容 Character</dt><dd data-studio-i18n="settings.advancedProvider.shared">共享 Provider</dd></div>
-                    <div><dt data-studio-i18n="settings.advancedProvider.sceneOnline">Scene 在线生成</dt><dd data-studio-i18n="settings.advancedProvider.shared">共享 Provider</dd></div>
+                    <div><dt data-studio-i18n="settings.advancedProvider.unifiedGeneration">AI 生成</dt><dd data-studio-i18n="settings.advancedProvider.geminiOnly">仅 Gemini 可用</dd></div>
+                    <div><dt data-studio-i18n="settings.advancedProvider.sceneOnline">Scene 在线生成</dt><dd data-studio-i18n="settings.advancedProvider.geminiOnly">仅 Gemini 可用</dd></div>
                     <div><dt>Character Strict</dt><dd data-studio-i18n="settings.advancedProvider.nativeGemini">原生 Gemini</dd></div>
                     <div><dt>Tiles AI</dt><dd data-studio-i18n="settings.advancedProvider.nativeGemini">原生 Gemini</dd></div>
                   </dl>
@@ -296,13 +305,15 @@
         class="studio-main action-main"
         data-studio-view="action"
         data-action-phase="empty"
-        data-design-source="figma:ro8w6TKkpd969zW2V5bmkx/829:4494,829:4862,829:5230,235:2223,310:8798,829:5598,830:4794,829:5966,829:6334,830:5162,848:4571,848:5036,848:5501,848:5966,321:4871,53:96"
+        data-design-source="figma:ro8w6TKkpd969zW2V5bmkx/829:4494,829:4862,829:5230,235:2223,310:8798,829:5598,830:4794,829:5966,829:6334,321:4871"
+        data-design-inventory="figma:ro8w6TKkpd969zW2V5bmkx/830:5162,848:4571,848:5036,848:5501,848:5966"
+        data-design-archive-inventory="figma:ro8w6TKkpd969zW2V5bmkx/53:96"
         data-ux-design-source="figma:ro8w6TKkpd969zW2V5bmkx/996:6266,996:6696"
         hidden
       >
         <header class="topbar action-topbar">
-          <strong data-studio-i18n="action.headerTitle">动作源</strong>
-          <span id="studio-action-header-crumb" class="crumb" data-studio-i18n="action.headerCrumb">· 本地源 · 尚未选择</span>
+          <strong data-studio-i18n="action.headerTitle">动作取帧</strong>
+          <span id="studio-action-header-crumb" class="crumb" data-studio-i18n="action.headerCrumb">· 本地素材 · 尚未选择</span>
           <span class="workspace-tab is-active" aria-current="page" data-studio-i18n="action.localEntry">本地导入</span>
           <span class="topbar-spacer"></span>
           <span id="studio-action-status" class="status-badge" data-state="idle" role="status" aria-live="polite" aria-atomic="true" data-studio-i18n="action.statusEmpty">等待导入</span>
@@ -313,44 +324,41 @@
         </header>
 
         <main class="action-workspace">
-          <header class="action-context-toolbar" aria-label="动作处理上下文" data-studio-i18n-aria-label="action.contextToolbarLabel">
-            <label class="action-context-select"><span data-studio-i18n="action.contextClip">动作片段</span><select id="studio-action-option-action" data-action-option="action" data-studio-server-required></select></label>
+          <header class="action-context-toolbar" hidden aria-label="动作处理上下文" data-studio-i18n-aria-label="action.contextToolbarLabel">
             <span class="action-context-quality"><span data-studio-i18n="action.contextQuality">质量</span><strong id="studio-action-quality-status" data-state="waiting" data-studio-i18n="action.contextQualityWaiting">等待</strong></span>
             <span class="topbar-spacer"></span>
-            <button id="studio-action-advanced-toggle" class="button secondary" type="button" data-studio-i18n="action.advancedToggle">高级参数</button>
           </header>
 
           <aside class="action-control-panel" aria-labelledby="studio-action-phase-title">
-            <header class="action-flow-header">
-              <span class="eyebrow" data-studio-i18n="action.flowEyebrow">当前流程</span>
-              <h1 id="studio-action-phase-title" tabindex="-1" data-studio-i18n="action.phase.emptyTitle">新建动作处理</h1>
-              <p id="studio-action-phase-summary" data-studio-i18n="action.phase.emptySummary">导入视频或动图，先分析帧候选，再审阅并应用到工作表。</p>
-            </header>
+            <div class="action-control-scroll">
+              <header class="action-flow-header">
+                <span class="eyebrow" data-studio-i18n="action.flowEyebrow">当前流程</span>
+                <h1 id="studio-action-phase-title" tabindex="-1" data-studio-i18n="action.phase.emptyTitle">新建动作处理</h1>
+                <p id="studio-action-phase-summary" data-studio-i18n="action.phase.emptySummary">导入视频或动图，先分析帧候选，再审阅并应用到工作表。</p>
+              </header>
 
-            <button id="studio-action-source-set-toggle" class="mode-tab action-source-set-toggle" type="button" data-studio-i18n="action.modeSourceSet">切换到现有条带</button>
+              <button id="studio-action-source-set-toggle" class="mode-tab action-source-set-toggle" type="button" hidden data-studio-i18n="action.modeSourceSet">切换到现有条带</button>
 
-            <section class="action-source-card" data-action-source="guided" aria-labelledby="studio-action-source-title">
-              <div>
-                <h2 id="studio-action-source-title" data-studio-i18n="action.sourceTitle">动作源</h2>
-                <p data-studio-i18n="action.sourceHelp">支持 GIF / ZIP / 静态图 / 视频；仅在本地工具链中处理。</p>
-              </div>
-              <label class="action-file-picker" for="studio-action-file">
-                <span data-studio-i18n="action.chooseSource">选择视频或动图</span>
-                <small data-studio-i18n="action.sourceFormats">GIF / ZIP / PNG / JPEG / WebP / MP4 等</small>
-              </label>
-              <input id="studio-action-file" class="action-visually-hidden" type="file" accept=".gif,.zip,image/png,image/jpeg,image/webp,video/*" data-studio-server-required />
-              <p class="action-source-limits" data-studio-i18n="action.sourceLimits">GIF / ZIP ≤ 64 MB · 静态图 ≤ 32 MB · 视频 ≤ 200 MB</p>
-              <dl id="studio-action-source-meta" class="action-meta-grid" aria-live="polite">
-                <div><dt data-studio-i18n="action.source.name">文件</dt><dd id="studio-action-source-name">—</dd></div>
-                <div><dt data-studio-i18n="action.source.size">大小</dt><dd id="studio-action-source-size">—</dd></div>
-                <div><dt data-studio-i18n="action.source.kind">类型</dt><dd id="studio-action-source-kind">—</dd></div>
-                <div><dt data-studio-i18n="action.source.identity">源标识</dt><dd id="studio-action-source-identity">—</dd></div>
-                <div><dt data-studio-i18n="action.source.uploadId">上传 ID</dt><dd id="studio-action-upload-id">—</dd></div>
-              </dl>
-            </section>
+              <section class="action-source-card" data-action-source="guided" aria-labelledby="studio-action-source-title">
+                <div>
+                  <h2 id="studio-action-source-title" data-studio-i18n="action.sourceTitle">动作素材</h2>
+                  <p data-studio-i18n="action.sourceHelp">支持 GIF / ZIP / 静态图 / 视频；仅在本地工具链中处理。</p>
+                </div>
+                <label class="action-file-picker" for="studio-action-file">
+                  <span data-studio-i18n="action.chooseSource">添加动作素材</span>
+                  <small data-studio-i18n="action.sourceFormats">GIF / ZIP / PNG / JPEG / WebP / MP4 等</small>
+                </label>
+                <input id="studio-action-file" class="action-visually-hidden" type="file" accept=".gif,.zip,image/png,image/jpeg,image/webp,video/*" data-studio-server-required />
+                <p id="studio-action-selected-source" class="action-selected-source" role="status" aria-live="polite" aria-atomic="true" hidden></p>
+                <p class="action-source-limits" data-studio-i18n="action.sourceLimits">GIF / ZIP ≤ 64 MB · 静态图 ≤ 32 MB · 视频 ≤ 200 MB</p>
+              </section>
 
-            <section class="action-option-grid" data-action-source="guided" aria-labelledby="studio-action-guided-options-title">
+              <section class="action-option-grid" data-action-source="guided" aria-labelledby="studio-action-guided-options-title">
               <h2 id="studio-action-guided-options-title" data-studio-i18n="action.guidedOptionsTitle">帧选择</h2>
+              <label class="action-field">
+                <span data-studio-i18n="action.optionActionName">动作名称</span>
+                <input id="studio-action-option-action" type="text" value="walk_down" autocomplete="off" spellcheck="false" data-action-option="action" data-studio-server-required />
+              </label>
               <label class="action-field">
                 <span data-studio-i18n="action.optionTargetFrameCount">目标帧数</span>
                 <input id="studio-action-option-target-frame-count" type="number" min="1" max="64" value="4" inputmode="numeric" data-action-option="targetFrameCount" data-studio-server-required />
@@ -362,7 +370,7 @@
                   <option value="manual" data-studio-i18n="action.valueManual">手动</option>
                 </select>
               </label>
-              <label class="action-field">
+              <label class="action-field action-operator-field" hidden>
                 <span data-studio-i18n="action.optionSelectionRecipe">选帧配方</span>
                 <select id="studio-action-option-selection-recipe" data-action-option="selectionRecipe" data-studio-server-required>
                   <option value="motion_selection_recipe_v2" data-studio-i18n="action.recipeV2">选帧配方 v2</option>
@@ -397,11 +405,13 @@
                 <span data-studio-i18n="action.optionEndSec">结束秒</span>
                 <input id="studio-action-option-end-sec" type="number" min="0" step="0.1" placeholder="自动" data-studio-i18n-placeholder="action.valueAuto" inputmode="decimal" data-action-option="endSec" data-studio-server-required />
               </label>
-            </section>
+              </section>
 
-            <section id="studio-action-advanced-panel" class="action-option-grid action-advanced-panel" data-action-panel="advanced" aria-labelledby="studio-action-advanced-title" hidden>
+              <button id="studio-action-advanced-toggle" class="button secondary action-advanced-toggle" type="button" aria-controls="studio-action-advanced-panel" aria-expanded="false" data-studio-i18n="action.advancedToggle">高级参数</button>
+
+              <section id="studio-action-advanced-panel" class="action-option-grid action-advanced-panel" data-action-panel="advanced" aria-labelledby="studio-action-advanced-title" hidden>
               <header class="action-panel-heading action-field-wide">
-                <div><h2 id="studio-action-advanced-title" data-studio-i18n="action.advancedTitle">高级清理与对齐</h2><p data-studio-i18n="action.advancedHelp">调整时序 Matte、键色、像素网格与尺寸不匹配策略。</p></div>
+                <div><h2 id="studio-action-advanced-title" tabindex="-1" data-studio-i18n="action.advancedTitle">高级清理与对齐</h2><p data-studio-i18n="action.advancedHelp">调整时序 Matte、键色、像素网格与尺寸不匹配策略。</p></div>
                 <button class="button secondary" type="button" data-action-return-guided data-studio-i18n="action.returnGuided">返回引导流程</button>
               </header>
               <label class="action-field">
@@ -450,9 +460,9 @@
                   <option value="nearest_keyframes" data-studio-i18n="action.valueNearest">最近关键帧</option>
                 </select>
               </label>
-            </section>
+              </section>
 
-            <section id="studio-action-apply-inputs" class="action-source-set-panel" data-action-panel="review source_set" aria-labelledby="studio-action-apply-inputs-title" hidden>
+              <section id="studio-action-apply-inputs" class="action-source-set-panel" data-action-panel="review source_set" aria-labelledby="studio-action-apply-inputs-title" hidden>
               <header>
                 <h2 id="studio-action-apply-inputs-title" data-studio-i18n="action.applyInputsTitle">应用目标</h2>
                 <p data-studio-i18n="action.applyInputsHelp">选择基础工作表；单条带可用于覆盖本次构建结果。</p>
@@ -461,9 +471,9 @@
               <input id="studio-action-sheet-file" class="action-visually-hidden" type="file" accept="image/png,image/webp" data-studio-server-required />
               <label class="action-compact-picker" for="studio-action-strip-file"><span data-studio-i18n="action.stripFile">单个动作条带</span><small id="studio-action-strip-file-name" data-studio-i18n="action.chooseFile">选择文件</small></label>
               <input id="studio-action-strip-file" class="action-visually-hidden" type="file" accept="image/png,image/webp" data-studio-server-required />
-            </section>
+              </section>
 
-            <section id="studio-action-source-set-panel" class="action-source-set-panel" data-action-panel="source_set" aria-labelledby="studio-action-source-set-title" hidden>
+              <section id="studio-action-source-set-panel" class="action-source-set-panel" data-action-panel="source_set" aria-labelledby="studio-action-source-set-title" hidden>
               <header class="action-panel-heading">
                 <div><h2 id="studio-action-source-set-title" data-studio-i18n="action.sourceSetTitle">现有工作表与动作条带</h2><p data-studio-i18n="action.sourceSetHelp">仅分析并应用已有本地资产，不进行 AI 生成。</p></div>
                 <button class="button secondary" type="button" data-action-return-guided data-studio-i18n="action.returnGuided">返回引导流程</button>
@@ -476,27 +486,30 @@
                 <button id="studio-action-source-set-analyze" class="button secondary" type="button" data-studio-server-required data-studio-i18n="action.sourceSetAnalyze">分析条带集</button>
                 <button id="studio-action-source-set-apply" class="button primary" type="button" data-studio-server-required data-studio-i18n="action.sourceSetApply">应用到工作表</button>
               </div>
-            </section>
+              </section>
+            </div>
 
-            <div class="action-primary-actions" data-action-source="guided">
-              <button id="studio-action-analyze" class="button primary" type="button" data-studio-server-required data-studio-i18n="action.analyze">分析动作源</button>
-              <button id="studio-action-preview" class="button primary" type="button" data-studio-server-required data-studio-i18n="action.preview">生成预览</button>
-              <button id="studio-action-restore-auto" class="button secondary" type="button" data-studio-server-required data-studio-i18n="action.restoreAuto">恢复自动选帧</button>
-              <button id="studio-action-build" class="button primary" type="button" data-studio-server-required data-studio-i18n="action.build">构建动作条带</button>
-              <button id="studio-action-apply" class="button primary" type="button" data-studio-server-required data-studio-i18n="action.apply">应用到工作表</button>
-            </div>
-            <div class="action-primary-actions" data-action-source="job">
-              <button id="studio-action-cancel" class="button secondary" type="button" data-studio-server-required data-studio-i18n="action.cancel">取消当前任务</button>
-              <button id="studio-action-resume" class="button secondary" type="button" data-studio-server-required data-studio-i18n="action.resume">继续观察当前任务</button>
-              <button id="studio-action-recover" class="button primary" type="button" hidden disabled>按当前输入恢复</button>
-            </div>
+            <footer class="action-control-footer">
+              <div class="action-primary-actions" data-action-source="guided">
+                <button id="studio-action-analyze" class="button primary studio-module-cta" type="button" data-studio-server-required data-studio-i18n="action.analyze">分析素材</button>
+                <button id="studio-action-preview" class="button primary studio-module-cta" type="button" data-studio-server-required data-studio-i18n="action.preview">生成预览</button>
+                <button id="studio-action-restore-auto" class="button secondary" type="button" data-studio-server-required data-studio-i18n="action.restoreAuto">恢复自动选帧</button>
+                <button id="studio-action-build" class="button primary studio-module-cta" type="button" data-studio-server-required data-studio-i18n="action.build">构建动作条带</button>
+                <button id="studio-action-apply" class="button primary studio-module-cta" type="button" data-studio-server-required data-studio-i18n="action.apply">应用到工作表</button>
+              </div>
+              <div class="action-primary-actions" data-action-source="job">
+                <button id="studio-action-cancel" class="button secondary" type="button" data-studio-server-required data-studio-i18n="action.cancel">取消当前任务</button>
+                <button id="studio-action-resume" class="button secondary" type="button" data-studio-server-required data-studio-i18n="action.resume">继续观察当前任务</button>
+                <button id="studio-action-recover" class="button primary studio-module-cta" type="button" hidden disabled>按当前输入恢复</button>
+              </div>
+            </footer>
           </aside>
 
           <section id="studio-action-stage" class="action-stage" aria-labelledby="studio-action-stage-title">
             <header class="action-stage-toolbar">
               <div>
                 <span class="eyebrow" data-studio-i18n="action.stageEyebrow">预览舞台</span>
-                <h2 id="studio-action-stage-title" data-studio-i18n="action.stageTitle">等待真实动作源</h2>
+                <h2 id="studio-action-stage-title" data-studio-i18n="action.stageTitle">等待真实动作素材</h2>
               </div>
               <span class="topbar-spacer"></span>
               <p id="studio-action-live-status" role="status" aria-live="polite" aria-atomic="true" data-state="idle" data-studio-i18n="action.phase.emptySummary">选择文件后先生成候选帧分析。</p>
@@ -504,8 +517,7 @@
 
             <div class="action-stage-body">
               <section class="action-state-panel action-empty-panel" data-action-panel="empty" aria-labelledby="studio-action-empty-title">
-                <div class="action-empty-glyph" aria-hidden="true"><i></i><b></b><span></span></div>
-                <h2 id="studio-action-empty-title" data-studio-i18n="action.emptyTitle">导入一个视频或动图</h2>
+                <h2 id="studio-action-empty-title" data-studio-i18n="action.emptyTitle">添加动作素材</h2>
                 <p data-studio-i18n="action.emptyHelp">真实输出仅在分析成功后显示；此处不展示示例结果。</p>
               </section>
 
@@ -648,15 +660,15 @@
           <span class="sequence-mode sequence-mode-local" aria-current="page" data-studio-i18n="sequence.localEntry">本地导入</span>
           <span class="topbar-spacer"></span>
           <span id="studio-sequence-status" class="status-badge sequence-phase-copy" data-state="idle" role="status" aria-live="polite" aria-atomic="true">
-            <span data-sequence-copy-phase="empty" data-studio-i18n="sequence.status.empty">等待帧</span>
-            <span data-sequence-copy-phase="ready" data-studio-i18n="sequence.status.ready">ready · 0 请求</span>
-            <span data-sequence-copy-phase="processing" data-studio-i18n="sequence.status.processing">local_processing · 0 请求</span>
-            <span data-sequence-copy-phase="building" data-studio-i18n="sequence.status.building">building · 1 请求</span>
-            <span data-sequence-copy-phase="complete" data-studio-i18n="sequence.status.complete">complete</span>
-            <span data-sequence-copy-phase="partial" data-studio-i18n="sequence.status.partial">partial · GIF failed</span>
-            <span data-sequence-copy-phase="stale" data-studio-i18n="sequence.status.stale">stale · locked</span>
-            <span data-sequence-copy-phase="error" data-studio-i18n="sequence.status.error">input_error · 0 请求</span>
-            <span data-sequence-copy-phase="local_error" data-studio-i18n="sequence.status.localError">local_error · 0 请求</span>
+            <span data-sequence-copy-phase="empty" data-studio-i18n="sequence.status.empty">等待添加帧</span>
+            <span data-sequence-copy-phase="ready" data-studio-i18n="sequence.status.ready">帧已就绪 · 0 次请求</span>
+            <span data-sequence-copy-phase="processing" data-studio-i18n="sequence.status.processing">正在本地处理 · 0 次请求</span>
+            <span data-sequence-copy-phase="building" data-studio-i18n="sequence.status.building">正在生成预览 · 1 次请求</span>
+            <span data-sequence-copy-phase="complete" data-studio-i18n="sequence.status.complete">已完成</span>
+            <span data-sequence-copy-phase="partial" data-studio-i18n="sequence.status.partial">部分完成 · GIF 不可用</span>
+            <span data-sequence-copy-phase="stale" data-studio-i18n="sequence.status.stale">输入已变更 · 需要重新生成</span>
+            <span data-sequence-copy-phase="error" data-studio-i18n="sequence.status.error">输入需要处理 · 0 次请求</span>
+            <span data-sequence-copy-phase="local_error" data-studio-i18n="sequence.status.localError">本地输出需要处理 · 0 次请求</span>
           </span>
           <div class="sequence-language-group" role="group" aria-label="界面语言" data-studio-i18n-aria-label="sequence.languageLabel">
             <button id="studio-sequence-language-zh" class="language-short sequence-language is-current" type="button" data-sequence-language="zh" data-studio-i18n="sequence.langZh" aria-pressed="true">中文</button>
@@ -767,7 +779,7 @@
             </section>
 
             <section id="studio-sequence-binding-summary" class="sequence-binding-summary" aria-labelledby="studio-sequence-binding-title">
-              <h2 id="studio-sequence-binding-title" data-studio-i18n="sequence.binding.title">Binding Summary</h2>
+              <h2 id="studio-sequence-binding-title" data-studio-i18n="sequence.binding.title.empty">尚未建立生成绑定</h2>
               <div class="sequence-binding-copy sequence-phase-copy">
                 <span data-sequence-copy-phase="empty"><strong>尚未建立生成绑定</strong><small>0 帧 · 未生成画布</small><small>本地产物与 GIF 均不可用</small></span>
                 <span data-sequence-copy-phase="ready"><strong>当前生成绑定</strong><small>8 帧 · source epoch 1</small><small>参数 256×256 · 4 列 · 12 FPS</small></span>
@@ -783,7 +795,7 @@
 
             <p class="sequence-processing-notice" data-studio-i18n="sequence.processingLockNotice">处理期间源文件与参数暂时锁定；不会重复提交。</p>
             <p id="studio-sequence-error" class="sequence-control-error" role="alert" hidden>输入错误：无法读取 frame_006.webp。请替换文件后重新选择完整序列。</p>
-            <button id="studio-sequence-primary" class="button primary sequence-primary-action sequence-phase-copy" type="button">
+            <button id="studio-sequence-primary" class="button primary studio-module-cta sequence-primary-action sequence-phase-copy" type="button">
               <span data-sequence-copy-phase="empty" data-studio-i18n="sequence.primary.choose">选择帧文件</span>
               <span data-sequence-copy-phase="ready" data-studio-i18n="sequence.primary.generate">生成序列资源</span>
               <span data-sequence-copy-phase="processing" data-studio-i18n="sequence.primary.processing">本地处理中…</span>
@@ -826,7 +838,6 @@
 
             <div class="sequence-stage-body">
               <section class="sequence-state-panel sequence-empty-panel" data-sequence-panel="empty" aria-labelledby="studio-sequence-empty-title">
-                <div class="sequence-pixel-person" aria-hidden="true"><i></i><b></b><span></span></div>
                 <div class="sequence-empty-copy">
                   <h2 id="studio-sequence-empty-title" data-studio-i18n="sequence.emptyTitle">等待导入序列帧</h2>
                   <p data-studio-i18n="sequence.emptyHelp">选择多张 PNG / JPEG / WebP。文件会按名称自然排序，本地生成 sprite.png、index.json 与 ZIP；GIF 使用本地服务接口。</p>
@@ -987,12 +998,13 @@
         data-studio-view="tiles"
         data-tiles-phase="empty"
         data-tiles-mode="local"
-        data-design-source="figma:ro8w6TKkpd969zW2V5bmkx/603:4360,909:6025,909:7644,910:4970,911:4977,911:6385,912:5088,913:5095,913:5234,914:5109,918:5310"
-        data-ux-design-source="figma:ro8w6TKkpd969zW2V5bmkx/997:5491,997:6498"
+        data-design-source="figma:ro8w6TKkpd969zW2V5bmkx/603:4360,909:6025,909:7644,910:4970,911:4977,911:6385"
+        data-ux-design-source="figma:ro8w6TKkpd969zW2V5bmkx/997:5491"
+        data-design-archive-inventory="figma:ro8w6TKkpd969zW2V5bmkx/912:5088,913:5095,913:5234,914:5109,918:5310,997:6498"
         hidden
       >
         <header class="topbar tiles-topbar">
-          <strong data-studio-i18n="tiles.headerTitle">图块工作室</strong>
+          <strong data-studio-i18n="tiles.headerTitle">地图工作室</strong>
           <span id="studio-tiles-header-crumb" class="crumb tiles-phase-copy" aria-live="polite" aria-atomic="true">
             <span data-tiles-copy-phase="empty" data-studio-i18n="tiles.crumb.empty">· 本地构建 · 等待编辑</span>
             <span data-tiles-copy-phase="ready" data-studio-i18n="tiles.crumb.ready">· 本地构建 · 编辑就绪</span>
@@ -1010,12 +1022,12 @@
           <button id="studio-tiles-mode-ai" class="tiles-mode tiles-mode-secondary" type="button" data-tiles-mode-control="ai" aria-pressed="false" data-studio-i18n="tiles.mode.ai">高级 · Provider 材质评测</button>
           <span class="topbar-spacer"></span>
           <span id="studio-tiles-status" class="status-badge tiles-phase-copy" data-state="idle" role="status" aria-live="polite" aria-atomic="true">
-            <span data-tiles-copy-phase="empty" data-studio-i18n="tiles.status.empty">empty · 0 Provider</span>
-            <span data-tiles-copy-phase="ready" data-studio-i18n="tiles.status.ready">ready · 0 Provider</span>
-            <span data-tiles-copy-phase="building" data-studio-i18n="tiles.status.building">building · 0 Provider</span>
-            <span data-tiles-copy-phase="complete" data-studio-i18n="tiles.status.complete">done · 0 Provider</span>
-            <span data-tiles-copy-phase="failed" data-studio-i18n="tiles.status.failed">failed · 0 Provider</span>
-            <span data-tiles-copy-phase="stale" data-studio-i18n="tiles.status.stale">stale · locked</span>
+            <span data-tiles-copy-phase="empty" data-studio-i18n="tiles.status.empty">等待编辑</span>
+            <span data-tiles-copy-phase="ready" data-studio-i18n="tiles.status.ready">编辑已就绪</span>
+            <span data-tiles-copy-phase="building" data-studio-i18n="tiles.status.building">正在构建图块集</span>
+            <span data-tiles-copy-phase="complete" data-studio-i18n="tiles.status.complete">验证通过 · 可下载</span>
+            <span data-tiles-copy-phase="failed" data-studio-i18n="tiles.status.failed">构建未完成</span>
+            <span data-tiles-copy-phase="stale" data-studio-i18n="tiles.status.stale">输入已变更 · 需要重建</span>
             <span data-tiles-copy-phase="ai_setup" data-studio-i18n="tiles.status.aiSetup">setup · 0/0 calls</span>
             <span data-tiles-copy-phase="ai_plan_ready" data-studio-i18n="tiles.status.aiPlanReady">plan_ready · 0/4 calls</span>
             <span data-tiles-copy-phase="ai_running" data-studio-i18n="tiles.status.aiRunning">generating · 0/4 calls</span>
@@ -1077,32 +1089,39 @@
 
             <div class="tiles-local-controls" data-tiles-mode-panel="local">
               <section class="tiles-source-section" aria-labelledby="studio-tiles-source-title">
-                <h2 id="studio-tiles-source-title" data-studio-i18n="tiles.sourceTitle">材质来源</h2>
+                <h2 id="studio-tiles-source-title" data-studio-i18n="tiles.sourceTitle">地形素材</h2>
+                <button id="studio-tiles-use-default" class="tiles-default-source is-active" type="button" aria-pressed="true" data-studio-i18n="tiles.sourceDefault">使用默认素材</button>
                 <label id="studio-tiles-drop-zone" class="tiles-file-picker" for="studio-tiles-source-file">
-                  <strong id="studio-tiles-source-name" data-studio-i18n="tiles.sourceChoose">可选：选择材质源图片</strong>
-                  <small data-studio-i18n="tiles.sourceHelp">PNG / WebP / JPEG · 图集结构仍由本地代码负责</small>
+                  <strong id="studio-tiles-source-name" data-studio-i18n="tiles.sourceChoose">选择图片</strong>
+                  <small id="studio-tiles-source-help" data-studio-i18n="tiles.sourceHelp">PNG / WebP / JPEG</small>
                 </label>
+                <p id="studio-tiles-source-status" data-studio-i18n="tiles.sourceDefaultActive">当前使用内置默认素材</p>
                 <input id="studio-tiles-source-file" class="tiles-visually-hidden" type="file" accept="image/png,image/jpeg,image/webp" />
               </section>
 
               <section class="tiles-contract-section" aria-labelledby="studio-tiles-contract-title">
-                <h2 id="studio-tiles-contract-title" data-studio-i18n="tiles.contractTitle">地图合同</h2>
+                <h2 id="studio-tiles-contract-title" data-studio-i18n="tiles.contractTitle">地图设置</h2>
                 <div class="tiles-field-grid">
-                  <label><span data-studio-i18n="tiles.field.width">宽度</span><input id="studio-tiles-width" type="number" min="1" max="64" value="8" data-tiles-option="mapWidth" /></label>
-                  <label><span data-studio-i18n="tiles.field.height">高度</span><input id="studio-tiles-height" type="number" min="1" max="64" value="6" data-tiles-option="mapHeight" /></label>
-                  <label><span data-studio-i18n="tiles.field.density">密度</span><input id="studio-tiles-density" type="number" min="0" max="1" step="0.01" value="0.55" data-tiles-option="mapDensity" /></label>
-                  <label><span data-studio-i18n="tiles.field.seed">种子</span><input id="studio-tiles-seed" type="number" value="170617" data-tiles-option="mapSeed" /></label>
-                  <label><span data-studio-i18n="tiles.field.solver">求解器</span><select id="studio-tiles-solver" data-tiles-option="mapSolver"><option value="constraint">constraint</option><option value="seeded">seeded</option></select></label>
-                  <label><span data-studio-i18n="tiles.field.border">边界</span><select id="studio-tiles-border" data-tiles-option="mapBorder"><option value="empty">empty</option><option value="none">none</option></select></label>
+                  <label><span data-studio-i18n="tiles.field.width">宽度（格）</span><input id="studio-tiles-width" type="number" min="1" max="64" value="8" data-tiles-option="mapWidth" /></label>
+                  <label><span data-studio-i18n="tiles.field.height">高度（格）</span><input id="studio-tiles-height" type="number" min="1" max="64" value="6" data-tiles-option="mapHeight" /></label>
+                  <label><span data-studio-i18n="tiles.field.density">密度</span><input id="studio-tiles-density" type="number" min="0" max="1" step="0.01" value="0.55" data-tiles-option="mapDensity" /><small data-studio-i18n="tiles.field.densityHelp">控制地图中地形的覆盖程度</small></label>
+                  <label><span data-studio-i18n="tiles.field.seed">种子</span><input id="studio-tiles-seed" type="number" value="170617" data-tiles-option="mapSeed" /><small data-studio-i18n="tiles.field.seedHelp">用于复现相同自动布局</small></label>
                 </div>
+                <details class="tiles-advanced-settings">
+                  <summary data-studio-i18n="tiles.advancedSummary">高级设置</summary>
+                  <div class="tiles-field-grid">
+                    <label><span data-studio-i18n="tiles.field.solver">求解器</span><select id="studio-tiles-solver" data-tiles-option="mapSolver"><option value="constraint" data-studio-i18n="tiles.field.solverConstraint">约束求解</option><option value="seeded" data-studio-i18n="tiles.field.solverSeeded">种子生成</option></select></label>
+                    <label><span data-studio-i18n="tiles.field.border">边界</span><select id="studio-tiles-border" data-tiles-option="mapBorder"><option value="empty" data-studio-i18n="tiles.field.borderEmpty">空白边界</option><option value="none" data-studio-i18n="tiles.field.borderNone">不限制边界</option></select></label>
+                  </div>
+                </details>
               </section>
 
               <section class="tiles-binding-summary" aria-labelledby="studio-tiles-binding-title">
                 <h2 id="studio-tiles-binding-title" data-studio-i18n="tiles.bindingTitle">构建绑定</h2>
                 <div class="tiles-binding-copy tiles-phase-copy">
-                  <span data-tiles-copy-phase="empty"><strong data-studio-i18n="tiles.binding.emptyTitle">尚未建立构建绑定</strong><small id="studio-tiles-binding-empty">8×6 · 0 项编辑<br />程序化材质 · 0 服务请求</small></span>
-                  <span data-tiles-copy-phase="ready"><strong data-studio-i18n="tiles.binding.readyTitle">当前输入已就绪</strong><small id="studio-tiles-binding-ready">8×6 · 0 项编辑<br />程序化材质 · 尚未提交</small></span>
-                  <span data-tiles-copy-phase="building"><strong data-studio-i18n="tiles.binding.buildingTitle">构建绑定已封存</strong><small id="studio-tiles-binding-building">Job：—<br />8×6 · 0 项编辑 · 0 Provider</small></span>
+                  <span data-tiles-copy-phase="empty"><strong data-studio-i18n="tiles.binding.emptyTitle">尚未建立构建绑定</strong><small id="studio-tiles-binding-empty">8×6 · 0 项编辑<br />程序化材质 · 尚未提交</small></span>
+                  <span data-tiles-copy-phase="ready"><strong data-studio-i18n="tiles.binding.readyTitle">当前输入已就绪</strong><small id="studio-tiles-binding-ready">8×6 · 0 项编辑<br />尚未开始构建</small></span>
+                  <span data-tiles-copy-phase="building"><strong data-studio-i18n="tiles.binding.buildingTitle">构建绑定已封存</strong><small id="studio-tiles-binding-building">任务：—<br />8×6 · 0 项编辑</small></span>
                   <span data-tiles-copy-phase="complete"><strong data-studio-i18n="tiles.binding.completeTitle">当前构建绑定一致</strong><small id="studio-tiles-binding-complete">Validation · —<br />LDtk / Import / Round-trip · —</small></span>
                   <span data-tiles-copy-phase="failed"><strong data-studio-i18n="tiles.binding.failedTitle">失败绑定已封存</strong><small id="studio-tiles-binding-failed">Job：—<br />输入与编辑仍保留 · 输出锁定</small></span>
                   <span data-tiles-copy-phase="stale"><strong data-studio-i18n="tiles.binding.staleTitle">构建绑定已过期</strong><small id="studio-tiles-binding-stale">旧：—<br />新：—</small></span>
@@ -1137,8 +1156,8 @@
             </div>
 
             <p id="studio-tiles-error" class="tiles-control-error" role="alert" hidden></p>
-            <button id="studio-tiles-primary" class="button primary tiles-primary tiles-phase-copy" type="button">
-              <span data-tiles-copy-phase="empty" data-studio-i18n="tiles.primary.empty">开始编辑</span>
+            <button id="studio-tiles-primary" class="button primary studio-module-cta tiles-primary tiles-phase-copy" type="button">
+              <span data-tiles-copy-phase="empty" data-studio-i18n="tiles.primary.empty">开始编辑地图</span>
               <span data-tiles-copy-phase="ready" data-studio-i18n="tiles.primary.ready">构建图块集</span>
               <span data-tiles-copy-phase="building" data-studio-i18n="tiles.primary.building">正在构建…</span>
               <span data-tiles-copy-phase="complete failed stale" data-studio-i18n="tiles.primary.rebuild">按当前输入重新构建</span>
@@ -1167,16 +1186,15 @@
               </strong>
               <span id="studio-tiles-stage-metrics">8×6 · 角点网格未编辑</span>
               <span class="topbar-spacer"></span>
-              <span id="studio-tiles-runtime-status" class="tiles-runtime-status" role="status" aria-live="polite" aria-atomic="true">本地预览 · 0 Provider</span>
+              <span id="studio-tiles-runtime-status" class="tiles-runtime-status" role="status" aria-live="polite" aria-atomic="true" data-studio-i18n="tiles.runtime.localPreview">本地预览</span>
             </header>
 
             <div class="tiles-stage-body">
               <section class="tiles-empty-panel" data-tiles-panel="empty" aria-labelledby="studio-tiles-empty-title">
-                <div class="tiles-pixel-person" aria-hidden="true"><i></i><b></b><span></span></div>
-                <div>
-                  <h2 id="studio-tiles-empty-title" data-studio-i18n="tiles.empty.title">从角点网格开始</h2>
-                  <p data-studio-i18n="tiles.empty.body">调整地图尺寸、密度与种子，也可以选择一张材质源。<br />结构始终由本地 16-mask 规则和确定性代码负责。</p>
-                  <small data-studio-i18n="tiles.empty.truth">无自动 AI 调用 · 无示例结果回填</small>
+                <div class="tiles-empty-copy">
+                  <h2 id="studio-tiles-empty-title" data-studio-i18n="tiles.empty.title">把地形素材变成可编辑的地图</h2>
+                  <p data-studio-i18n="tiles.empty.body">确认地形素材和地图大小，然后开始编辑。不上传图片时使用内置默认素材。</p>
+                  <small data-studio-i18n="tiles.empty.truth">图块结构由本地规则生成，不会自动调用 AI。</small>
                 </div>
               </section>
 
@@ -1197,22 +1215,22 @@
                   <aside class="tiles-contract-card">
                     <span class="tiles-kicker">STRICT CONTRACT</span>
                     <h2 data-studio-i18n="tiles.contract.cardTitle">本地确定性角点网格</h2>
-                    <p data-studio-i18n="tiles.contract.cardBody">规则：corner_mask_16<br />逻辑格：32×32<br />Sprite cell：64×64<br />固定高度：24 px<br />调色板：最多 32 色<br />Provider 调用：0</p>
+                    <p data-studio-i18n="tiles.contract.cardBody">规则：corner_mask_16<br />逻辑格：32×32<br />Sprite cell：64×64<br />固定高度：24 px<br />调色板：最多 32 色</p>
                     <h3 data-studio-i18n="tiles.editor.methodTitle">编辑方式</h3>
                     <p data-studio-i18n="tiles.editor.methodBody">拖动单元格绘制/擦除矩形；<br />点击网格角点设置实心或空白。<br />所有操作都会进入本次构建绑定。</p>
                   </aside>
                   <aside id="studio-tiles-job-card" class="tiles-job-card tiles-phase-copy">
-                    <div data-tiles-copy-phase="building"><span id="studio-tiles-job-pill-building" class="tiles-job-pill">POST_PROCESSING</span><h2 data-studio-i18n="tiles.job.buildingTitle">后台正在构建严格图集</h2><p id="studio-tiles-job-building">Job：—<br />状态：queued<br />Provider 调用：0</p><small data-studio-i18n="tiles.job.buildingRecovery">等待当前 Job 完成；传输中断时只继续观察该 Job。</small></div>
-                    <div data-tiles-copy-phase="complete"><span id="studio-tiles-job-pill-complete" class="tiles-job-pill">DONE · PASS</span><h2 data-studio-i18n="tiles.job.completeTitle">验证与导出已就绪</h2><p id="studio-tiles-job-complete">Validation：—<br />LDtk：—<br />Import：—<br />Round-trip：—</p><small data-studio-i18n="tiles.job.completeRecovery">18 类证据与导出均绑定当前 Job。</small></div>
-                    <div data-tiles-copy-phase="stale"><span class="tiles-job-pill">STALE · REFERENCE ONLY</span><h2 data-studio-i18n="tiles.job.staleTitle">旧结果已锁定</h2><p id="studio-tiles-job-stale">旧绑定：—<br />当前输入：—</p><small data-studio-i18n="tiles.job.staleRecovery">按当前输入重新构建后，新的下载和证据才会解锁。</small></div>
+                    <div data-tiles-copy-phase="building"><span id="studio-tiles-job-pill-building" class="tiles-job-pill" data-studio-i18n="tiles.job.pill.building">构建中</span><h2 data-studio-i18n="tiles.job.buildingTitle">后台正在构建严格图集</h2><p id="studio-tiles-job-building">任务：—<br />状态：排队中</p><small data-studio-i18n="tiles.job.buildingRecovery">等待当前 Job 完成；传输中断时只继续观察该 Job。</small></div>
+                    <div data-tiles-copy-phase="complete"><span id="studio-tiles-job-pill-complete" class="tiles-job-pill" data-studio-i18n="tiles.job.pill.complete">已验证</span><h2 data-studio-i18n="tiles.job.completeTitle">验证与导出已就绪</h2><p id="studio-tiles-job-complete">Validation：—<br />LDtk：—<br />Import：—<br />Round-trip：—</p><small data-studio-i18n="tiles.job.completeRecovery">18 类证据与导出均绑定当前 Job。</small></div>
+                    <div data-tiles-copy-phase="stale"><span id="studio-tiles-job-pill-stale" class="tiles-job-pill" data-studio-i18n="tiles.job.pill.stale">需要重建</span><h2 data-studio-i18n="tiles.job.staleTitle">旧结果已锁定</h2><p id="studio-tiles-job-stale">旧绑定：—<br />当前输入：—</p><small data-studio-i18n="tiles.job.staleRecovery">按当前输入重新构建后，新的下载和证据才会解锁。</small></div>
                   </aside>
                 </div>
               </section>
 
               <section class="tiles-failed-panel" data-tiles-panel="failed" aria-labelledby="studio-tiles-failed-title">
-                <span id="studio-tiles-failed-status" class="tiles-error-pill">FAILED_POST_PROCESSING</span>
+                <span id="studio-tiles-failed-status" class="tiles-error-pill" data-studio-i18n="tiles.job.pill.failed">构建失败</span>
                 <h2 id="studio-tiles-failed-title" data-studio-i18n="tiles.failed.title">本地构建未完成</h2>
-                <p id="studio-tiles-failed-reason">原始原因：当前任务失败<br />Job：— · Provider 调用：0</p>
+                <p id="studio-tiles-failed-reason">原始原因：当前任务失败<br />任务：—</p>
                 <small data-studio-i18n="tiles.failed.recovery">当前输入和编辑操作仍保留；重新构建会创建一个新的 Job。</small>
               </section>
 
@@ -1260,12 +1278,36 @@
             </div>
 
             <footer class="tiles-output-dock">
-              <h2 id="studio-tiles-output-title"><span data-tiles-mode-copy="local" data-studio-i18n="tiles.output.localTitle">产物</span><span data-tiles-mode-copy="ai" data-studio-i18n="tiles.output.aiTitle">证据</span></h2>
+              <div class="tiles-output-intro">
+                <h2 id="studio-tiles-output-title"><span data-tiles-mode-copy="local" data-studio-i18n="tiles.output.localTitle">构建产物</span><span data-tiles-mode-copy="ai" data-studio-i18n="tiles.output.aiTitle">证据</span></h2>
+                <p class="tiles-output-lede" data-tiles-mode-copy="local" data-studio-i18n="tiles.output.localLede">完成构建并通过验证后，可在这里下载本次结果。</p>
+                <p class="tiles-output-lede" data-tiles-mode-copy="ai" data-studio-i18n="tiles.output.aiLede">评测证据只在当前 Job 产生后解锁，不会回填示例结果。</p>
+              </div>
               <div class="tiles-output-grid" data-tiles-output-mode="local">
-                <a id="studio-tiles-output-atlas" class="tiles-output-card" aria-disabled="true"><span>ATLAS</span><strong>strict_atlas.png</strong><small data-tiles-output-state>等待</small></a>
-                <a id="studio-tiles-output-map" class="tiles-output-card" aria-disabled="true"><span>MAP</span><strong>map_editor_preview.png</strong><small data-tiles-output-state>等待</small></a>
-                <a id="studio-tiles-output-tiled" class="tiles-output-card" aria-disabled="true"><span>TILED</span><strong>JSON + TSX</strong><small data-tiles-output-state>等待</small></a>
-                <a id="studio-tiles-output-pack" class="tiles-output-card" aria-disabled="true"><span>PACK</span><strong>release_demo_pack.zip</strong><small data-tiles-output-state>等待</small></a>
+                <a id="studio-tiles-output-atlas" class="tiles-output-card" aria-disabled="true">
+                  <strong class="tiles-output-name" data-studio-i18n="tiles.output.atlas.name">图块集</strong>
+                  <span class="tiles-output-purpose" data-studio-i18n="tiles.output.atlas.purpose">游戏地图使用的图块图片</span>
+                  <code class="tiles-output-file">strict_atlas.png</code>
+                  <small class="tiles-output-state" data-tiles-output-state>尚未构建</small>
+                </a>
+                <a id="studio-tiles-output-map" class="tiles-output-card" aria-disabled="true">
+                  <strong class="tiles-output-name" data-studio-i18n="tiles.output.map.name">地图预览</strong>
+                  <span class="tiles-output-purpose" data-studio-i18n="tiles.output.map.purpose">查看本次地图拼接效果</span>
+                  <code class="tiles-output-file">map_editor_preview.png</code>
+                  <small class="tiles-output-state" data-tiles-output-state>尚未构建</small>
+                </a>
+                <a id="studio-tiles-output-tiled" class="tiles-output-card" aria-disabled="true">
+                  <strong class="tiles-output-name" data-studio-i18n="tiles.output.tiled.name">地图工程文件</strong>
+                  <span class="tiles-output-purpose" data-studio-i18n="tiles.output.tiled.purpose">可在 Tiled 中继续编辑（两个文件）</span>
+                  <code class="tiles-output-file">tileset.tiled.json + tileset.tsx</code>
+                  <small class="tiles-output-state" data-tiles-output-state>尚未构建</small>
+                </a>
+                <a id="studio-tiles-output-pack" class="tiles-output-card" aria-disabled="true">
+                  <strong class="tiles-output-name" data-studio-i18n="tiles.output.pack.name">完整导出包</strong>
+                  <span class="tiles-output-purpose" data-studio-i18n="tiles.output.pack.purpose">汇总本次构建的可交付结果</span>
+                  <code class="tiles-output-file">release_demo_pack.zip</code>
+                  <small class="tiles-output-state" data-tiles-output-state>尚未构建</small>
+                </a>
               </div>
               <div class="tiles-output-grid tiles-ai-output-grid" data-tiles-output-mode="ai" hidden>
                 <a id="studio-tiles-output-plan" class="tiles-output-card" aria-disabled="true"><span>PLAN</span><strong>benchmark_plan.json</strong><small data-tiles-output-state>等待</small></a>
@@ -1273,7 +1315,7 @@
                 <a id="studio-tiles-output-notes" class="tiles-output-card" aria-disabled="true"><span>NOTES</span><strong>benchmark.md</strong><small data-tiles-output-state>等待</small></a>
               </div>
               <p id="studio-tiles-output-truth" class="tiles-dock-truth tiles-phase-copy">
-                <span data-tiles-copy-phase="empty" data-studio-i18n="tiles.output.truth.empty">构建完成前，所有产物入口保持锁定；完整清单共 18 类证据与导出。</span>
+                <span data-tiles-copy-phase="empty" data-studio-i18n="tiles.output.truth.empty">通过验证的构建完成后，再在这里下载。</span>
                 <span data-tiles-copy-phase="ready" data-studio-i18n="tiles.output.truth.ready">生成前保持锁定；预览只代表当前浏览器输入，不是后台构建结果。</span>
                 <span data-tiles-copy-phase="building" data-studio-i18n="tiles.output.truth.building">当前任务完成并通过绑定校验前，所有产物保持锁定。</span>
                 <span data-tiles-copy-phase="complete" data-studio-i18n="tiles.output.truth.complete">严格图集、地图预览、Tiled/LDtk 与已验证下载包均来自当前 Job；不回填历史产物。</span>
@@ -1296,7 +1338,8 @@
         data-studio-view="scene"
         data-scene-phase="empty"
         data-scene-mode="local"
-        data-design-source="figma:ro8w6TKkpd969zW2V5bmkx/650:3694,603:5380,946:4572,946:4702,946:4832,977:5069"
+        data-design-source="figma:ro8w6TKkpd969zW2V5bmkx/650:3694,946:4572,946:4702,946:4832,977:5069,1119:5324"
+        data-design-archive-inventory="figma:ro8w6TKkpd969zW2V5bmkx/603:5380"
         data-ux-design-source="figma:ro8w6TKkpd969zW2V5bmkx/997:6627,998:5286"
         hidden
       >
@@ -1310,7 +1353,7 @@
           <span class="topbar-spacer"></span>
           <button id="studio-scene-prompt-open" class="prompt-assistant-entry" type="button" aria-controls="studio-scene-prompt-drawer" aria-expanded="false" data-prompt-copy="entry" data-prompt-copy-aria="entry" data-design-source="figma:ro8w6TKkpd969zW2V5bmkx/977:5224">提示词助手</button>
           <span id="studio-scene-status" class="status-badge" data-state="idle" role="status" aria-live="polite" aria-atomic="true">待源图块</span>
-          <button id="studio-scene-export" class="button primary scene-export" type="button" disabled data-scene-copy="export">导出资源包</button>
+          <button id="studio-scene-export" class="button secondary scene-export" type="button" disabled data-scene-copy="export">导出资源包</button>
           <div class="scene-language-group" role="group" aria-label="界面语言" data-scene-copy-aria-label="languageLabel">
             <button id="studio-scene-language-zh" class="language-short scene-language is-current" type="button" data-scene-language="zh" aria-pressed="true">中文</button>
             <button id="studio-scene-language-en" class="language-short scene-language" type="button" data-scene-language="en" aria-pressed="false">EN</button>
@@ -1361,8 +1404,18 @@
                   <h2 id="studio-scene-live-title" data-scene-copy="liveSourceTitle">在线生成图块源</h2>
                 </div>
                 <label for="studio-scene-description"><span data-scene-copy="liveDescriptionLabel">场景描述</span><textarea id="studio-scene-description" rows="3" maxlength="1200" data-scene-copy-placeholder="liveDescriptionPlaceholder" placeholder="例如：低饱和苔藓石径、清晰像素块、俯视场景"></textarea></label>
-                <label for="studio-scene-candidates"><span data-scene-copy="candidateCount">候选数</span><input id="studio-scene-candidates" type="number" min="1" max="8" value="1" /></label>
-                <p id="studio-scene-provider-note" class="scene-provider-note" data-scene-copy="providerNote">使用“设置”中的共享 Provider；每个候选恰好一次调用。</p>
+                <label for="studio-scene-candidates"><span data-scene-copy="candidateCount">生成次数</span><select id="studio-scene-candidates">
+                  <option value="1" selected>1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                  <option value="4">4</option>
+                  <option value="5">5</option>
+                  <option value="6">6</option>
+                  <option value="7">7</option>
+                  <option value="8">8</option>
+                </select></label>
+                <p id="studio-scene-provider-note" class="scene-provider-note" data-scene-copy="providerNote">可选择 1 到 8 次。每次生成消耗 1 次原生 Gemini 调用。</p>
+                <p id="studio-scene-gemini-lock" class="scene-gemini-lock" hidden data-scene-copy="geminiUnavailable">原生 Gemini 不可用。在线生成已锁定；本地 PNG / WebP / JPEG 导入不受影响。</p>
                 <label class="scene-live-confirm"><input id="studio-scene-live-confirm" type="checkbox" /><span id="studio-scene-live-confirm-copy">我确认本次最多 1 次 Provider 调用</span></label>
               </section>
             </div>
@@ -1381,14 +1434,14 @@
             </section>
 
             <details id="studio-scene-advanced" class="scene-advanced-card">
-              <summary><span data-scene-copy="advancedTitle">高级 / 实验参数</span><small>style-snap · edge-condition</small></summary>
+              <summary><span data-scene-copy="advancedTitle">高级 / 实验参数</span><small data-scene-copy="advancedHint">调色板对齐 · 边缘条件</small></summary>
               <div class="scene-advanced-grid">
-                <label class="scene-check"><input id="studio-scene-style-snap" type="checkbox" data-scene-option="styleSnap" /><span data-scene-copy="styleSnap">Palette snap</span></label>
+                <label class="scene-check"><input id="studio-scene-style-snap" type="checkbox" data-scene-option="styleSnap" /><span data-scene-copy="styleSnap">调色板对齐</span></label>
                 <label><span data-scene-copy="maxColors">最大颜色数</span><input id="studio-scene-style-max-colors" type="number" min="1" max="64" value="16" data-scene-option="styleMaxColors" /></label>
-                <label class="scene-check"><input id="studio-scene-edge-condition" type="checkbox" data-scene-option="edgeCondition" /><span data-scene-copy="edgeCondition">Edge condition</span></label>
+                <label class="scene-check"><input id="studio-scene-edge-condition" type="checkbox" data-scene-option="edgeCondition" /><span data-scene-copy="edgeCondition">边缘条件</span></label>
                 <label><span data-scene-copy="edgeBand">边缘带</span><input id="studio-scene-edge-band" type="number" min="1" max="8" value="3" data-scene-option="edgeBand" /></label>
-                <label><span data-scene-copy="edgeMode">模式</span><select id="studio-scene-edge-mode" data-scene-option="edgeConditionMode"><option value="edge-aware-v1">edge-aware-v1</option><option value="global-v0">global-v0</option></select></label>
-                <label><span data-scene-copy="rawPolicy">原始图块策略</span><select id="studio-scene-raw-policy" data-scene-option="rawTilePolicy"><option value="warn">warn</option><option value="strict">strict</option></select></label>
+                <label><span data-scene-copy="edgeMode">模式</span><select id="studio-scene-edge-mode" data-scene-option="edgeConditionMode"><option value="edge-aware-v1" data-scene-copy="edgeModeAware">边缘感知 v1</option><option value="global-v0" data-scene-copy="edgeModeGlobal">全局 v0</option></select></label>
+                <label><span data-scene-copy="rawPolicy">原始图块策略</span><select id="studio-scene-raw-policy" data-scene-option="rawTilePolicy"><option value="warn" data-scene-copy="rawPolicyWarn">警告</option><option value="strict" data-scene-copy="rawPolicyStrict">严格</option></select></label>
               </div>
             </details>
 
@@ -1399,7 +1452,7 @@
             </section>
 
             <p id="studio-scene-error" class="scene-control-error" role="alert" hidden></p>
-            <button id="studio-scene-primary" class="button primary scene-primary" type="button" disabled>开始导入并质检</button>
+            <button id="studio-scene-primary" class="button primary studio-module-cta scene-primary" type="button" disabled>开始导入并质检</button>
           </aside>
 
           <section class="scene-stage" aria-labelledby="studio-scene-stage-title">
@@ -1487,7 +1540,6 @@
             <button class="button secondary" type="button" data-prompt-kind="scene" data-prompt-action="reset" data-prompt-copy="reset">重置</button>
           </div>
           <p id="studio-scene-prompt-live" class="prompt-assistant-live" role="status" aria-live="polite"></p>
-          <button id="studio-scene-prompt-character" class="button secondary prompt-assistant-secondary" type="button" data-prompt-copy="goCharacter">前往角色助手</button>
           <button class="button secondary prompt-assistant-close" type="button" data-prompt-kind="scene" data-prompt-action="close" data-prompt-copy="close">关闭</button>
         </section>
       </div>
@@ -1506,7 +1558,7 @@
           <span class="crumb" data-project-copy="headerCrumb">· 合成</span>
           <span class="topbar-spacer"></span>
           <span id="studio-project-status" class="status-badge" data-state="idle" role="status" aria-live="polite" aria-atomic="true">等待输入</span>
-          <a id="studio-project-export" class="button primary project-export" aria-disabled="true" data-project-copy="export">下载项目包</a>
+          <a id="studio-project-export" class="button secondary project-export" aria-disabled="true" data-project-copy="export">下载项目包</a>
           <div class="project-language-group" role="group" aria-label="界面语言" data-project-copy-aria-label="languageLabel">
             <button class="language-short project-language is-current" type="button" data-project-language="zh" aria-pressed="true">中文</button>
             <button class="language-short project-language" type="button" data-project-language="en" aria-pressed="false">EN</button>
@@ -1558,7 +1610,7 @@
             </section>
 
             <p id="studio-project-error" class="project-control-error" role="alert" hidden></p>
-            <button id="studio-project-primary" class="button primary project-primary" type="button" disabled data-studio-server-required data-project-copy="build">生成项目包</button>
+            <button id="studio-project-primary" class="button primary studio-module-cta project-primary" type="button" disabled data-studio-server-required data-project-copy="build">生成项目包</button>
           </aside>
 
           <section class="project-stage" aria-label="项目包合成舞台" data-project-copy-aria-label="stageLabel">
@@ -1745,19 +1797,18 @@
         data-studio-view="character"
         data-character-phase="setup"
         data-character-mode="local"
-        data-design-source="figma:ro8w6TKkpd969zW2V5bmkx/655:3697,660:3702,683:3795,663:3707,665:3716,667:3725,668:3736,701:4864,702:3936,709:4274,704:4036,706:4136,711:4369,971:4596,971:4831,971:5066,971:5301,971:6230,971:7159,971:8101,971:9023"
-        data-ux-design-source="figma:ro8w6TKkpd969zW2V5bmkx/996:5125,996:5274"
+        data-design-source="figma:ro8w6TKkpd969zW2V5bmkx/655:3697,660:3702,683:3795,683:4017,1449:4733,1450:4953,1450:6394,1452:5091,1452:5453,663:3707,665:3716,667:3725,668:3736,701:4864,702:3936,709:4274,704:4036,706:4136,711:4369,971:4596,971:9023"
+        data-design-inventory="figma:ro8w6TKkpd969zW2V5bmkx/971:4831,971:5066"
+        data-ux-design-source="figma:ro8w6TKkpd969zW2V5bmkx/996:5125"
       >
         <header class="topbar character-topbar">
           <strong data-studio-i18n="character.headerTitle">角色工作室</strong>
           <span id="character-header-crumb" class="crumb" data-studio-i18n="character.headerCrumb">· 严格审阅</span>
           <button id="character-local-entry" class="workspace-tab is-active" type="button" aria-pressed="true" data-studio-i18n="character.localEntry">本地导入</button>
           <button id="character-ai-entry" class="workspace-tab" type="button" aria-pressed="false" data-studio-i18n="character.aiEntry">AI 生成</button>
-          <button id="character-compat-entry" class="workspace-tab" type="button" aria-pressed="false" data-character-compat-copy="entry">高级兼容</button>
           <span class="topbar-spacer"></span>
-          <button id="studio-character-prompt-open" class="prompt-assistant-entry" type="button" aria-controls="studio-character-prompt-drawer" aria-expanded="false" data-prompt-copy="entry" data-prompt-copy-aria="entry" data-design-source="figma:ro8w6TKkpd969zW2V5bmkx/975:5104">提示词助手</button>
-          <span id="character-top-status" class="status-badge" data-state="idle" role="status" aria-live="polite" aria-atomic="true" data-studio-i18n="character.statusReviewPending">review_pending · 0 次调用</span>
-          <a id="character-export-link" class="button primary character-export" aria-disabled="true" data-studio-i18n="character.exportLocked">接受后可导出</a>
+          <span id="character-top-status" class="status-badge" data-state="idle" role="status" aria-live="polite" aria-atomic="true" data-studio-i18n="character.statusReviewPending">尚未审阅 · 0 次调用</span>
+          <a id="character-export-link" class="button secondary character-export" aria-disabled="true" data-studio-i18n="character.exportLocked">处理完成后可导出</a>
           <div class="character-language-group" role="group" aria-label="界面语言" data-studio-i18n-aria-label="settings.language.label">
             <button class="language-short character-language is-current" type="button" data-character-language="zh" aria-pressed="true">中文</button>
             <button class="language-short character-language" type="button" data-character-language="en" aria-pressed="false">EN</button>
@@ -1765,23 +1816,19 @@
         </header>
 
         <main id="character-local-workspace" class="character-local-workspace" data-character-local-phase="empty">
-          <aside class="character-local-panel" aria-labelledby="character-local-flow-title">
-            <header class="character-local-flow-header">
-              <span class="eyebrow" data-character-local-copy="flowEyebrow">当前流程</span>
-              <h1 id="character-local-flow-title" tabindex="-1" data-character-local-copy="flowTitle">本地精灵表导入</h1>
-              <p data-character-local-copy="flowSummary">上传一张 PNG 或 WebP 精灵表，运行仓库维护中的本地质量管线。</p>
-            </header>
+          <aside class="character-local-panel" aria-labelledby="character-workspace-title">
+            <h1 id="character-workspace-title" class="character-workspace-title" tabindex="-1" data-studio-i18n="character.headerTitle">角色工作室</h1>
 
-            <section class="character-local-source" aria-labelledby="character-local-source-title">
+            <section class="character-local-source" data-character-source="local" aria-labelledby="character-local-source-title">
               <header>
                 <h2 id="character-local-source-title" data-character-local-copy="sourceTitle">精灵表</h2>
-                <span data-character-local-copy="sourceHint">PNG / WebP · 最大 32 MiB</span>
+                <span data-character-local-copy="sourceHint">PNG / WebP / JPEG · 最大 32 MiB</span>
               </header>
               <input id="character-local-file" class="character-local-file" type="file" accept="image/png,image/webp,image/jpeg,.png,.webp,.jpg,.jpeg" data-studio-server-required />
               <label id="character-local-source-empty" class="character-local-drop" for="character-local-file">
                 <span class="character-local-drop-icon" aria-hidden="true">＋</span>
                 <strong data-character-local-copy="sourceDrop">选择精灵表</strong>
-                <small data-character-local-copy="sourceDropHelp">处理使用锁定的标准 RPG 8 × 8 布局。</small>
+                <small data-character-local-copy="sourceDropHelp">在下方选择维护中的 8 × 8 或固定区域布局。</small>
               </label>
               <article id="character-local-source-selected" class="character-local-source-card" hidden>
                 <img id="character-local-source-preview" alt="" />
@@ -1797,61 +1844,184 @@
               </article>
             </section>
 
-            <section class="character-local-profile" aria-labelledby="character-local-profile-title">
-              <span class="eyebrow" data-character-local-copy="profileTitle">智能默认</span>
-              <h2 id="character-local-profile-title" data-character-local-copy="profileName">标准 RPG 俯视 · 8 × 8</h2>
+            <section id="character-ai-workspace" class="character-ai-source" data-character-source="ai" aria-labelledby="character-flow-title">
+              <header>
+                <h2 id="character-flow-title" tabindex="-1" data-studio-i18n="character.aiSourceTitle">AI 生成角色</h2>
+                <span data-studio-i18n="character.aiSourceHint">描述角色，确认后生成源图</span>
+              </header>
+              <form id="character-ai-form" class="character-ai-form" data-character-source="ai" novalidate>
+                <div class="character-prompt-field">
+                  <span id="character-model-label" data-studio-i18n="character.modelLabel">模型</span>
+                  <div class="character-ai-combobox">
+                    <select id="character-model" hidden tabindex="-1" aria-hidden="true" disabled>
+                      <option value="" data-studio-i18n="character.modelChecking">正在检查可用模型…</option>
+                    </select>
+                    <div id="character-model-trigger" class="character-ai-combobox-trigger" role="combobox" tabindex="-1" aria-disabled="true" aria-autocomplete="none" aria-haspopup="listbox" aria-expanded="false" aria-controls="character-model-list" aria-labelledby="character-model-label character-model-value">
+                      <span id="character-model-value" class="character-ai-combobox-value" data-studio-i18n="character.modelChecking">正在检查可用模型…</span>
+                      <span class="character-ai-combobox-caret" aria-hidden="true"><svg viewBox="0 0 20 20" width="14" height="14" focusable="false" aria-hidden="true"><path d="M5 8l5 5 5-5" fill="none" stroke="#94a3b8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                    </div>
+                    <ul id="character-model-list" class="character-ai-combobox-list" role="listbox" hidden aria-labelledby="character-model-label"></ul>
+                  </div>
+                </div>
+                <div class="character-prompt-field">
+                  <span id="character-preset-label" data-studio-i18n="character.presetLabel">角色类型</span>
+                  <div class="character-ai-combobox">
+                    <select id="character-preset" hidden tabindex="-1" aria-hidden="true">
+                      <option value="rpg_humanoid_v0" selected data-studio-i18n="character.presetRpg">RPG 人形</option>
+                      <option value="animal_companion_v0" data-studio-i18n="character.presetAnimal">动物伙伴</option>
+                      <option value="monster_creature_v0" data-studio-i18n="character.presetMonster">魔物生物</option>
+                      <option value="xianxia_hero_v0" data-studio-i18n="character.presetXianxia">仙侠角色</option>
+                      <option value="chibi_big_pixel_v0" data-studio-i18n="character.presetChibi">大像素 Q 版</option>
+                    </select>
+                    <div id="character-preset-trigger" class="character-ai-combobox-trigger" role="combobox" tabindex="0" aria-autocomplete="none" aria-haspopup="listbox" aria-expanded="false" aria-controls="character-preset-list" aria-labelledby="character-preset-label character-preset-value">
+                      <span id="character-preset-value" class="character-ai-combobox-value" data-studio-i18n="character.presetRpg">RPG 人形</span>
+                      <span class="character-ai-combobox-caret" aria-hidden="true"><svg viewBox="0 0 20 20" width="14" height="14" focusable="false" aria-hidden="true"><path d="M5 8l5 5 5-5" fill="none" stroke="#94a3b8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                    </div>
+                    <ul id="character-preset-list" class="character-ai-combobox-list" role="listbox" hidden aria-labelledby="character-preset-label">
+                      <li id="character-preset-option-rpg_humanoid_v0" role="option" data-value="rpg_humanoid_v0" aria-selected="true" data-studio-i18n="character.presetRpg">RPG 人形</li>
+                      <li id="character-preset-option-animal_companion_v0" role="option" data-value="animal_companion_v0" aria-selected="false" data-studio-i18n="character.presetAnimal">动物伙伴</li>
+                      <li id="character-preset-option-monster_creature_v0" role="option" data-value="monster_creature_v0" aria-selected="false" data-studio-i18n="character.presetMonster">魔物生物</li>
+                      <li id="character-preset-option-xianxia_hero_v0" role="option" data-value="xianxia_hero_v0" aria-selected="false" data-studio-i18n="character.presetXianxia">仙侠角色</li>
+                      <li id="character-preset-option-chibi_big_pixel_v0" role="option" data-value="chibi_big_pixel_v0" aria-selected="false" data-studio-i18n="character.presetChibi">大像素 Q 版</li>
+                    </ul>
+                  </div>
+                </div>
+                <label class="character-prompt-field" for="character-description">
+                  <span data-studio-i18n="character.descriptionLabel">角色概念</span>
+                  <textarea id="character-description" rows="3" required aria-required="true" aria-describedby="character-description-error" data-studio-i18n-placeholder="character.descriptionPlaceholder" placeholder="例如：一名铜发游侠，绿色外套，清晰像素轮廓"></textarea>
+                  <p id="character-description-error" class="character-ai-ref-error" role="alert" hidden></p>
+                </label>
+                <div class="character-prompt-field character-ai-ref-mode">
+                  <span id="character-reference-mode-label" data-studio-i18n="character.referenceModeLabel">参考方式</span>
+                  <div class="character-ai-combobox">
+                    <select id="character-reference-mode" hidden tabindex="-1" aria-hidden="true">
+                      <option value="builtin" selected data-studio-i18n="character.referenceModeBuiltin">内置动作模板（默认）</option>
+                      <option value="custom" data-studio-i18n="character.referenceModeCustom">内置动作模板 + 外观/配色参考</option>
+                    </select>
+                    <div id="character-reference-mode-trigger" class="character-ai-combobox-trigger" role="combobox" tabindex="0" aria-autocomplete="none" aria-haspopup="listbox" aria-expanded="false" aria-controls="character-reference-mode-list" aria-labelledby="character-reference-mode-label character-reference-mode-value" aria-describedby="character-reference-mode-help character-reference-mode-error">
+                      <span id="character-reference-mode-value" class="character-ai-combobox-value" data-studio-i18n="character.referenceModeBuiltin">内置动作模板（默认）</span>
+                      <span class="character-ai-combobox-caret" aria-hidden="true"><svg viewBox="0 0 20 20" width="14" height="14" focusable="false" aria-hidden="true"><path d="M5 8l5 5 5-5" fill="none" stroke="#94a3b8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                    </div>
+                    <ul id="character-reference-mode-list" class="character-ai-combobox-list" role="listbox" hidden aria-labelledby="character-reference-mode-label">
+                      <li id="character-reference-mode-option-builtin" role="option" data-value="builtin" aria-selected="true" data-studio-i18n="character.referenceModeBuiltin">内置动作模板（默认）</li>
+                      <li id="character-reference-mode-option-custom" role="option" data-value="custom" aria-selected="false" data-studio-i18n="character.referenceModeCustom">内置动作模板 + 外观/配色参考</li>
+                    </ul>
+                  </div>
+                  <small id="character-reference-mode-help" data-studio-i18n="character.referenceModeBuiltinHelp">无需上传。动作与排布由内置模板决定，角色类型与概念决定外观。</small>
+                  <p id="character-reference-mode-error" class="character-ai-ref-error" role="alert" hidden></p>
+                </div>
+                <div id="character-ai-refs" class="character-ai-refs" hidden>
+                  <div class="character-ai-ref" data-character-ref="reference">
+                    <span id="character-reference-label" data-studio-i18n="character.referenceLabel">角色参考</span>
+                    <input id="character-reference-file" class="character-local-file" type="file" accept="image/png,image/webp,image/jpeg,.png,.webp,.jpg,.jpeg" aria-labelledby="character-reference-label" aria-describedby="character-reference-error" />
+                    <label id="character-reference-empty" class="character-ai-ref-empty" for="character-reference-file">
+                      <span class="character-local-drop-icon" aria-hidden="true">＋</span>
+                      <strong data-studio-i18n="character.referenceChoose">添加参考图</strong>
+                    </label>
+                    <article id="character-reference-selected" class="character-ai-ref-card" hidden>
+                      <img id="character-reference-preview" alt="" data-studio-i18n-alt="character.referenceImageAlt" />
+                      <div>
+                        <strong id="character-reference-name">—</strong>
+                        <span id="character-reference-meta">—</span>
+                      </div>
+                      <nav aria-label="角色参考操作" data-studio-i18n-aria-label="character.referenceActionsAria">
+                        <label class="character-local-source-action" for="character-reference-file" data-studio-i18n="character.referenceReplace">替换</label>
+                        <button id="character-reference-clear" class="character-local-source-action" type="button" data-studio-i18n="character.referenceClear">清除</button>
+                      </nav>
+                    </article>
+                    <p id="character-reference-error" class="character-ai-ref-error" role="alert" hidden></p>
+                  </div>
+                  <div class="character-ai-ref" data-character-ref="palette">
+                    <span id="character-palette-label" data-studio-i18n="character.paletteLabel">配色参考</span>
+                    <input id="character-palette-file" class="character-local-file" type="file" accept="image/png,image/webp,image/jpeg,.png,.webp,.jpg,.jpeg" aria-labelledby="character-palette-label" aria-describedby="character-palette-error" />
+                    <label id="character-palette-empty" class="character-ai-ref-empty" for="character-palette-file">
+                      <span class="character-local-drop-icon" aria-hidden="true">＋</span>
+                      <strong data-studio-i18n="character.paletteChoose">添加配色图</strong>
+                    </label>
+                    <article id="character-palette-selected" class="character-ai-ref-card" hidden>
+                      <img id="character-palette-preview" alt="" data-studio-i18n-alt="character.paletteImageAlt" />
+                      <div>
+                        <strong id="character-palette-name">—</strong>
+                        <span id="character-palette-meta">—</span>
+                      </div>
+                      <nav aria-label="配色参考操作" data-studio-i18n-aria-label="character.paletteActionsAria">
+                        <label class="character-local-source-action" for="character-palette-file" data-studio-i18n="character.paletteReplace">替换</label>
+                        <button id="character-palette-clear" class="character-local-source-action" type="button" data-studio-i18n="character.paletteClear">清除</button>
+                      </nav>
+                    </article>
+                    <p id="character-palette-error" class="character-ai-ref-error" role="alert" hidden></p>
+                  </div>
+                </div>
+                <details class="character-ai-advanced">
+                  <summary data-studio-i18n="character.advancedToggle">高级</summary>
+                  <label class="character-prompt-field" for="character-seed">
+                    <span data-studio-i18n="character.seedLabel">种子</span>
+                    <input id="character-seed" type="number" step="1" inputmode="numeric" autocomplete="off" aria-describedby="character-seed-error" data-studio-i18n-placeholder="character.seedPlaceholder" placeholder="可选，用于复现同一次结果" />
+                    <p id="character-seed-error" class="character-ai-ref-error" role="alert" hidden></p>
+                  </label>
+                </details>
+              </form>
+              <button id="character-regenerate-action" class="button secondary character-regenerate-action" type="button" hidden data-studio-i18n="character.regenerateAction">准备生成另一张</button>
+              <p id="character-replace-help" class="character-ai-replace-help" hidden data-studio-i18n="character.reviewDescriptionHelp">修改描述只会准备一张新图，不会改变当前图片；下一次在线调用仍需确认。</p>
+              <p id="character-ai-gemini" class="character-ai-gemini" hidden data-studio-i18n="character.geminiEligibility">请先在设置中配置生成会话。</p>
+            </section>
+
+            <section id="character-sealed-input" class="character-sealed-input character-ai-only" hidden aria-hidden="true" aria-labelledby="character-sealed-input-title">
+              <header>
+                <div>
+                  <span class="eyebrow" data-studio-i18n="character.sealedInputKicker">生成依据</span>
+                  <h2 id="character-sealed-input-title" data-studio-i18n="character.sealedInputTitle">生成输入（已封存）</h2>
+                </div>
+                <span class="character-sealed-input-state" data-studio-i18n="character.sealedInputState">只读</span>
+              </header>
+              <div class="character-sealed-input-row">
+                <strong data-studio-i18n="character.sealedPositiveLabel">正向描述</strong>
+                <p id="character-sealed-description">—</p>
+              </div>
+              <div class="character-sealed-input-row">
+                <strong data-studio-i18n="character.sealedNegativeLabel">内置负面约束</strong>
+                <p data-studio-i18n="character.sealedNegativeSummary">系统已封存布局、背景、解剖、额外角色、文字水印及未明确要求的道具限制。</p>
+                <small data-studio-i18n="character.sealedNegativeHelp">这不是可编辑的第二个提示词；完整规则以封存提示词为准。</small>
+              </div>
+              <a id="character-sealed-prompt-link" class="character-sealed-prompt-link" target="_blank" rel="noopener" hidden data-studio-i18n="character.sealedPromptAction">查看完整提示词</a>
+            </section>
+
+            <section class="character-local-profile" data-character-processing-controls aria-labelledby="character-local-profile-title">
+              <span class="eyebrow" data-character-local-copy="profileTitle">当前参数</span>
+              <h2 id="character-local-profile-title" data-character-local-copy="profileName">固定区域动作源图</h2>
               <label for="character-local-name">
                 <span data-character-local-copy="resourceName">资源名称</span>
                 <input id="character-local-name" type="text" maxlength="64" autocomplete="off" data-studio-server-required />
               </label>
-              <div class="character-local-default-chips" aria-label="锁定的处理默认值" data-character-local-aria="defaultsAria">
+              <div class="character-local-default-chips" hidden aria-label="锁定的处理默认值" data-character-local-aria="defaultsAria">
                 <span data-character-local-copy="defaultCell">单元格 · 自动</span>
                 <span data-character-local-copy="defaultFps">FPS · 由每个动画定义</span>
                 <span data-character-local-copy="defaultMatte">Matte · 自动</span>
               </div>
             </section>
 
-            <details class="character-local-advanced">
-              <summary data-character-local-copy="advanced">高级默认值</summary>
-              <p data-character-local-copy="advancedHelp">下列维护中默认值会原样提交，不存在由隐藏控件覆盖的参数。</p>
-              <ul>
-                <li data-character-local-copy="advancedCleanup">清理 · 开 · 最小 Alpha 18 · 最小面积 4</li>
-                <li data-character-local-copy="advancedAnchor">锚点 · (0, 0) · 无逐帧调整</li>
-                <li data-character-local-copy="advancedMotion">自动校正 · 开 · 稳定处理 · 开 · 最大位移 2</li>
-                <li data-character-local-copy="advancedExport">尺寸 · 1× / 2× · 像素精修关闭</li>
-              </ul>
-            </details>
-
-            <button id="character-advanced-entry" class="character-advanced-entry" type="button" aria-controls="character-advanced-config character-advanced-calibration character-advanced-cuts" aria-expanded="false" data-character-advanced-copy="advancedMode">
-              高级处理
-            </button>
-            <p id="character-advanced-entry-help" class="character-advanced-entry-help" data-character-advanced-copy="advancedModeHelp">
-              JPEG、固定区域布局、黑底配对、校准、切线及维护中的高级参数。
-            </p>
-
-            <p id="character-local-error" class="character-local-error" role="alert" hidden></p>
-            <button id="character-local-primary" class="button primary character-local-primary" type="button" data-action="blocked" data-studio-server-required disabled>开始处理</button>
-          </aside>
-
-          <section id="character-advanced-config" class="character-advanced-overlay character-advanced-config" hidden aria-labelledby="character-advanced-title">
-            <header class="character-advanced-header">
-              <div>
-                <span class="eyebrow" data-character-advanced-copy="advancedConfigKicker">高级处理 · 当前输入绑定</span>
-                <h2 id="character-advanced-title" tabindex="-1" data-character-advanced-copy="advancedConfigTitle">高级本地配置</h2>
-                <p data-character-advanced-copy="advancedConfigHelp">更换文件或参数会立即撤销旧任务、导出和 Project candidate。</p>
-              </div>
-              <button id="character-advanced-close" type="button" aria-label="关闭高级面板" data-character-advanced-aria="advancedClose">×</button>
+          <section id="character-advanced-config" class="character-advanced-config" data-character-processing-controls aria-labelledby="character-advanced-title">
+            <header class="character-advanced-inline-header">
+              <h2 id="character-advanced-title" tabindex="-1" data-studio-i18n="character.processingTitle">处理参数</h2>
+              <p id="character-processing-shared-help" data-studio-i18n="character.processingSharedHelp">这些参数描述当前模式真正会使用的处理合同。</p>
             </header>
 
+            <form id="character-local-advanced-form" class="character-local-advanced-form" data-character-processing="shared">
+            <p class="character-local-processing-help" data-character-advanced-copy="advancedConfigHelp">更换文件或参数会立即撤销旧任务、导出和 Project candidate。</p>
             <div class="character-advanced-scroll">
               <fieldset>
-                <legend data-character-advanced-copy="advancedSourceLayout">源布局</legend>
-                <label><span data-character-advanced-copy="advancedSourceLayout">源布局</span>
-                  <select id="character-advanced-layout">
+                <legend id="character-advanced-layout-label" data-character-advanced-copy="advancedSourceLayout">源布局</legend>
+                <div class="character-ai-combobox">
+                  <select id="character-advanced-layout" hidden tabindex="-1" aria-hidden="true" data-character-advanced-aria="advancedSourceLayout">
                     <option value="topdown_rpg_v0" data-character-advanced-copy="advancedLayoutTopdown">标准 RPG · 8 × 8</option>
-                    <option value="fixed_region_motion_v0" data-character-advanced-copy="advancedLayoutFixed">固定区域动作源图</option>
+                    <option value="fixed_region_motion_v0" data-character-advanced-copy="advancedLayoutFixed" selected>固定区域动作源图</option>
                   </select>
-                </label>
+                  <div id="character-advanced-layout-trigger" class="character-ai-combobox-trigger" role="combobox" tabindex="0" aria-autocomplete="none" aria-haspopup="listbox" aria-expanded="false" aria-controls="character-advanced-layout-list" aria-labelledby="character-advanced-layout-label character-advanced-layout-value">
+                    <span id="character-advanced-layout-value" class="character-ai-combobox-value" data-character-advanced-copy="advancedLayoutFixed">固定区域动作源图</span>
+                    <span class="character-ai-combobox-caret" aria-hidden="true"><svg viewBox="0 0 20 20" width="14" height="14" focusable="false" aria-hidden="true"><path d="M5 8l5 5 5-5" fill="none" stroke="#94a3b8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                  </div>
+                  <ul id="character-advanced-layout-list" class="character-ai-combobox-list" role="listbox" hidden aria-labelledby="character-advanced-layout-label"></ul>
+                </div>
                 <div class="character-advanced-matte">
                   <input id="character-advanced-black-file" class="character-local-file" type="file" accept="image/png,image/webp,image/jpeg,.png,.webp,.jpg,.jpeg" />
                   <label for="character-advanced-black-file" data-character-advanced-copy="advancedBlackChoose">选择同尺寸黑底图</label>
@@ -1863,24 +2033,48 @@
               <fieldset>
                 <legend data-character-advanced-copy="advancedBackground">背景与清理</legend>
                 <div class="character-advanced-grid">
-                  <label><span data-character-advanced-copy="advancedBackgroundMode">背景模式</span>
-                    <select id="character-advanced-background-mode">
-                      <option value="auto">auto</option><option value="flood">solid flood</option><option value="edge_palette">edge palette</option><option value="alpha">transparent alpha</option><option value="dual_matte">dual matte</option>
-                    </select>
-                  </label>
+                  <div class="character-advanced-field"><span id="character-advanced-background-mode-label" data-character-advanced-copy="advancedBackgroundMode">背景模式</span>
+                    <div class="character-ai-combobox">
+                      <select id="character-advanced-background-mode" hidden tabindex="-1" aria-hidden="true">
+                        <option value="auto" data-character-advanced-copy="advancedBackgroundAuto">自动检测</option>
+                        <option value="flood" data-character-advanced-copy="advancedBackgroundFlood">纯色连通去背</option>
+                        <option value="edge_palette" data-character-advanced-copy="advancedBackgroundEdgePalette">边缘取色去背</option>
+                        <option value="alpha" data-character-advanced-copy="advancedBackgroundAlpha">透明通道清理</option>
+                        <option value="dual_matte" data-character-advanced-copy="advancedBackgroundDualMatte">黑白底配对</option>
+                      </select>
+                      <div id="character-advanced-background-mode-trigger" class="character-ai-combobox-trigger" role="combobox" tabindex="0" aria-autocomplete="none" aria-haspopup="listbox" aria-expanded="false" aria-controls="character-advanced-background-mode-list" aria-labelledby="character-advanced-background-mode-label character-advanced-background-mode-value">
+                        <span id="character-advanced-background-mode-value" class="character-ai-combobox-value" data-character-advanced-copy="advancedBackgroundAuto">自动检测</span>
+                        <span class="character-ai-combobox-caret" aria-hidden="true"><svg viewBox="0 0 20 20" width="14" height="14" focusable="false" aria-hidden="true"><path d="M5 8l5 5 5-5" fill="none" stroke="#94a3b8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                      </div>
+                      <ul id="character-advanced-background-mode-list" class="character-ai-combobox-list" role="listbox" hidden aria-labelledby="character-advanced-background-mode-label"></ul>
+                    </div>
+                  </div>
                   <label><span data-character-advanced-copy="advancedTolerance">容差</span><input id="character-advanced-tolerance" type="number" min="0" max="80" step="1" value="24" /></label>
                   <label><span data-character-advanced-copy="advancedMinAlpha">最小 Alpha</span><input id="character-advanced-min-alpha" type="number" min="0" max="80" step="1" value="18" /></label>
                   <label><span data-character-advanced-copy="advancedMinArea">最小面积</span><input id="character-advanced-min-area" type="number" min="1" max="64" step="1" value="4" /></label>
                   <label><span data-character-advanced-copy="advancedMinAreaRatio">最小面积比例</span><input id="character-advanced-min-area-ratio" type="number" min="0" max="0.25" step="0.01" value="0" /></label>
                 </div>
                 <div class="character-advanced-checks">
-                  <label><input id="character-advanced-component-cleanup" type="checkbox" checked /><span data-character-advanced-copy="advancedCleanupToggle">组件清理</span></label>
-                  <label><input id="character-advanced-pixel-finishing" type="checkbox" /><span data-character-advanced-copy="advancedPixel">像素精修</span></label>
-                  <label><input id="character-advanced-outline" type="checkbox" checked /><span data-character-advanced-copy="advancedOutline">描边</span></label>
+                  <label><input id="character-advanced-component-cleanup" class="studio-checkbox" type="checkbox" checked /><span data-character-advanced-copy="advancedCleanupToggle">组件清理</span></label>
+                  <label><input id="character-advanced-pixel-finishing" class="studio-checkbox" type="checkbox" /><span data-character-advanced-copy="advancedPixel">像素精修</span></label>
+                  <label><input id="character-advanced-outline" class="studio-checkbox" type="checkbox" checked /><span data-character-advanced-copy="advancedOutline">描边</span></label>
                 </div>
                 <div class="character-advanced-grid">
                   <label><span data-character-advanced-copy="advancedMaxColors">最大颜色数</span><input id="character-advanced-max-colors" type="number" min="2" max="64" step="1" value="16" /></label>
-                  <label><span data-character-advanced-copy="advancedOutlineMode">描边模式</span><select id="character-advanced-outline-mode"><option value="outer">outer</option><option value="inner">inner</option><option value="both">both</option></select></label>
+                  <div class="character-advanced-field"><span id="character-advanced-outline-mode-label" data-character-advanced-copy="advancedOutlineMode">描边模式</span>
+                    <div class="character-ai-combobox">
+                      <select id="character-advanced-outline-mode" hidden tabindex="-1" aria-hidden="true">
+                        <option value="outer" data-character-advanced-copy="advancedOutlineOuter">外描边</option>
+                        <option value="inner" data-character-advanced-copy="advancedOutlineInner">内描边</option>
+                        <option value="both" data-character-advanced-copy="advancedOutlineBoth">内外描边</option>
+                      </select>
+                      <div id="character-advanced-outline-mode-trigger" class="character-ai-combobox-trigger" role="combobox" tabindex="0" aria-autocomplete="none" aria-haspopup="listbox" aria-expanded="false" aria-controls="character-advanced-outline-mode-list" aria-labelledby="character-advanced-outline-mode-label character-advanced-outline-mode-value">
+                        <span id="character-advanced-outline-mode-value" class="character-ai-combobox-value" data-character-advanced-copy="advancedOutlineOuter">外描边</span>
+                        <span class="character-ai-combobox-caret" aria-hidden="true"><svg viewBox="0 0 20 20" width="14" height="14" focusable="false" aria-hidden="true"><path d="M5 8l5 5 5-5" fill="none" stroke="#94a3b8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                      </div>
+                      <ul id="character-advanced-outline-mode-list" class="character-ai-combobox-list" role="listbox" hidden aria-labelledby="character-advanced-outline-mode-label"></ul>
+                    </div>
+                  </div>
                 </div>
               </fieldset>
 
@@ -1889,7 +2083,16 @@
                 <div class="character-advanced-grid">
                   <label><span data-character-advanced-copy="advancedAnchorX">锚点 X</span><input id="character-advanced-anchor-x" type="number" min="-16" max="16" step="1" value="0" /></label>
                   <label><span data-character-advanced-copy="advancedAnchorY">锚点 Y</span><input id="character-advanced-anchor-y" type="number" min="-16" max="16" step="1" value="0" /></label>
-                  <label><span data-character-advanced-copy="advancedFrame">帧</span><select id="character-advanced-frame"></select></label>
+                  <div class="character-advanced-field"><span id="character-advanced-frame-label" data-character-advanced-copy="advancedFrame">帧</span>
+                    <div class="character-ai-combobox">
+                      <select id="character-advanced-frame" hidden tabindex="-1" aria-hidden="true"></select>
+                      <div id="character-advanced-frame-trigger" class="character-ai-combobox-trigger" role="combobox" tabindex="0" aria-autocomplete="none" aria-haspopup="listbox" aria-expanded="false" aria-controls="character-advanced-frame-list" aria-labelledby="character-advanced-frame-label character-advanced-frame-value">
+                        <span id="character-advanced-frame-value" class="character-ai-combobox-value">0</span>
+                        <span class="character-ai-combobox-caret" aria-hidden="true"><svg viewBox="0 0 20 20" width="14" height="14" focusable="false" aria-hidden="true"><path d="M5 8l5 5 5-5" fill="none" stroke="#94a3b8" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+                      </div>
+                      <ul id="character-advanced-frame-list" class="character-ai-combobox-list" role="listbox" hidden aria-labelledby="character-advanced-frame-label"></ul>
+                    </div>
+                  </div>
                   <label><span data-character-advanced-copy="advancedNudgeX">逐帧位移 X</span><input id="character-advanced-nudge-x" type="number" min="-16" max="16" step="1" value="0" /></label>
                   <label><span data-character-advanced-copy="advancedNudgeY">逐帧位移 Y</span><input id="character-advanced-nudge-y" type="number" min="-16" max="16" step="1" value="0" /></label>
                 </div>
@@ -1897,13 +2100,13 @@
                   <button id="character-advanced-nudge-save" type="button" data-character-advanced-copy="advancedSaveNudge">保存位移</button>
                   <button id="character-advanced-nudge-clear" type="button" data-character-advanced-copy="advancedClearNudge">清除位移</button>
                 </div>
-                <label class="character-advanced-lock-label"><span data-character-advanced-copy="advancedAnimationLocks">动画锁（不参与稳定）</span><select id="character-advanced-locks" multiple></select></label>
+                <label class="character-advanced-lock-label" hidden><span data-character-advanced-copy="advancedAnimationLocks">动画锁（不参与稳定）</span><select id="character-advanced-locks" multiple></select></label>
                 <div class="character-advanced-checks">
-                  <label><input id="character-advanced-auto-correct" type="checkbox" checked /><span data-character-advanced-copy="advancedAutoCorrect">自动校正</span></label>
-                  <label><input id="character-advanced-motion-stabilize" type="checkbox" checked /><span data-character-advanced-copy="advancedStabilize">运动稳定</span></label>
+                  <label><input id="character-advanced-auto-correct" class="studio-checkbox" type="checkbox" checked /><span data-character-advanced-copy="advancedAutoCorrect">自动校正</span></label>
+                  <label><input id="character-advanced-motion-stabilize" class="studio-checkbox" type="checkbox" checked /><span data-character-advanced-copy="advancedStabilize">运动稳定</span></label>
                   <label><span data-character-advanced-copy="advancedMaxShift">最大位移</span><input id="character-advanced-motion-max-shift" type="number" min="0" max="8" step="1" value="2" /></label>
                 </div>
-                <div class="character-advanced-actions">
+                <div class="character-advanced-actions character-local-operator-tools" hidden>
                   <button id="character-advanced-calibration-open" type="button" aria-controls="character-advanced-calibration" aria-expanded="false" data-character-advanced-copy="advancedCalibration">打开校准</button>
                   <button id="character-advanced-cuts-open" type="button" aria-controls="character-advanced-cuts" aria-expanded="false" data-character-advanced-copy="advancedCutLines">手动切线</button>
                   <button id="character-advanced-auto-grid" type="button" data-character-advanced-copy="advancedAutoGrid">使用自动网格</button>
@@ -1913,19 +2116,71 @@
               <fieldset>
                 <legend data-character-advanced-copy="advancedExportScales">导出倍率</legend>
                 <div class="character-advanced-scales">
-                  <label><input id="character-advanced-export-1x" type="checkbox" checked />1×</label>
-                  <label><input id="character-advanced-export-2x" type="checkbox" checked />2×</label>
-                  <label><input id="character-advanced-export-3x" type="checkbox" />3×</label>
-                  <label><input id="character-advanced-export-4x" type="checkbox" />4×</label>
+                  <label><input id="character-advanced-export-1x" type="checkbox" checked /><span>1×</span></label>
+                  <label><input id="character-advanced-export-2x" type="checkbox" checked /><span>2×</span></label>
+                  <label><input id="character-advanced-export-3x" type="checkbox" /><span>3×</span></label>
+                  <label><input id="character-advanced-export-4x" type="checkbox" /><span>4×</span></label>
                 </div>
               </fieldset>
             </div>
-
-            <footer class="character-advanced-footer">
-              <button id="character-advanced-back-standard" type="button" data-character-advanced-copy="advancedBackStandard">返回标准导入</button>
-              <button id="character-advanced-run" class="button primary" type="button" data-character-advanced-copy="advancedRun">运行高级处理</button>
-            </footer>
+            </form>
           </section>
+
+            <section class="character-ai-settings character-ai-only" hidden aria-hidden="true" aria-labelledby="character-ai-settings-title">
+              <h2 id="character-ai-settings-title" data-studio-i18n="character.budgetLabel">调用预算</h2>
+              <button id="character-fixed-profile" class="character-ai-readonly-param" type="button" hidden disabled data-studio-i18n="character.fixedProfileTab">固定区域</button>
+              <span class="character-ai-topdown-note" hidden role="note" data-studio-i18n="character.topdownProfileTab">俯视布局暂不可用</span>
+              <dl class="character-ai-budget" aria-label="调用预算" data-studio-i18n-aria-label="character.budgetLabel">
+                <div><dt data-studio-i18n="character.plannedCallsLabel">计划调用</dt><dd id="character-ai-planned-calls">0</dd></div>
+                <div><dt data-studio-i18n="character.maxCallsLabel">最多调用</dt><dd id="character-ai-max-calls">1</dd></div>
+                <div><dt data-studio-i18n="character.usedCallsLabel">已使用</dt><dd id="character-ai-used-calls">0</dd></div>
+                <div><dt data-studio-i18n="character.nextActionLabel">下一步</dt><dd id="character-ai-next-action">生成审阅包（0 次调用）</dd></div>
+              </dl>
+            </section>
+
+            <details id="character-sealed-binding" class="character-sealed-binding technical-disclosure character-ai-only" hidden aria-hidden="true" aria-labelledby="character-sealed-title">
+              <summary>
+                <h2 id="character-sealed-title" data-studio-i18n="character.sealedTitle">封存绑定</h2>
+                <small data-studio-i18n="character.sealedHelp">Provider、模型与哈希不占用主要任务层级。</small>
+              </summary>
+              <dl>
+                <div><dt data-studio-i18n="character.reviewIdLabel">审阅编号</dt><dd id="character-review-id">—</dd></div>
+                <div><dt data-studio-i18n="character.planHashLabel">计划哈希</dt><dd id="character-plan-hash">—</dd></div>
+                <div><dt data-studio-i18n="character.referenceHashLabel">参考清单哈希</dt><dd id="character-reference-hash">—</dd></div>
+                <div><dt data-studio-i18n="character.providerLabel">服务提供方</dt><dd id="character-provider-binding">—</dd></div>
+                <div><dt data-studio-i18n="character.modelLabel">模型</dt><dd id="character-model-binding">—</dd></div>
+              </dl>
+              <nav id="character-review-links" class="character-review-links" aria-label="封存的审阅证据" data-studio-i18n-aria-label="character.sealedArtifactsLabel"></nav>
+            </details>
+
+            <section id="character-review-evidence" class="character-review-evidence character-ai-only" hidden aria-hidden="true">
+              <h2 data-studio-i18n="character.reviewEvidenceTitle">人工审阅</h2>
+              <dl class="character-evidence-binding">
+                <div><dt data-studio-i18n="character.gateLabel">门</dt><dd id="character-review-gate-binding">manual_accept_v1</dd></div>
+                <div><dt data-studio-i18n="character.rawHashLabel">原始图哈希</dt><dd id="character-review-raw-sha">—</dd></div>
+                <div><dt data-studio-i18n="character.matteEvidenceLabel">去背景证据</dt><dd id="character-review-matte-count">—</dd></div>
+              </dl>
+              <label for="character-issue-count"><span data-studio-i18n="character.issueCountLabel">已确认问题数</span><input id="character-issue-count" type="number" min="0" step="1" value="0" /></label>
+              <p id="character-accept-preflight" role="status" aria-live="polite" data-studio-i18n="character.evidencePending">等待真实证据完整性校验。</p>
+              <dl class="character-manual-gate">
+                <div><dt data-studio-i18n="character.manualGateLabel">人工门</dt><dd data-studio-i18n="character.explicitHumanAcceptValue">显式人工接受</dd></div>
+                <div><dt data-studio-i18n="character.nextLabel">下一步</dt><dd data-studio-i18n="character.sealPublicationValue">封存已接受的验证下载</dd></div>
+              </dl>
+            </section>
+
+            <div class="character-state-mode-hint character-review-mode-hint character-ai-only" hidden>
+              <span data-studio-i18n="character.strictFixedRegionLabel">严格固定区域</span>
+              <strong id="character-review-mode-binding" data-studio-i18n="character.statusReviewRequired">需要人工审阅 · 已调用 1/1</strong>
+            </div>
+
+            <div class="character-local-commit">
+              <p id="character-local-error" class="character-local-error" role="alert" hidden></p>
+              <p id="character-action-message" class="character-action-message character-ai-only" role="status" aria-live="polite"></p>
+              <button id="character-local-primary" class="button primary studio-module-cta character-local-primary" type="button" data-action="blocked" data-studio-server-required disabled>开始处理</button>
+              <button id="character-primary-action" class="button primary studio-module-cta character-primary-action character-ai-only" type="button" data-action="review" data-studio-i18n="character.reviewAction" data-studio-server-required disabled>生成角色</button>
+              <button id="character-reset-action" class="button secondary character-reset-action character-ai-only" type="button" hidden data-studio-i18n="character.resetAction">返回审阅设置（不会自动调用）</button>
+            </div>
+          </aside>
 
           <section id="character-advanced-calibration" class="character-advanced-overlay character-advanced-full" hidden aria-labelledby="character-calibration-title">
             <header class="character-advanced-header">
@@ -1965,408 +2220,173 @@
             <footer class="character-advanced-footer"><button class="character-advanced-panel-back" type="button" data-character-advanced-copy="advancedBackConfig">返回高级配置</button><span class="topbar-spacer"></span><button id="character-cut-confirm" class="button primary" type="button" data-character-advanced-copy="cutConfirm">确认切线</button></footer>
           </section>
 
-          <section class="character-local-stage" aria-labelledby="character-local-stage-title">
+          <section class="character-local-stage character-stage" aria-labelledby="character-stage-title">
             <header class="character-local-stage-toolbar">
               <span data-character-local-copy="stageLabel">预览舞台</span>
               <span id="character-local-stage-phase" class="stage-phase">等待源文件</span>
+              <span id="character-stage-phase" class="stage-phase" hidden></span>
             </header>
             <div class="character-local-stage-body">
-              <header class="character-local-stage-copy">
-                <span id="character-local-stage-kicker" class="stage-kicker">本地管线</span>
-                <h2 id="character-local-stage-title" tabindex="-1">选择真实源精灵表</h2>
-                <p id="character-local-stage-help">处理成功前不会显示结果、质量报告或导出。</p>
+              <header class="character-stage-copy character-local-stage-copy">
+                <span id="character-stage-kicker" class="stage-kicker" data-studio-i18n="character.reviewKicker">等待生成审阅包</span>
+                <h2 id="character-stage-title" tabindex="-1" data-studio-i18n="character.reviewStageTitle">选择真实源精灵表</h2>
+                <p id="character-stage-help" data-studio-i18n="character.reviewStageSummary">处理成功前不会显示结果、质量报告或导出。</p>
+                <span id="character-local-stage-kicker" hidden></span>
+                <h2 id="character-local-stage-title" tabindex="-1" hidden>选择真实源精灵表</h2>
+                <p id="character-local-stage-help" hidden></p>
               </header>
+
+              <details class="character-state-panel character-running-panel character-state-card technical-disclosure character-ai-only">
+                <summary><h2 id="character-running-panel-title" data-studio-i18n="character.runningAuthorityTitle">任务阶段只依据服务端回执</h2></summary>
+                <strong id="character-running-mode-binding" data-studio-i18n="character.oneCallSealedJob">一次调用任务 · 已封存</strong>
+                <p class="character-state-signal"><span data-studio-i18n="character.providerCallsLabel">服务提供方调用</span><strong id="character-running-provider-calls">—</strong><span id="character-running-network-phase" data-studio-i18n="character.networkStatePending">· 等待网络阶段回执</span></p>
+                <dl class="character-state-rows">
+                  <div><dt data-studio-i18n="character.profileLabel">配置档</dt><dd id="character-running-profile">full_sheet_fixed_region_v1</dd></div>
+                  <div><dt data-studio-i18n="character.providerCallsLabel">服务提供方调用</dt><dd id="character-running-call-budget">—</dd></div>
+                  <div><dt data-studio-i18n="character.rawProvenanceLabel">原始图来源证据</dt><dd id="character-running-raw-provenance">—</dd></div>
+                </dl>
+                <ol class="character-running-phases" aria-label="当前阶段" data-studio-i18n-aria-label="character.currentPhaseLabel">
+                  <li data-running-phase="queued" data-studio-i18n="character.jobStatusQueued">排队中</li>
+                  <li data-running-phase="generating" data-studio-i18n="character.jobStatusGenerating">生成中</li>
+                  <li data-running-phase="raw" data-studio-i18n="character.rawSealedPhase">原图已封存</li>
+                  <li data-running-phase="matte" data-studio-i18n="character.pipelineMatte">去背景</li>
+                  <li data-running-phase="count" data-studio-i18n="character.pipelineCount">主体计数</li>
+                </ol>
+              </details>
+              <section class="character-state-panel character-accepted-panel character-state-card character-ai-only" aria-labelledby="character-accepted-panel-title">
+                <div class="character-release-card">
+                  <span id="character-accepted-card-kicker">已接受 · 正在核验文件</span>
+                  <h2 id="character-accepted-panel-title">character_pack.zip</h2>
+                  <small id="character-accepted-card-detail">下载尚未核验</small>
+                </div>
+                <dl class="character-state-rows">
+                  <div><dt data-studio-i18n="character.acceptanceIdLabel">接受记录</dt><dd id="character-accepted-publication-id">—</dd></div>
+                  <div><dt data-studio-i18n="character.profileLabel">配置档</dt><dd id="character-accepted-profile">full_sheet_fixed_region_v1</dd></div>
+                  <div><dt data-studio-i18n="character.sourceJobLabel">源任务</dt><dd id="character-accepted-source-job">—</dd></div>
+                  <div><dt data-studio-i18n="character.rawHashLabel">原始图哈希</dt><dd id="character-accepted-raw-sha">—</dd></div>
+                  <div><dt data-studio-i18n="character.gateLabel">门</dt><dd id="character-accepted-release-gate" data-studio-i18n="character.acceptedSealedValue">已接受 · 已封存</dd></div>
+                  <div><dt data-studio-i18n="character.packLabel">资源包</dt><dd id="character-accepted-output-pack">character_pack.zip</dd></div>
+                  <div><dt data-studio-i18n="character.enginesLabel">引擎</dt><dd id="character-accepted-output-engines">Godot · RPG Maker · OCAD</dd></div>
+                </dl>
+              </section>
+              <section class="character-state-panel character-topdown-panel character-state-card character-state-card-compact character-ai-only" aria-labelledby="character-topdown-panel-title">
+                <h2 id="character-topdown-panel-title" data-studio-i18n="character.topdownKicker">俯视布局已禁用</h2>
+                <strong data-studio-i18n="character.statusBlockedPreReview">调用前已阻断 · 0 次调用</strong>
+              </section>
 
               <section id="character-local-progress" class="character-local-progress" hidden aria-live="polite">
                 <div class="character-local-progress-ring" aria-hidden="true"></div>
                 <strong id="character-local-progress-label">排队中</strong>
-                <progress id="character-local-progress-bar" max="100" value="22">22%</progress>
+                <progress id="character-local-progress-bar" max="100" aria-labelledby="character-local-progress-label"></progress>
                 <span id="character-local-progress-job">—</span>
                 <small data-character-local-copy="noCancel">当前接口没有取消能力；到达终态前输入保持锁定。</small>
               </section>
 
-              <section id="character-local-failure" class="character-local-failure" hidden aria-labelledby="character-local-failure-title">
-                <h3 id="character-local-failure-title" data-character-local-copy="qualityTitle">质量报告</h3>
-                <div id="character-local-failure-issues" class="character-local-issue-list"></div>
-              </section>
-
               <section id="character-local-preview" class="character-local-preview" hidden aria-labelledby="character-local-preview-state">
                 <canvas id="character-local-canvas" width="960" height="500" tabindex="0" aria-label="可试玩的已核验角色预览。使用 WASD 或方向键移动。" aria-describedby="character-local-stage-help character-local-preview-state" data-character-local-aria="previewAria"></canvas>
-                <span id="character-local-preview-state" class="character-local-preview-state">idle_down · x 480 · y 340</span>
+                <section id="character-sheet-inspector" class="character-sheet-inspector" aria-labelledby="character-sheet-inspector-title" hidden>
+                  <header class="character-sheet-inspector-toolbar">
+                    <span class="character-sheet-inspector-copy">
+                      <strong id="character-sheet-inspector-title" data-studio-i18n="character.sheetInspectorTitle">生成原图检查器</strong>
+                      <small data-studio-i18n="character.sheetInspectorHelp">默认以原始像素显示；在画布内滚动检查每个格子。</small>
+                    </span>
+                    <span class="character-sheet-inspector-tools">
+                      <output id="character-sheet-size" class="character-sheet-size" aria-live="polite"></output>
+                      <span class="character-sheet-zoom" role="group" aria-label="原图缩放" data-studio-i18n-aria-label="character.sheetZoomLabel">
+                        <button id="character-sheet-zoom-fit-button" type="button" aria-controls="character-sheet-viewport" aria-pressed="false" data-studio-i18n="character.sheetZoomFit">整图</button>
+                        <button id="character-sheet-zoom-actual-button" type="button" aria-controls="character-sheet-viewport" aria-pressed="true" data-studio-i18n="character.sheetZoomActual">1:1</button>
+                        <button id="character-sheet-zoom-double-button" type="button" aria-controls="character-sheet-viewport" aria-pressed="false">2×</button>
+                        <button id="character-sheet-zoom-quad-button" type="button" aria-controls="character-sheet-viewport" aria-pressed="false">4×</button>
+                      </span>
+                      <a id="character-sheet-open-original" class="character-sheet-open-original" target="_blank" rel="noopener" hidden data-studio-i18n="character.sheetOpenOriginal">打开原图</a>
+                    </span>
+                  </header>
+                  <div id="character-sheet-viewport" class="character-sheet-viewport" data-character-sheet-zoom="actual" role="region" tabindex="0" aria-label="可滚动的生成原图" data-studio-i18n-aria-label="character.sheetViewportLabel">
+                    <img id="character-accepted-image" class="character-shared-sheet" alt="已接受的规范化角色图" data-studio-i18n-alt="character.acceptedImageAlt" hidden />
+                  </div>
+                </section>
+                <span id="character-local-preview-state" class="character-local-preview-state" hidden>idle_down · x 480 · y 340</span>
+                <p id="character-result-error" class="character-result-error" role="alert" hidden></p>
+                <button id="character-accepted-retry" class="button secondary" type="button" hidden data-studio-i18n="character.retryAcceptedArtifacts">重新加载已接受文件</button>
               </section>
 
               <aside id="character-local-quality" class="character-local-quality" hidden aria-labelledby="character-local-quality-title">
-                <header>
-                  <h3 id="character-local-quality-title" data-character-local-copy="qualityTitle">质量报告</h3>
-                  <span id="character-local-quality-status" data-state="pass">通过</span>
-                </header>
-                <dl>
-                  <div><dt data-character-local-copy="qualityFrames">帧数</dt><dd id="character-local-quality-frames">—</dd></div>
-                  <div><dt data-character-local-copy="qualityRepaired">已修复</dt><dd id="character-local-quality-repaired">—</dd></div>
-                  <div><dt data-character-local-copy="qualityIssues">发现</dt><dd id="character-local-quality-findings">—</dd></div>
-                </dl>
-                <div id="character-local-quality-issues" class="character-local-issue-list"></div>
-                <a id="character-local-quality-link" target="_blank" rel="noopener" data-character-local-copy="openReport">打开真实质量报告</a>
+                <details id="character-local-quality-disclosure">
+                  <summary>
+                    <h3 id="character-local-quality-title" data-character-local-copy="qualityTitle">质量报告</h3>
+                    <span id="character-local-quality-status" data-state="pass">通过</span>
+                    <small id="character-local-quality-summary"></small>
+                  </summary>
+                  <div class="character-local-quality-body">
+                    <dl>
+                      <div><dt data-character-local-copy="qualityFrames">帧数</dt><dd id="character-local-quality-frames">—</dd></div>
+                      <div><dt data-character-local-copy="qualityRepaired">已修复</dt><dd id="character-local-quality-repaired">—</dd></div>
+                      <div><dt data-character-local-copy="qualityIssues">发现</dt><dd id="character-local-quality-findings">—</dd></div>
+                    </dl>
+                    <div id="character-local-quality-issues" class="character-local-issue-list"></div>
+                    <a id="character-local-quality-link" target="_blank" rel="noopener" data-character-local-copy="openReport">打开真实质量报告</a>
+                  </div>
+                </details>
               </aside>
-            </div>
 
-            <footer class="character-local-clips-dock">
-              <span data-character-local-copy="clipsLabel">已核验动画片段</span>
-              <div id="character-local-clips" class="character-local-clips"><p>animations.json 核验通过后才会出现动画片段。</p></div>
-            </footer>
-          </section>
-        </main>
-
-        <main id="character-compat-workspace" class="character-compat-workspace" data-character-compat-phase="config" hidden>
-          <aside class="character-compat-panel" aria-labelledby="character-compat-title">
-            <header class="character-compat-header">
-              <span class="eyebrow" data-character-compat-copy="configKicker">独立状态机 · generate-character 现有 API</span>
-              <h1 id="character-compat-title" tabindex="-1" data-character-compat-copy="configTitle">高级兼容生成</h1>
-              <p data-character-compat-copy="configHelp">不混用 Strict Review / Confirm / Accept；候选数就是最大 Provider 调用数。</p>
-            </header>
-
-            <div class="character-compat-form" aria-describedby="character-compat-boundary">
-              <label data-character-compat-production-only><span data-character-compat-copy="name">资源名称</span><input id="character-compat-name" type="text" value="generated_character" maxlength="64" autocomplete="off" data-studio-server-required /></label>
-              <label class="character-compat-wide"><span data-character-compat-copy="description">角色描述</span><textarea id="character-compat-description" rows="3" maxlength="2000" data-studio-server-required>银发女剑士，深蓝披风，细长单手剑，金色护肩，小体型</textarea></label>
-              <label><span data-character-compat-copy="mode">生成模式</span><select id="character-compat-mode" data-studio-server-required><option value="production_sheet_v0">production_sheet_v0</option><option value="quality_character_v0">quality_character_v0</option></select></label>
-              <label><span data-character-compat-copy="preset">角色预设</span><select id="character-compat-preset" data-studio-server-required><option value="rpg_humanoid_v0">rpg_humanoid_v0</option><option value="animal_companion_v0">animal_companion_v0</option><option value="monster_creature_v0">monster_creature_v0</option><option value="xianxia_hero_v0">xianxia_hero_v0</option><option value="chibi_big_pixel_v0">chibi_big_pixel_v0</option><option value="two_to_one_character_v0">two_to_one_character_v0</option></select></label>
-              <label data-character-compat-production-only><span data-character-compat-copy="layout">生成布局</span><select id="character-compat-layout" data-studio-server-required><option value="fixed_region_motion_v0">fixed_region_motion_v0</option><option value="topdown_rpg_v0">topdown_rpg_v0</option></select></label>
-              <label><span data-character-compat-copy="imageSize">图像尺寸</span><select id="character-compat-image-size" data-studio-server-required><option value="1K">1024 × 1024</option><option value="2K" selected>2048 × 2048</option></select></label>
-              <label><span data-character-compat-copy="candidates">候选 / 最大调用</span><select id="character-compat-candidates" data-studio-server-required><option value="1">1</option><option value="2">2</option><option value="4">4</option><option value="6">6</option></select></label>
-              <label><span data-character-compat-copy="seed">Seed</span><input id="character-compat-seed" type="number" min="0" max="2147483647" step="1" placeholder="随机" data-character-compat-placeholder="seedPlaceholder" data-studio-server-required /></label>
-            </div>
-
-            <section class="character-compat-files" aria-labelledby="character-compat-files-title">
-              <h2 id="character-compat-files-title" data-character-compat-copy="optionalImages">可选图像绑定</h2>
-              <input id="character-compat-reference" class="character-local-file" type="file" accept="image/png,image/webp,image/jpeg,.png,.webp,.jpg,.jpeg" data-studio-server-required />
-              <label for="character-compat-reference"><span data-character-compat-copy="reference">参考图</span><strong id="character-compat-reference-name" data-character-compat-copy="notSelected">未选择</strong></label>
-              <button id="character-compat-reference-clear" type="button" data-character-compat-copy="clearFile">清除</button>
-              <input id="character-compat-palette" class="character-local-file" type="file" accept="image/png,image/webp,image/jpeg,.png,.webp,.jpg,.jpeg" data-studio-server-required />
-              <label for="character-compat-palette"><span data-character-compat-copy="palette">Palette</span><strong id="character-compat-palette-name" data-character-compat-copy="notSelected">未选择</strong></label>
-              <button id="character-compat-palette-clear" type="button" data-character-compat-copy="clearFile">清除</button>
-              <small data-character-compat-copy="imageHelp">PNG / WebP / JPEG · 最大 32 MiB · 当前输入绑定</small>
-            </section>
-
-            <p id="character-compat-quality-boundary" class="character-compat-quality-boundary" hidden data-character-compat-copy="qualityModeBoundary">质量单图不使用资源名称、精灵表布局、组件清理、运动稳定或多倍率精灵表；像素精修固定执行，仅最大颜色与描边会提交。</p>
-
-            <details class="character-compat-advanced">
-              <summary data-character-compat-copy="cleanupExport">清理与导出参数</summary>
-              <div class="character-compat-form">
-                <label><span data-character-compat-copy="background">背景</span><select id="character-compat-background"><option value="auto">auto</option><option value="flood">flood</option><option value="alpha">alpha</option></select></label>
-                <label data-character-compat-production-only><span data-character-compat-copy="tolerance">背景容差</span><input id="character-compat-tolerance" type="number" min="0" max="80" step="1" value="24" /></label>
-                <label data-character-compat-production-only><span data-character-compat-copy="minAlpha">最小 Alpha</span><input id="character-compat-min-alpha" type="number" min="0" max="80" step="1" value="18" /></label>
-                <label data-character-compat-production-only><span data-character-compat-copy="minArea">最小面积</span><input id="character-compat-min-area" type="number" min="1" max="64" step="1" value="4" /></label>
-                <label data-character-compat-production-only><span data-character-compat-copy="minAreaRatio">最小面积比例</span><input id="character-compat-min-area-ratio" type="number" min="0" max="0.25" step="0.01" value="0" /></label>
-                <label data-character-compat-production-only><span data-character-compat-copy="motionShift">稳定最大位移</span><input id="character-compat-motion-shift" type="number" min="0" max="8" step="1" value="2" /></label>
-                <label><span data-character-compat-copy="maxColors">最大颜色</span><input id="character-compat-max-colors" type="number" min="2" max="64" step="1" value="16" /></label>
-                <label data-character-compat-production-only><span data-character-compat-copy="outlineMode">描边模式</span><select id="character-compat-outline-mode"><option value="outer">outer</option><option value="inner">inner</option><option value="both">both</option></select></label>
-              </div>
-              <div class="character-compat-checks">
-                <label data-character-compat-production-only><input id="character-compat-component-cleanup" type="checkbox" checked /><span data-character-compat-copy="componentCleanup">组件清理</span></label>
-                <label data-character-compat-production-only><input id="character-compat-auto-correct" type="checkbox" checked /><span data-character-compat-copy="autoCorrect">自动校正</span></label>
-                <label data-character-compat-production-only><input id="character-compat-motion-stabilize" type="checkbox" checked /><span data-character-compat-copy="motionStabilize">运动稳定</span></label>
-                <label data-character-compat-production-only><input id="character-compat-pixel-finishing" type="checkbox" /><span data-character-compat-copy="pixelFinishing">像素精修</span></label>
-                <label><input id="character-compat-outline" type="checkbox" checked /><span data-character-compat-copy="outline">描边</span></label>
-              </div>
-              <div class="character-compat-scales" role="group" aria-label="导出倍率" data-character-compat-aria="scalesAria" data-character-compat-production-only>
-                <label><input id="character-compat-export-1x" type="checkbox" checked />1×</label>
-                <label><input id="character-compat-export-2x" type="checkbox" checked />2×</label>
-                <label><input id="character-compat-export-3x" type="checkbox" />3×</label>
-                <label><input id="character-compat-export-4x" type="checkbox" />4×</label>
-              </div>
-            </details>
-
-            <section id="character-compat-boundary" class="character-compat-boundary">
-              <h2 data-character-compat-copy="matrixTitle">兼容矩阵</h2>
-              <dl>
-                <div><dt data-character-compat-copy="matrixCompat">高级兼容 Character</dt><dd data-character-compat-copy="sharedProvider">共享 Provider</dd></div>
-                <div><dt data-character-compat-copy="matrixScene">Scene 在线生成</dt><dd data-character-compat-copy="sharedProvider">共享 Provider</dd></div>
-                <div><dt>Character Strict</dt><dd data-character-compat-copy="nativeGemini">原生 Gemini</dd></div>
-                <div><dt>Tiles AI</dt><dd data-character-compat-copy="nativeGemini">原生 Gemini</dd></div>
-              </dl>
-              <p data-character-compat-copy="noLiveCall">本次验收不发起真实 Provider 调用。</p>
-            </section>
-
-            <p id="character-compat-error" class="character-local-error" role="alert" hidden></p>
-            <div class="character-compat-actions">
-              <button id="character-compat-return" type="button" hidden data-character-compat-copy="returnConfig">返回配置</button>
-              <button id="character-compat-primary" class="button primary" type="button" data-action="blocked" data-studio-server-required disabled data-character-compat-copy="run">运行兼容生成</button>
-            </div>
-          </aside>
-
-          <section class="character-compat-stage" aria-labelledby="character-compat-stage-title">
-            <header class="character-compat-stage-toolbar">
-              <span data-character-compat-copy="stageLabel">兼容生成舞台</span>
-              <span id="character-compat-stage-phase" class="stage-phase">尚未运行</span>
-              <span class="topbar-spacer"></span>
-              <button id="character-compat-stop" type="button" hidden data-character-compat-copy="stopObserve">停止观察</button>
-            </header>
-            <div class="character-compat-stage-body">
-              <header class="character-compat-stage-copy">
-                <span id="character-compat-stage-kicker" class="stage-kicker">终态 · 当前输入绑定</span>
-                <h2 id="character-compat-stage-title" tabindex="-1">等待真实 Job</h2>
-                <p id="character-compat-stage-help">当前 Job、下载处置、质量门与精确产物 URL 全部通过后才开放已验证下载。</p>
-              </header>
-
-              <section id="character-compat-progress" class="character-compat-progress" hidden aria-live="polite">
-                <span class="stage-kicker" data-character-compat-copy="runningKicker">一次调用任务进行中</span>
-                <h3 data-character-compat-copy="runningTitle">等待真实 Job 证据</h3>
-                <p data-character-compat-copy="runningHelp">不会创建第二个 Job，也不会使用 Strict 的人工验收。</p>
-                <progress id="character-compat-progress-bar" max="100" value="18">18%</progress>
-                <strong id="character-compat-job">—</strong>
-                <small id="character-compat-calls">Provider —</small>
-              </section>
-
-              <section id="character-compat-diagnostic" class="character-compat-result" hidden aria-labelledby="character-compat-diagnostic-title">
-                <span class="stage-kicker" data-character-compat-copy="diagnosticKicker">真实诊断 · URL 已绑定</span>
-                <h3 id="character-compat-diagnostic-title" data-character-compat-copy="diagnosticTitle">候选需要复核</h3>
-                <p data-character-compat-copy="diagnosticHelp">此 Job 没有封存 Strict Review，因此不能人工 Accept。</p>
-                <dl id="character-compat-diagnostic-rows"></dl>
-                <div id="character-compat-diagnostic-links" class="character-compat-links"></div>
-                <strong class="character-compat-lock" data-character-compat-copy="diagnosticLock">无 Accept · 无导出 · 无 Project candidate</strong>
-              </section>
-
-              <section id="character-compat-release" class="character-compat-result character-compat-release" hidden aria-labelledby="character-compat-release-title">
-                <span class="stage-kicker" data-character-compat-copy="releaseKicker">verified · quality pass</span>
-                <h3 id="character-compat-release-title" data-character-compat-copy="releaseTitle">兼容下载产物已验证</h3>
-                <p data-character-compat-copy="releaseHelp">仅展示当前 Job 的精确 artifact URL；切换文件或参数后立即锁定。</p>
-                <img id="character-compat-release-image" alt="已核验的兼容 Character 结果" data-character-compat-aria="releaseImageAria" />
-                <dl id="character-compat-release-rows"></dl>
-                <div id="character-compat-release-links" class="character-compat-links"></div>
-              </section>
-
-              <details class="character-compat-policy technical-disclosure">
-                <summary id="character-compat-policy-title" data-character-compat-copy="policyTitle">已验证下载条件</summary>
-                <p><strong>review_required / diagnostic_only</strong><span data-character-compat-copy="policyDiagnostic">只显示真实诊断；不提供 Accept、导出或 Project candidate。</span></p>
-                <p><strong>release_ready + artifact_disposition=release</strong><span data-character-compat-copy="policyRelease">质量门和精确 Job artifact URL 必须全部通过。</span></p>
+              <details id="character-ai-evidence-disclosure" class="character-ai-evidence-disclosure technical-disclosure character-ai-only" hidden>
+                <summary>
+                  <span class="character-evidence-summary-copy">
+                    <strong id="character-evidence-inspector-title" data-studio-i18n="character.evidenceInspectorTitle">技术证据</strong>
+                    <small data-studio-i18n="character.evidenceInspectorHelp">Provider、模型、审阅记录与完整哈希</small>
+                  </span>
+                  <span id="character-evidence-summary-status" class="character-evidence-summary-status" data-state="loading">0/11</span>
+                  <span class="character-evidence-summary-chevron" aria-hidden="true"></span>
+                </summary>
+                <div class="character-evidence-inspector-body">
+                  <dl class="character-evidence-metadata">
+                    <div><dt data-studio-i18n="character.providerLabel">Provider</dt><dd id="character-evidence-provider">—</dd></div>
+                    <div><dt data-studio-i18n="character.modelLabel">模型</dt><dd id="character-evidence-model">—</dd></div>
+                    <div><dt data-studio-i18n="character.reviewIdLabel">审阅编号</dt><dd id="character-evidence-review-id">—</dd></div>
+                    <div><dt data-studio-i18n="character.rawHashLabel">原始图哈希</dt><dd id="character-evidence-raw-sha">—</dd></div>
+                  </dl>
+                  <h3 data-studio-i18n="character.evidenceComparisonsTitle">对照检查</h3>
+                  <div id="character-evidence-grid" class="character-evidence-grid" hidden>
+                  <figure><div class="evidence-media"><img id="character-raw-image" alt="服务提供方原始输出" data-studio-i18n-alt="character.rawAlt" /></div><figcaption><strong data-studio-i18n="character.rawEvidence">原始图 · 校验值已绑定</strong><span id="character-raw-caption">—</span></figcaption></figure>
+                  <figure><div class="evidence-media checker"><img id="character-background-image" alt="原尺寸服务提供方去背景结果" data-studio-i18n-alt="character.backgroundAlt" /></div><figcaption><strong data-studio-i18n="character.backgroundEvidence">原尺寸去背景结果</strong><span>background_removed_provider_output.png</span></figcaption></figure>
+                  <figure><div class="evidence-media checker"><img id="character-normalized-image" alt="规范化生产图；它是派生证据，不是原始图" data-studio-i18n-alt="character.normalizedAlt" /></div><figcaption><strong data-studio-i18n="character.normalizedEvidence">规范化结果 · 派生证据</strong><span data-studio-i18n="character.normalizedFileNote">normalized_sheet.png · 不是原始图</span></figcaption></figure>
+                  <figure><div class="evidence-media checker"><img id="character-preview-image" alt="六种背景底色预览" data-studio-i18n-alt="character.previewAlt" /></div><figcaption><strong data-studio-i18n="character.previewEvidence">六底预览</strong><span data-studio-i18n="character.previewEvidenceHelp">白点与边缘检查</span></figcaption></figure>
+                  <figure><div class="evidence-media"><img id="character-spill-image" alt="溢色与遮罩诊断叠加图" data-studio-i18n-alt="character.spillAlt" /></div><figcaption><strong data-studio-i18n="character.spillEvidence">溢色诊断叠加图</strong><span id="character-spill-caption">0/11</span></figcaption></figure>
+                  <figure><div class="evidence-media"><img id="character-sure-background-image" alt="确定背景分类遮罩" data-studio-i18n-alt="character.sureBackgroundAlt" /></div><figcaption><strong data-studio-i18n="character.sureBackgroundEvidence">确定背景</strong><span>background_sure_background_mask.png</span></figcaption></figure>
+                  <figure><div class="evidence-media"><img id="character-unknown-image" alt="未知带分类遮罩" data-studio-i18n-alt="character.unknownAlt" /></div><figcaption><strong data-studio-i18n="character.unknownEvidence">未知带</strong><span>background_unknown_band_mask.png</span></figcaption></figure>
+                  <figure><div class="evidence-media"><img id="character-sure-foreground-image" alt="确定前景分类遮罩" data-studio-i18n-alt="character.sureForegroundAlt" /></div><figcaption><strong data-studio-i18n="character.sureForegroundEvidence">确定前景</strong><span>background_sure_foreground_mask.png</span></figcaption></figure>
+                  <figure><div class="evidence-media"><img id="character-alpha-image" alt="背景抠图透明度估计图" data-studio-i18n-alt="character.alphaAlt" /></div><figcaption><strong data-studio-i18n="character.alphaEvidence">透明度估计</strong><span>background_alpha_estimate.png</span></figcaption></figure>
+                  <figure><div class="evidence-media"><img id="character-reconstruction-image" alt="背景抠图前景重建图" data-studio-i18n-alt="character.reconstructionAlt" /></div><figcaption><strong data-studio-i18n="character.reconstructionEvidence">前景重建</strong><span>background_foreground_reconstruction.png</span></figcaption></figure>
+                  </div>
+                  <h3 data-studio-i18n="character.evidenceFilesTitle">已核验文件</h3>
+                  <nav id="character-evidence-artifacts" class="character-evidence-artifacts" aria-label="已核验的证据文件" data-studio-i18n-aria-label="character.verifiedArtifactsLabel" hidden></nav>
+                </div>
               </details>
             </div>
-          </section>
-        </main>
-
-        <main id="character-ai-workspace" class="character-workspace" hidden>
-          <aside class="character-control-panel" aria-labelledby="character-flow-title">
-            <header class="character-flow-header">
-              <span class="eyebrow" data-studio-i18n="character.flowEyebrow">当前流程</span>
-              <span id="character-flow-badge" class="condition-badge"><i></i><span data-studio-i18n="character.flowReview">审阅</span></span>
-              <h1 id="character-flow-title" tabindex="-1" data-studio-i18n="character.reviewTitle">新建一次调用计划</h1>
-              <p id="character-flow-summary" data-studio-i18n="character.reviewSummary">先在本地生成零调用审阅包，再由你明确确认唯一一次在线调用。</p>
-            </header>
-
-            <div class="character-mode-tabs" role="group" aria-label="生成布局" data-studio-i18n-aria-label="character.profileSelectorLabel">
-              <button id="character-fixed-profile" class="mode-tab is-active" type="button" aria-pressed="true" data-studio-i18n="character.fixedProfileTab">固定区域（Fixed-region）</button>
-              <span class="mode-tab character-profile-unavailable" role="note" data-studio-i18n="character.topdownProfileTab">俯视布局不可用 · 缺少权威 Structure</span>
+            <div id="character-release-grid" class="character-release-grid" hidden>
+              <a id="character-release-pack" href="#" download><strong>character_pack.zip</strong><span data-studio-i18n="character.releasePack">已验证角色下载</span></a>
+              <a id="character-release-godot" href="#" download><strong>Godot</strong><span data-studio-i18n="character.releaseEngine">引擎包</span></a>
+              <a id="character-release-rpgmaker" href="#" download><strong>RPG Maker</strong><span data-studio-i18n="character.releaseEngine">引擎包</span></a>
+              <a id="character-release-ocad" href="#" download><strong>OCAD</strong><span data-studio-i18n="character.releaseEngine">引擎包</span></a>
             </div>
-
-            <label class="character-prompt-field" for="character-description">
-              <span data-studio-i18n="character.descriptionLabel">角色描述</span>
-              <textarea id="character-description" rows="6" data-studio-i18n-placeholder="character.descriptionPlaceholder" placeholder="例如：一名铜发游侠，绿色外套，清晰像素轮廓"></textarea>
-              <small data-studio-i18n="character.descriptionHelp">这段文字会写入封存提示词；审阅包封存后不能更改。</small>
-            </label>
-
-            <section class="character-contract-card" aria-labelledby="character-contract-title">
-              <h2 id="character-contract-title" data-studio-i18n="character.contractTitle">严格配置（Profile）</h2>
-              <dl>
-                <div><dt data-studio-i18n="character.profileLabel">配置档（Profile）</dt><dd id="character-profile-value">full_sheet_fixed_region_v1</dd></div>
-                <div><dt data-studio-i18n="character.layoutLabel">布局</dt><dd id="character-layout-value">fixed_region_motion_v0</dd></div>
-                <div><dt data-studio-i18n="character.imageLabel">图像</dt><dd>2K · 1:1</dd></div>
-                <div><dt data-studio-i18n="character.budgetLabel">调用预算</dt><dd id="character-budget-value">0/1 · 无重试 / 无回退</dd></div>
-                <div><dt data-studio-i18n="character.matteLabel">去背景</dt><dd id="character-matte-value">deterministic_pixel_matte_v2</dd></div>
-                <div><dt data-studio-i18n="character.overridesLabel">手动覆盖</dt><dd data-studio-i18n="character.overridesValue">无 · 锚点 (0, 0)</dd></div>
-                <div><dt data-studio-i18n="character.frameLocksLabel">帧调整</dt><dd data-studio-i18n="character.frameLocksValue">空 · 锁定动画为空</dd></div>
-                <div><dt data-studio-i18n="character.normalizationLabel">规范化</dt><dd data-studio-i18n="character.normalizationValue">自动校正：开 · 稳定处理：开</dd></div>
-              </dl>
-            </section>
-
-            <section class="character-state-panel character-running-panel" aria-labelledby="character-running-panel-title">
-              <div class="character-state-mode-hint">
-                <span data-studio-i18n="character.strictFixedRegionLabel">严格固定区域</span>
-                <strong id="character-running-mode-binding" data-studio-i18n="character.oneCallSealedJob">一次调用任务 · 已封存</strong>
-              </div>
-              <div class="character-state-card character-running-card">
-                <h2 id="character-running-panel-title" data-studio-i18n="character.runningAuthorityTitle">任务阶段只依据服务端回执</h2>
-                <p class="character-state-signal"><span>provider_calls_used</span><strong id="character-running-provider-calls">—</strong><span id="character-running-network-phase" data-studio-i18n="character.networkStatePending">· 等待网络阶段回执</span></p>
-                <dl class="character-state-rows">
-                  <div><dt data-studio-i18n="character.profileLabel">配置档（Profile）</dt><dd id="character-running-profile">full_sheet_fixed_region_v1</dd></div>
-                  <div><dt data-studio-i18n="character.providerCallsLabel">服务提供方调用</dt><dd id="character-running-call-budget">—</dd></div>
-                  <div><dt data-studio-i18n="character.rawProvenanceLabel">Raw 来源证据</dt><dd id="character-running-raw-provenance">—</dd></div>
-                </dl>
-                <ol class="character-running-phases" aria-label="当前阶段" data-studio-i18n-aria-label="character.currentPhaseLabel">
-                  <li data-running-phase="queued" data-studio-i18n="character.jobStatusQueued">queued（排队中）</li>
-                  <li data-running-phase="generating" data-studio-i18n="character.jobStatusGenerating">generating（生成中）</li>
-                  <li data-running-phase="raw" data-studio-i18n="character.rawSealedPhase">Raw 已封存</li>
-                  <li data-running-phase="matte">Matte V2</li>
-                  <li data-running-phase="count" data-studio-i18n="character.pipelineCount">主体计数</li>
-                </ol>
-              </div>
-            </section>
-
-            <div class="character-state-mode-hint character-review-mode-hint">
-              <span data-studio-i18n="character.strictFixedRegionLabel">严格固定区域</span>
-              <strong id="character-review-mode-binding" data-studio-i18n="character.statusReviewRequired">review_required · 1/1</strong>
+            <div id="character-placeholder" class="character-placeholder" aria-label="等待真实结果" data-studio-i18n-aria-label="character.placeholderLabel">
+              <p data-studio-i18n="character.placeholderText">等待真实证据</p>
             </div>
-
-            <section class="character-state-panel character-accepted-panel" aria-labelledby="character-accepted-panel-title">
-              <div class="character-release-card">
-                <span data-studio-i18n="character.acceptedKicker">已接受 · 下载已验证</span>
-                <strong id="character-accepted-panel-title">character_pack.zip</strong>
-                <small data-studio-i18n="character.releasePack">已验证角色下载</small>
-              </div>
-              <div class="character-state-card">
-                <h2 data-studio-i18n="character.publicationLabel">已接受下载记录</h2>
-                <dl class="character-state-rows">
-                  <div><dt>acceptance_id</dt><dd id="character-accepted-publication-id">—</dd></div>
-                  <div><dt data-studio-i18n="character.bindingLabel">绑定</dt><dd data-studio-i18n="character.sealedValue">已封存</dd></div>
-                </dl>
-              </div>
-              <div class="character-state-card character-state-card-compact">
-                <h2 data-studio-i18n="character.profileLabel">配置档（Profile）</h2>
-                <dl class="character-state-rows">
-                  <div><dt data-studio-i18n="character.profileLabel">配置档（Profile）</dt><dd id="character-accepted-profile">full_sheet_fixed_region_v1</dd></div>
-                  <div><dt data-studio-i18n="character.sourceJobLabel">源任务</dt><dd id="character-accepted-source-job">—</dd></div>
-                </dl>
-              </div>
-              <div class="character-state-card character-state-card-compact">
-                <h2 data-studio-i18n="character.releaseEvidenceLabel">下载验证证据</h2>
-                <dl class="character-state-rows">
-                  <div><dt>Raw SHA</dt><dd id="character-accepted-raw-sha">—</dd></div>
-                  <div><dt data-studio-i18n="character.gateLabel">门</dt><dd id="character-accepted-release-gate" data-studio-i18n="character.acceptedSealedValue">accepted · 已封存</dd></div>
-                </dl>
-              </div>
-              <div class="character-state-card character-state-card-compact">
-                <h2 data-studio-i18n="character.outputLabel">输出</h2>
-                <dl class="character-state-rows">
-                  <div><dt data-studio-i18n="character.packLabel">资源包</dt><dd id="character-accepted-output-pack">character_pack.zip</dd></div>
-                  <div><dt data-studio-i18n="character.enginesLabel">引擎</dt><dd id="character-accepted-output-engines">Godot · RPG Maker · OCAD</dd></div>
-                </dl>
-              </div>
-            </section>
-
-            <section class="character-state-panel character-topdown-panel" aria-labelledby="character-topdown-panel-title">
-              <div class="character-state-mode-hint">
-                <span data-studio-i18n="character.topdownProfileLabel">俯视布局配置档</span>
-                <strong>blocked_pre_review</strong>
-              </div>
-              <div class="character-state-card character-topdown-card">
-                <h2 id="character-topdown-panel-title" data-studio-i18n="character.topdownKicker">俯视布局已禁用</h2>
-                <p data-studio-i18n="character.topdownSummary">缺少权威结构（Structure），因此审阅和服务提供方在任何调用前均被阻断。</p>
-                <dl class="character-state-rows">
-                  <div><dt data-studio-i18n="character.strictProfileLabel">严格配置档</dt><dd>full_sheet_topdown_v1</dd></div>
-                  <div><dt data-studio-i18n="character.structureLabel">结构（Structure）</dt><dd data-studio-i18n="character.missingRequiredValue">缺失 · 必填</dd></div>
-                  <div><dt data-studio-i18n="character.providerCallsLabel">服务提供方调用</dt><dd data-studio-i18n="character.blockedPreCallValue">0 · 调用前阻断</dd></div>
-                </dl>
-                <div class="character-coming-later"><span data-studio-i18n="character.statusLabel">状态</span><strong data-studio-i18n="character.comingLaterValue">稍后提供</strong></div>
-              </div>
-            </section>
-
-            <section id="character-sealed-binding" class="character-sealed-binding" hidden aria-labelledby="character-sealed-title">
-              <h2 id="character-sealed-title" data-studio-i18n="character.sealedTitle">封存绑定</h2>
-              <dl>
-                <div><dt data-studio-i18n="character.reviewIdLabel">审阅 ID</dt><dd id="character-review-id">—</dd></div>
-                <div><dt data-studio-i18n="character.planHashLabel">计划 Hash</dt><dd id="character-plan-hash">—</dd></div>
-                <div><dt data-studio-i18n="character.referenceHashLabel">参考清单 Hash</dt><dd id="character-reference-hash">—</dd></div>
-                <div><dt data-studio-i18n="character.providerLabel">服务提供方</dt><dd id="character-provider-binding">—</dd></div>
-                <div><dt data-studio-i18n="character.modelLabel">模型</dt><dd id="character-model-binding">—</dd></div>
-              </dl>
-              <nav id="character-review-links" class="character-review-links" aria-label="封存的审阅证据" data-studio-i18n-aria-label="character.sealedArtifactsLabel"></nav>
-            </section>
-
-            <section id="character-review-evidence" class="character-review-evidence" hidden>
-              <h2 data-studio-i18n="character.reviewEvidenceTitle">人工审阅</h2>
-              <dl class="character-evidence-binding">
-                <div><dt data-studio-i18n="character.gateLabel">门</dt><dd id="character-review-gate-binding">manual_accept_v1</dd></div>
-                <div><dt>Raw SHA</dt><dd id="character-review-raw-sha">—</dd></div>
-                <div><dt>Matte V2</dt><dd id="character-review-matte-count">—</dd></div>
-              </dl>
-              <label for="character-issue-count"><span data-studio-i18n="character.issueCountLabel">已确认问题数</span><input id="character-issue-count" type="number" min="0" step="1" value="0" /></label>
-              <p id="character-accept-preflight" role="status" aria-live="polite" data-studio-i18n="character.evidencePending">等待真实证据完整性校验。</p>
-              <dl class="character-manual-gate">
-                <div><dt data-studio-i18n="character.manualGateLabel">人工门</dt><dd data-studio-i18n="character.explicitHumanAcceptValue">显式人工接受</dd></div>
-                <div><dt data-studio-i18n="character.nextLabel">下一步</dt><dd data-studio-i18n="character.sealPublicationValue">封存已接受的验证下载</dd></div>
-              </dl>
-            </section>
-
-            <p id="character-action-message" class="character-action-message" role="status" aria-live="polite"></p>
-            <button id="character-primary-action" class="button primary character-primary-action" type="button" data-action="review" data-studio-i18n="character.reviewAction" data-studio-server-required disabled>生成审阅包（0 次调用）</button>
-            <button id="character-reset-action" class="button secondary character-reset-action" type="button" hidden data-studio-i18n="character.resetAction">返回审阅设置（不会自动调用）</button>
-          </aside>
-
-          <section class="character-stage" aria-labelledby="character-stage-title">
-            <header class="character-stage-toolbar">
-              <span data-studio-i18n="character.stageLabel">预览舞台</span>
-              <span id="character-stage-phase" class="stage-phase" data-studio-i18n="character.phaseReview">审阅</span>
-            </header>
-
-            <div class="character-stage-body">
-              <header class="character-stage-copy">
-                <span id="character-stage-kicker" class="stage-kicker" data-studio-i18n="character.reviewKicker">等待生成审阅包</span>
-                <h2 id="character-stage-title" data-studio-i18n="character.reviewStageTitle">计划与参考清单 Hash 尚未封存</h2>
-                <p id="character-stage-summary" data-studio-i18n="character.reviewStageSummary">审阅阶段不调用服务提供方，也不会出现 Raw 原图或生成结果。</p>
-              </header>
-
-              <div id="character-placeholder" class="character-placeholder" aria-label="等待真实结果" data-studio-i18n-aria-label="character.placeholderLabel">
-                <div class="pixel-character" aria-hidden="true"><i></i><b></b><span></span></div>
-                <p data-studio-i18n="character.placeholderText">等待真实证据</p>
-              </div>
-
-              <div class="character-job-strip" aria-hidden="true">
-                <div class="character-job-strip-review">
-                  <strong data-studio-i18n="character.statusReviewPending">review_pending · 0 次调用</strong>
-                  <span data-studio-i18n="character.noProviderYet">服务提供方尚未调用</span>
-                </div>
-                <div class="character-job-strip-confirm">
-                  <strong data-studio-i18n="character.statusReady">已就绪 · 0/1</strong>
-                  <span data-studio-i18n="character.confirmAction">确认并开始生成（最多 1 次调用）</span>
-                </div>
-                <div class="character-job-strip-running">
-                  <strong id="character-running-job-state" data-studio-i18n="character.statusReviewPending">review_pending · 0 次调用</strong>
-                  <span id="character-running-job-detail" data-studio-i18n="character.noProviderYet">服务提供方尚未调用</span>
-                </div>
-              </div>
-
-              <div id="character-evidence-grid" class="character-evidence-grid" hidden>
-                <figure><div class="evidence-media"><img id="character-raw-image" alt="服务提供方原始 Raw 输出" data-studio-i18n-alt="character.rawAlt" /></div><figcaption><strong data-studio-i18n="character.rawEvidence">Raw · SHA 已绑定</strong><span id="character-raw-caption">—</span></figcaption></figure>
-                <figure><div class="evidence-media checker"><img id="character-background-image" alt="原尺寸服务提供方去背景结果" data-studio-i18n-alt="character.backgroundAlt" /></div><figcaption><strong data-studio-i18n="character.backgroundEvidence">原尺寸去背景结果</strong><span>background_removed_provider_output.png</span></figcaption></figure>
-                <figure><div class="evidence-media checker"><img id="character-normalized-image" alt="规范化生产图；它是派生证据，不是 Raw 原图" data-studio-i18n-alt="character.normalizedAlt" /></div><figcaption><strong data-studio-i18n="character.normalizedEvidence">规范化结果 · 派生证据</strong><span data-studio-i18n="character.normalizedFileNote">normalized_sheet.png · 不是 Raw 原图</span></figcaption></figure>
-                <figure><div class="evidence-media checker"><img id="character-preview-image" alt="六种背景底色预览" data-studio-i18n-alt="character.previewAlt" /></div><figcaption><strong data-studio-i18n="character.previewEvidence">六底预览</strong><span data-studio-i18n="character.previewEvidenceHelp">白点与边缘检查</span></figcaption></figure>
-                <figure><div class="evidence-media"><img id="character-spill-image" alt="溢色与 Mask 诊断叠加图" data-studio-i18n-alt="character.spillAlt" /></div><figcaption><strong data-studio-i18n="character.spillEvidence">溢色诊断叠加图</strong><span id="character-spill-caption">0/11</span></figcaption></figure>
-                <figure><div class="evidence-media"><img id="character-sure-background-image" alt="确定背景分类 Mask" data-studio-i18n-alt="character.sureBackgroundAlt" /></div><figcaption><strong data-studio-i18n="character.sureBackgroundEvidence">确定背景（Sure Background）</strong><span>background_sure_background_mask.png</span></figcaption></figure>
-                <figure><div class="evidence-media"><img id="character-unknown-image" alt="未知带分类 Mask" data-studio-i18n-alt="character.unknownAlt" /></div><figcaption><strong data-studio-i18n="character.unknownEvidence">未知带（Unknown Band）</strong><span>background_unknown_band_mask.png</span></figcaption></figure>
-                <figure><div class="evidence-media"><img id="character-sure-foreground-image" alt="确定前景分类 Mask" data-studio-i18n-alt="character.sureForegroundAlt" /></div><figcaption><strong data-studio-i18n="character.sureForegroundEvidence">确定前景（Sure Foreground）</strong><span>background_sure_foreground_mask.png</span></figcaption></figure>
-                <figure><div class="evidence-media"><img id="character-alpha-image" alt="Background Matte V2 Alpha 估计图" data-studio-i18n-alt="character.alphaAlt" /></div><figcaption><strong data-studio-i18n="character.alphaEvidence">Alpha 估计</strong><span>background_alpha_estimate.png</span></figcaption></figure>
-                <figure><div class="evidence-media"><img id="character-reconstruction-image" alt="Background Matte V2 前景重建图" data-studio-i18n-alt="character.reconstructionAlt" /></div><figcaption><strong data-studio-i18n="character.reconstructionEvidence">前景重建</strong><span>background_foreground_reconstruction.png</span></figcaption></figure>
-              </div>
-              <nav id="character-evidence-artifacts" class="character-evidence-artifacts" aria-label="已核验的证据文件" data-studio-i18n-aria-label="character.verifiedArtifactsLabel" hidden></nav>
-
-              <div id="character-blocking-grid" class="character-blocking-grid" hidden>
-                <h3 data-studio-i18n="character.blockingTitle">阻断条件</h3>
-                <ul>
-                  <li data-studio-i18n="character.blockProfile">配置档（Profile）· 已锁定</li>
-                  <li data-studio-i18n="character.blockStructure">结构（Structure）· 缺失</li>
-                  <li data-studio-i18n="character.blockPrompt">提示词（Prompt）· 已阻断</li>
-                  <li data-studio-i18n="character.blockModel">模型 · 已锁定</li>
-                  <li data-studio-i18n="character.blockBudget">预算 · 0 次</li>
-                  <li data-studio-i18n="character.blockHashes">Hash · 未封存</li>
-                  <li data-studio-i18n="character.blockReview">审阅 · 不可用</li>
-                </ul>
-              </div>
-
-              <div id="character-release-grid" class="character-release-grid" hidden>
-                <a id="character-release-pack" href="#" download><strong>character_pack.zip</strong><span data-studio-i18n="character.releasePack">已验证角色下载</span></a>
-                <a id="character-release-godot" href="#" download><strong>Godot</strong><span data-studio-i18n="character.releaseEngine">引擎包</span></a>
-                <a id="character-release-rpgmaker" href="#" download><strong>RPG Maker</strong><span data-studio-i18n="character.releaseEngine">引擎包</span></a>
-                <a id="character-release-ocad" href="#" download><strong>OCAD</strong><span data-studio-i18n="character.releaseEngine">引擎包</span></a>
-              </div>
-
-              <div class="character-accepted-preview" aria-hidden="true">
-                <img id="character-accepted-image" alt="已接受的规范化角色图" data-studio-i18n-alt="character.acceptedImageAlt" />
+            <div id="character-job-strip" class="character-job-strip" role="group" data-studio-i18n-aria-label="character.jobStripLabel" aria-label="当前任务状态">
+              <div>
+                <strong id="character-running-job-state" data-studio-i18n="character.statusReviewPending">尚未审阅 · 0 次调用</strong>
+                <span id="character-running-job-detail" data-studio-i18n="character.reviewJobDetail">未调用服务提供方 · 生成审阅包后可继续</span>
               </div>
             </div>
-
+            <div id="character-blocking-grid" class="character-blocking-grid" hidden>
+              <h3 data-studio-i18n="character.blockingTitle">阻断条件</h3>
+            </div>
+            <span id="character-flow-badge" hidden><i></i><span data-studio-i18n="character.flowReview">审阅</span></span>
+            <span id="character-flow-summary" hidden></span>
             <footer class="character-pipeline">
-              <span class="pipeline-label" data-studio-i18n="character.pipelineLabel">处理流程</span>
+              <span class="pipeline-label"><strong data-studio-i18n="character.pipelineLabel">处理流程</strong><small data-studio-i18n="character.pipelineStepCount">7 步</small></span>
               <ol>
-                <li data-pipeline-step="raw"><span data-studio-i18n="character.pipelineRaw">Raw 原图</span><small data-studio-i18n="character.pipelineWait">等待</small></li>
+                <li data-pipeline-step="raw"><span data-studio-i18n="character.pipelineRaw">原图</span><small data-studio-i18n="character.pipelineWait">等待</small></li>
                 <li data-pipeline-step="matte"><span data-studio-i18n="character.pipelineMatte">去背景</span><small data-studio-i18n="character.pipelineWait">等待</small></li>
                 <li data-pipeline-step="count"><span data-studio-i18n="character.pipelineCount">主体计数</span><small data-studio-i18n="character.pipelineWait">等待</small></li>
                 <li data-pipeline-step="evidence"><span data-studio-i18n="character.pipelineEvidence">证据</span><small data-studio-i18n="character.pipelineWait">等待</small></li>
@@ -2374,7 +2394,11 @@
                 <li data-pipeline-step="preview"><span data-studio-i18n="character.pipelinePreview">预览</span><small data-studio-i18n="character.pipelineWait">等待</small></li>
                 <li data-pipeline-step="accept"><span data-studio-i18n="character.pipelineAccept">人工接受</span><small data-studio-i18n="character.pipelineLocked">已锁定</small></li>
               </ol>
-              <div class="pipeline-status" role="status" aria-live="polite" aria-atomic="true"><strong id="character-job-state">review_pending</strong><span id="character-job-detail" data-studio-i18n="character.noProviderYet">服务提供方尚未调用</span></div>
+            </footer>
+
+            <footer class="character-local-clips-dock">
+              <span data-character-local-copy="clipsLabel">已核验动画片段</span>
+              <div id="character-local-clips" class="character-local-clips"><p>animations.json 核验通过后才会出现动画片段。</p></div>
             </footer>
           </section>
         </main>
@@ -2398,27 +2422,6 @@
           </form>
         </dialog>
 
-        <div id="studio-character-prompt-shade" class="prompt-assistant-shade" hidden aria-hidden="true"></div>
-        <section id="studio-character-prompt-drawer" class="prompt-assistant-drawer" role="dialog" aria-modal="true" aria-labelledby="studio-character-prompt-title" data-prompt-kind="character" data-design-source="figma:ro8w6TKkpd969zW2V5bmkx/971:9023" hidden>
-          <header class="prompt-assistant-head">
-            <div><span data-prompt-copy="deterministic">确定性本地文本 · 0 fetch / 0 storage</span><h2 id="studio-character-prompt-title" tabindex="-1" data-prompt-copy="characterTitle">角色提示词助手</h2></div>
-            <button type="button" data-prompt-kind="character" data-prompt-action="close" data-prompt-copy-aria="closeAria" aria-label="关闭提示词助手">×</button>
-          </header>
-          <p class="prompt-assistant-help" data-prompt-copy="characterHelp">直接使用现有 buildCharacterPrompt；不会自动填充生成表单。</p>
-          <div class="prompt-assistant-fields">
-            <label><span data-prompt-copy="preset">角色预设</span><select id="studio-character-prompt-preset"></select></label>
-            <label><span data-prompt-copy="character">角色描述</span><textarea id="studio-character-prompt-character" rows="5">一个披风游侠，深绿斗篷，银色短剑，轮廓清晰。</textarea></label>
-            <label class="prompt-assistant-check"><input id="studio-character-prompt-reference" type="checkbox" checked /><span><strong data-prompt-copy="reference">存在参考图</strong><small data-prompt-copy="referenceHelp">只影响确定性提示词中的参考说明</small></span></label>
-          </div>
-          <label class="prompt-assistant-output"><span data-prompt-copy="output">确定性提示词</span><textarea id="studio-character-prompt-output" rows="11" readonly></textarea><small data-prompt-copy="outputHelp">参数顺序固定；相同输入产生相同文本。</small></label>
-          <div class="prompt-assistant-actions">
-            <button class="button primary" type="button" data-prompt-kind="character" data-prompt-action="generate" data-prompt-copy="generate">生成</button>
-            <button class="button secondary" type="button" data-prompt-kind="character" data-prompt-action="copy" data-prompt-copy="copy">复制</button>
-            <button class="button secondary" type="button" data-prompt-kind="character" data-prompt-action="reset" data-prompt-copy="reset">重置</button>
-          </div>
-          <p id="studio-character-prompt-live" class="prompt-assistant-live" role="status" aria-live="polite"></p>
-          <button class="button secondary prompt-assistant-close" type="button" data-prompt-kind="character" data-prompt-action="close" data-prompt-copy="close">关闭</button>
-        </section>
       </div>
     </div>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>

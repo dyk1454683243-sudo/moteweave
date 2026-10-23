@@ -140,7 +140,7 @@ export function moveAdvancedCutLine(cutLines, axis, index, position) {
 
 export function createAdvancedLocalSettings(dimensions = null) {
   return {
-    sourceLayout: TOPDOWN_RPG_SOURCE_LAYOUT_ID,
+    sourceLayout: FIXED_REGION_MOTION_LAYOUT_ID,
     backgroundMode: 'auto',
     backgroundTolerance: 24,
     componentCleanup: true,

@@ -3,6 +3,7 @@ import test from 'node:test'
 
 import {
   isRecoverableStrictPendingRestoreError,
+  loadAcceptedRawCharacterSource,
   parseStrictAcceptedPublicationSelector,
   parseStrictPendingGenerationSelector,
   pollStrictGenerationJob,
@@ -224,7 +225,7 @@ async function buildAcceptanceFixture() {
 
 async function buildPendingRecoveryFixture() {
   const fixture = await buildAcceptanceFixture()
-  const planHash = 'a'.repeat(64)
+  let planHash = 'a'.repeat(64)
   const referenceManifest = {
     protocol: 'generation_reference_manifest_v1',
     schema_version: 1,
@@ -278,7 +279,14 @@ async function buildPendingRecoveryFixture() {
     automatic_retry: false,
     provider_fallback: false,
     model_fallback: false,
+    request_input: {
+      description: 'one original forest ranger',
+    },
   }
+  const { plan_hash: ignoredPlanHash, ...requestManifestBase } = requestManifest
+  planHash = await sha256Bytes(textEncoder.encode(JSON.stringify(canonicalize(requestManifestBase))))
+  requestManifest.plan_hash = planHash
+  reviewArtifact.plan_hash = planHash
   const generation = JSON.parse(new TextDecoder().decode(fixture.payloads.get(fixture.job.generation_url)))
   generation.generation_review = {
     reviewed_run_id: REVIEW_ID,
@@ -344,6 +352,7 @@ test('provider-free Review locks the fixed-region contract and reports zero Prov
   assert.equal(Object.isFrozen(STRICT_FIXED_REGION_PROFILE), true)
   assert.equal(Object.isFrozen(STRICT_FIXED_REGION_PROFILE.imageConfig), true)
   assert.equal(Object.isFrozen(STRICT_FIXED_REGION_PROFILE.generationOptions), true)
+  assert.equal(STRICT_FIXED_REGION_PROFILE.sourceLayout, 'fixed_region_motion_v0')
   const calls = []
   const review = await requestStrictFixedRegionReview({
     runId: REVIEW_ID,
@@ -382,6 +391,9 @@ test('provider-free Review locks the fixed-region contract and reports zero Prov
     backgroundMode: 'deterministic_pixel_matte_v2',
   })
   assert.equal(review.provider_calls_used, 0)
+  for (const key of ['backgroundTolerance', 'anchorOffset', 'frameAdjustments', 'lockedAnimations', 'autoCorrect', 'motionStabilize', 'blackSourceBuffer', 'manualOverrides', 'exportScales']) {
+    assert.equal(Object.hasOwn(calls[1].body, key), false, `Review body must not include ${key}`)
+  }
 })
 
 test('provider-free Review fails closed before POST when no strict native Gemini preset is ready', async () => {
@@ -419,6 +431,9 @@ test('live start sends only the six sealed confirmation fields', async () => {
       maxProviderCalls: 1,
     },
   }])
+  for (const key of ['backgroundTolerance', 'anchorOffset', 'frameAdjustments', 'lockedAnimations', 'autoCorrect', 'motionStabilize', 'blackSourceBuffer', 'manualOverrides', 'exportScales']) {
+    assert.equal(Object.hasOwn(calls[0].body, key), false, `Live body must not include ${key}`)
+  }
 })
 
 test('polling uses fixed 500 ms intervals, stops on terminal state, and times out at 240 polls', async () => {
@@ -525,6 +540,7 @@ test('sealed pending deep link restores the exact review-required Job without a 
   assert.equal(restored.review.reviewed_run_id, REVIEW_ID)
   assert.equal(restored.review.plan_hash, fixture.planHash)
   assert.equal(restored.review.reference_manifest_sha256, fixture.referenceHash)
+  assert.equal(restored.sealedDescription, 'one original forest ranger')
 
   requested.length = 0
   const prepared = await prepareStrictManualAcceptanceEvidence({
@@ -546,6 +562,22 @@ test('pending deep-link recovery fails closed on changed Review bytes or a block
   await assert.rejects(
     restoreStrictReviewRequiredGeneration({ jobId: JOB_ID, reviewId: REVIEW_ID }, {
       fetchImpl: async (url) => bytesResponse(changedReview.payloads.get(url)),
+    }),
+    (error) => error?.code === 'pending_review_mismatch',
+  )
+
+  const changedDescription = await buildPendingRecoveryFixture()
+  const changedRequestManifest = JSON.parse(new TextDecoder().decode(
+    changedDescription.payloads.get(changedDescription.recoveryUrls.request),
+  ))
+  changedRequestManifest.request_input.description = 'tampered after Review sealing'
+  changedDescription.payloads.set(
+    changedDescription.recoveryUrls.request,
+    textEncoder.encode(JSON.stringify(changedRequestManifest)),
+  )
+  await assert.rejects(
+    restoreStrictReviewRequiredGeneration({ jobId: JOB_ID, reviewId: REVIEW_ID }, {
+      fetchImpl: async (url) => bytesResponse(changedDescription.payloads.get(url)),
     }),
     (error) => error?.code === 'pending_review_mismatch',
   )
@@ -730,6 +762,65 @@ test('manual Accept posts the exact body and accepts only a zero-Provider respon
     url: `/api/generate-character/${JOB_ID}/accept`,
     body,
   }])
+  for (const key of ['backgroundTolerance', 'anchorOffset', 'frameAdjustments', 'lockedAnimations', 'autoCorrect', 'motionStabilize', 'blackSourceBuffer', 'manualOverrides', 'exportScales']) {
+    assert.equal(Object.hasOwn(calls[0].body, key), false, `Accept body must not include ${key}`)
+  }
+})
+
+test('accepted AI raw bytes become one verified shared-processing source', async () => {
+  const raw = textEncoder.encode('accepted raw provider image')
+  const expectedRawProviderOutputSha256 = await sha256Bytes(raw)
+  const publicationId = `accepted_v1_${JOB_ID}`
+  const acceptance = {
+    publication_id: publicationId,
+    raw_provider_output_url: `/generated/${publicationId}/raw_provider_output.png`,
+  }
+  const calls = []
+  const source = await loadAcceptedRawCharacterSource(acceptance, {
+    expectedRawProviderOutputSha256,
+  }, {
+    fetchImpl: async (url, options = {}) => {
+      calls.push({ url, method: options.method || 'GET' })
+      return bytesResponse(raw)
+    },
+    fileFactory: ({ bytes, name, type }) => ({
+      name,
+      type,
+      size: bytes.byteLength,
+      arrayBuffer: async () => bytes.slice().buffer,
+    }),
+  })
+
+  assert.deepEqual(calls, [{
+    url: acceptance.raw_provider_output_url,
+    method: 'GET',
+  }])
+  assert.equal(source.name, 'raw_provider_output.png')
+  assert.equal(source.type, 'image/png')
+  assert.equal(source.size, raw.byteLength)
+  assert.deepEqual(new Uint8Array(await source.arrayBuffer()), raw)
+
+  await assert.rejects(
+    loadAcceptedRawCharacterSource(acceptance, {
+      expectedRawProviderOutputSha256: 'f'.repeat(64),
+    }, {
+      fetchImpl: async () => bytesResponse(raw),
+      fileFactory: () => assert.fail('hash mismatch must fail before File creation'),
+    }),
+    (error) => error?.code === 'accepted_source_hash_mismatch',
+  )
+
+  await assert.rejects(
+    loadAcceptedRawCharacterSource({
+      ...acceptance,
+      raw_provider_output_url: `/generated/${publicationId}/raw_provider_output.bin`,
+    }, {
+      expectedRawProviderOutputSha256,
+    }, {
+      fetchImpl: async () => assert.fail('unsupported source type must fail before fetch'),
+    }),
+    (error) => error?.code === 'accepted_source_type_unsupported',
+  )
 })
 
 test('accepted publication restore replays only the existing zero-Provider Accept binding', async () => {

@@ -5,9 +5,41 @@
 - Documented the public contributor surface: repository homepage and topics,
   a visitor-facing README intro with Quick Start aligned to `npm ci` / Node.js
   22 or 24, `CONTRIBUTING.md`, and GitHub issue templates. No version bump.
+
+## [0.6.0] - 2026-10-23
+
+### Added
+
+- Added an opt-in VNext workspace for v1 projects and documents. Studio stays
+  the default entry. Three native text assistants (Codex, Grok, and
+  Antigravity) can discuss the open project or apply one selected creative
+  action, with undo.
+- Added native pixel drawing on the editor canvas: brushes, fill, eraser,
+  color controls, onion skin, a project palette, timeline structure, and
+  document export.
+- Added linked-cel editing so a change to a shared cel updates the frames that
+  use it, plus a provider-free pixel-tools CLI.
+- Added pixel selection, editable canvas text, canvas display settings, and
+  download of the saved canvas PNG.
+- Added separate editor history storage. The open project keeps a small current
+  state, and the full edit history stays on disk, so longer pixel-editing
+  sessions can still save. Existing undo and redo behavior is unchanged.
+- Added native Astra animation. With an explicit skill, Astra draws distinct
+  frames and timings on the selected canvas and applies them as one undoable
+  change.
+
+### Changed
+
+- Retired the Studio character compatibility generation flow. Reviewed
+  generation and advanced local processing stay in place.
+- Simplified Studio character review and advanced options, renamed the Action
+  workflow to frame extraction, clarified Tiles build outputs, and unified each
+  module's primary action.
+- Unified Studio map routing with the current character source and result
+  workflow.
 - Restored the provider-free public snapshot export path (`release:check` /
-  `release:export`) on the current Studio-era baseline so a new MoteWeave
-  public snapshot can be cut from v0.5.0.
+  `release:export`) on the Studio-era baseline so this 0.6.0 snapshot can be
+  cut from v0.5.0.
 
 ## [0.5.0] - 2026-08-13
 

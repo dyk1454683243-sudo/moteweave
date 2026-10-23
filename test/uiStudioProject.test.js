@@ -86,6 +86,22 @@ test('Project Studio exposes the complete truthful state matrix without fake his
   assert.equal(getStudioSceneProjectCandidate(), null)
 })
 
+test('Project Current clips the left flow explainer and capability callout', async () => {
+  const [html, css] = await Promise.all([
+    readFile('src/ui/studio/studio.html', 'utf8'),
+    readFile('src/ui/studio/studio.css', 'utf8'),
+  ])
+  const project = projectHtml(html)
+  assert.match(project, /class="project-flow-header"/)
+  assert.match(project, /id="studio-project-title"/)
+  assert.match(project, /aria-labelledby="studio-project-title"/)
+  assert.match(project, /class="project-truth-callout"/)
+  assert.match(project, /id="studio-project-truth-title"/)
+  assert.match(project, /id="studio-project-id"/)
+  assert.match(css, /\.project-flow-header \{[^}]*clip:\s*rect\(0,\s*0,\s*0,\s*0\)/)
+  assert.match(css, /\.project-truth-callout \{[^}]*clip:\s*rect\(0,\s*0,\s*0,\s*0\)/)
+})
+
 test('Project state gates new submission, same-Job resume, stale output, and verified release', () => {
   const fileMode = createInitialProjectState({ serviceAvailable: false })
   fileMode.inputsValid = true
@@ -123,7 +139,7 @@ test('Project state gates new submission, same-Job resume, stale output, and ver
 
 test('Project geometry preserves the 1920 Current frame and has a real narrow layout', async () => {
   const css = await readFile('src/ui/studio/studio.css', 'utf8')
-  assert.match(css, /\.project-workspace\s*\{[^}]*grid-template-columns:\s*320px minmax\(0,1fr\)/)
+  assert.match(css, /\.project-workspace\s*\{[^}]*min-width:\s*0[^}]*grid-template-columns:\s*320px minmax\(0,1fr\)/)
   assert.match(css, /\.project-stage-body\s*\{[^}]*grid-template-rows:\s*minmax\(420px,1fr\) 225px[^}]*gap:\s*16px[^}]*padding:\s*16px/)
   assert.match(css, /\.project-candidate-grid\s*\{[^}]*grid-template-columns:\s*repeat\(2,minmax\(0,1fr\)\)[^}]*gap:\s*16px/)
   assert.match(css, /@media \(max-width: 900px\)[\s\S]*?\.project-workspace\s*\{[^}]*grid-template-columns:\s*minmax\(0,1fr\)/)

@@ -26,6 +26,7 @@
   ],
   "exclude_paths": [
     ".claude/",
+    ".pi/",
     "test/fixtures/character-pack/local-image-golden/ocad-sheet/ocad_knight_walk.jpg"
   ],
   "forbidden_paths": [

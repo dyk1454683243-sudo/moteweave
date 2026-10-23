@@ -18,6 +18,7 @@ import {
 } from '../src/character-pack/backgroundMatteV2.js'
 import { loadRgba } from '../src/character-pack/imageCodec.js'
 import { acceptFullSheetGeneration } from '../src/server/fullSheetGenerationAcceptance.js'
+import { STRICT_ACCEPT_URL_FIELDS } from '../src/ui/studio/characterApi.js'
 
 function listen(server) {
   return new Promise((resolve) => {
@@ -797,6 +798,55 @@ test('strict full-sheet live generation completes as review-required after one s
   )
   assert.equal(provider.requests.length, 1)
 
+  // A request-based acceptance records its basis truthfully; a record without one keeps its
+  // historical meaning and is never rewritten.
+  const legacyAcceptance = JSON.parse(await readFile(path.join(mattePublicationDir, 'manual_acceptance.json'), 'utf8'))
+  assert.equal(Object.hasOwn(legacyAcceptance, 'acceptance_basis'), false, 'a request without a basis records none')
+  await assert.rejects(
+    acceptFullSheetGeneration({
+      sourceJobId: 'matte_v2_accept_request',
+      request: { ...matteAcceptanceBody, acceptanceBasis: 'user_request', humanReviewedIssueCount: 2 },
+      generatedDir: matteRoot,
+    }),
+    (error) => error?.code === 'invalid_acceptance_request',
+    'a request-based acceptance cannot claim reviewed issues',
+  )
+  const requestedJobId = 'matte_v2_accept_request'
+  // Matte evidence is bound to its job id, so this job gets its own bundle.
+  const requestBundle = await buildBackgroundMatteV2ArtifactBundle(matteResult, {
+    rawSource: rawProviderImage,
+    artifactUrlPrefix: `/generated/${requestedJobId}`,
+  })
+  const requestOutput = requestBundle.artifacts[BACKGROUND_MATTE_V2_ARTIFACT_FILES.OUTPUT]
+  const requestedJobDir = path.join(matteRoot, requestedJobId)
+  await mkdir(requestedJobDir)
+  for (const file of matteSourceFiles) await copyFile(path.join(sourceJobDir, file), path.join(requestedJobDir, file))
+  for (const [file, content] of Object.entries(requestBundle.files)) await writeFile(path.join(requestedJobDir, file), content, { flag: 'wx' })
+  await writeFile(path.join(requestedJobDir, 'generation.json'), JSON.stringify({
+    ...matteGeneration,
+    background_removed_provider_output: { ...matteGeneration.background_removed_provider_output, ...requestOutput },
+    background_matte_v2: requestBundle.metadata,
+  }, null, 2), { flag: 'wx' })
+  const requestedBaseBody = { ...acceptanceBody, expectedBackgroundRemovedProviderOutputSha256: requestOutput.sha256 }
+  const requestBody = { ...requestedBaseBody, acceptanceBasis: 'user_request' }
+  const requested = await acceptFullSheetGeneration({ sourceJobId: requestedJobId, request: requestBody, generatedDir: matteRoot })
+  assert.equal(requested.saved, 'accepted')
+  const requestedAcceptance = JSON.parse(await readFile(path.join(matteRoot, requested.publication_id, 'manual_acceptance.json'), 'utf8'))
+  assert.equal(requestedAcceptance.acceptance_basis, 'user_request')
+  assert.equal(requestedAcceptance.human_reviewed_issue_count, 0)
+  assert.equal(requestedAcceptance.decision_authority, 'human', 'the requester decided; the record does not claim an inspection')
+  const requestedGate = JSON.parse(await readFile(path.join(matteRoot, requested.publication_id, 'generation_release_gate.json'), 'utf8'))
+  assert.equal(requestedGate.manual_acceptance.acceptance_basis, 'user_request')
+  assert.equal((await acceptFullSheetGeneration({ sourceJobId: requestedJobId, request: requestBody, generatedDir: matteRoot })).saved, 'already_accepted')
+  assert.equal((await acceptFullSheetGeneration({ sourceJobId: requestedJobId, request: requestedBaseBody, generatedDir: matteRoot })).saved, 'already_accepted',
+    'a client that states no basis gets the existing record unchanged')
+  await assert.rejects(
+    acceptFullSheetGeneration({ sourceJobId: requestedJobId, request: { ...requestedBaseBody, acceptanceBasis: 'visual_inspection' }, generatedDir: matteRoot }),
+    (error) => error?.code === 'acceptance_conflict',
+    'a different stated basis never rewrites the record',
+  )
+  assert.equal(provider.requests.length, 1)
+
   const oversizedAcceptance = await fetch(
     `${baseUrl}/api/generate-character/${job.id}/accept`,
     {
@@ -963,6 +1013,15 @@ test('strict full-sheet live generation completes as review-required after one s
   const acceptedAgain = await acceptanceRequest()
   assert.equal(acceptedAgain.saved, 'already_accepted')
   assert.equal(acceptedAgain.publication_id, accepted.publication_id)
+  assert.equal(accepted.debug_report_url, `/generated/${accepted.publication_id}/debug_report.json`)
+  assert.equal(acceptedAgain.debug_report_url, accepted.debug_report_url)
+  assert.equal(acceptedAgain.animations_url, accepted.animations_url)
+  assert.equal(acceptedAgain.normalized_sheet_url, accepted.normalized_sheet_url)
+  assert.equal(acceptedAgain.zip_url, accepted.zip_url)
+  for (const field of Object.keys(STRICT_ACCEPT_URL_FIELDS)) {
+    assert.equal(Boolean(accepted[field]), true, `fresh accepted missing ${field}`)
+    assert.equal(acceptedAgain[field], accepted[field], `already_accepted drifted ${field}`)
+  }
   assert.equal(provider.requests.length, 1)
   const expectAcceptanceReplayIntegrityFailure = async () => {
     const response = await fetch(

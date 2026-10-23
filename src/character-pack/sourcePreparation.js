@@ -19,6 +19,7 @@ import {
 import { encodeRgbaPng, loadRgba, resizeRgbaNearest } from './imageCodec.js'
 import { cloneRgba, colorDistanceSq as pixelColorDistanceSq, pixelOffset } from './imageMath.js'
 import { resolveBackgroundOptions, resolveComponentCleanupOptions, resolveFixedRegionSourceStagingOptions } from './processingOptions.js'
+import { hardenBackgroundAlpha } from './backgroundMatteV2.js'
 
 export async function preprocessSourceForLayout(raw, sourceLayout, options = {}) {
   const target = sourceLayout.sheet
@@ -96,7 +97,7 @@ function topLeftConnectedMatte(image, { tolerance = 80 } = {}) {
   return { image: out, removedPixels }
 }
 
-export async function stageFixedRegionSource(raw, sourceLayout, options = {}) {
+export async function stageFixedRegionSource(raw, sourceLayout, options = {}, { removeConnectedMatte = true } = {}) {
   const staging = resolveFixedRegionSourceStagingOptions(options)
   const baseReport = {
     applied: false,
@@ -108,7 +109,7 @@ export async function stageFixedRegionSource(raw, sourceLayout, options = {}) {
   if (!staging.enabled || sourceLayout.kind !== 'fixed_regions') return { image: raw, report: baseReport }
 
   const resized = await resizeRgbaNearest(raw, { w: staging.stage_size, h: staging.stage_size })
-  const matte = topLeftConnectedMatte(resized, { tolerance: staging.matte_tolerance })
+  const matte = removeConnectedMatte ? topLeftConnectedMatte(resized, { tolerance: staging.matte_tolerance }) : { image: resized, removedPixels: 0 }
   const cropped = cropRgba(matte.image, {
     right: staging.crop_right,
     bottom: staging.crop_bottom,
@@ -123,7 +124,7 @@ export async function stageFixedRegionSource(raw, sourceLayout, options = {}) {
       output_size: { w: cropped.width, h: cropped.height },
       source_layout: sourceLayout.id,
       matte: {
-        method: 'top_left_connected',
+        method: removeConnectedMatte ? 'top_left_connected' : 'none',
         tolerance: staging.matte_tolerance,
         removed_pixels: matte.removedPixels,
       },
@@ -360,16 +361,29 @@ export function cleanupCellComponents(cells, options = {}) {
   }
 }
 
-export async function prepareSourceForProcessing(buffer, sourceLayout, options = {}) {
-  const loadedRaw = await loadRgba(buffer)
-  const sourceStaging = await stageFixedRegionSource(loadedRaw, sourceLayout, options)
+export async function prepareSourceForProcessing(buffer, sourceLayout, options = {}, pixelSource = null) {
+  const loadedRaw = pixelSource?.loadedRaw ?? await loadRgba(buffer)
+  const stagingPolicy = { removeConnectedMatte: !pixelSource?.background }
+  const sourceStaging = await stageFixedRegionSource(pixelSource?.image ?? loadedRaw, sourceLayout, options, stagingPolicy)
   const sourcePreprocess = await preprocessSourceForLayout(sourceStaging.image, sourceLayout, options)
   const raw = sourcePreprocess.image
   const sourcePng = await encodeRgbaPng(raw)
   const inputAlphaProvenance = sourceStaging.report.applied
     ? ALPHA_PROVENANCE.STAGING
     : options.inputAlphaProvenance
-  const background = {
+  const backgroundStaging = pixelSource?.background
+    ? await stageFixedRegionSource(pixelSource.background.image, sourceLayout, options, stagingPolicy)
+    : null
+  const backgroundPreprocess = backgroundStaging
+    ? await preprocessSourceForLayout(backgroundStaging.image, sourceLayout, options)
+    : null
+  const background = backgroundPreprocess ? {
+    ...pixelSource.background,
+    image: hardenBackgroundAlpha(backgroundPreprocess.image).image,
+    hard_alpha_after_geometry: true,
+    input_decode: loadedRaw.decode ?? null,
+    processed_before_geometry: true,
+  } : {
     ...(await removeBackground(raw, {
       ...options,
       inputAlphaProvenance,
