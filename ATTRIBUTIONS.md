@@ -68,8 +68,10 @@ See `package.json` and `package-lock.json` for the complete dependency tree.
 - `website/assets/studio-character.png`, `website/assets/studio-extract.png`,
   `website/assets/studio-map.png`, and `website/assets/vnext-editor.png` are
   local headless-browser captures of the v0.6.0 Studio and VNext workspace,
-  written by `scripts/capture-website-assets.mjs`. They contain no third-party
-  artwork.
+  written by `scripts/capture-website-assets.mjs`. Sprite pixels in the VNext,
+  Character, and Extract captures come from the repository character-pack
+  fixture. The Map capture shows a local rules preview. They contain no
+  third-party artwork.
 
 ## File Format Compatibility
 

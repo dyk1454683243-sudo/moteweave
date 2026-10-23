@@ -67,8 +67,8 @@
     },
     {
       "path": "ATTRIBUTIONS.md",
-      "sha256": "eb81ab01e3606765c6678c711261cff5aed1c3865b6d2637548e4a496cb3ff74",
-      "size": 7922,
+      "sha256": "bc369ced188248754eb01b1854675efcff0cef36ca955b0d1f64726bc7743092",
+      "size": 8080,
       "mode": "644"
     },
     {
@@ -97,7 +97,7 @@
     },
     {
       "path": "configs/public-asset-provenance.json",
-      "sha256": "7cb3253fa0d89bfa9300e2cc5a119bb6aebb57cfa9c044f87755cca481d2c85a",
+      "sha256": "5a4be2a6bacb49ca9eb8823c702ba76c8918376b6160d8eab9044b69f9e3dada",
       "size": 4935,
       "mode": "644"
     },
@@ -1099,8 +1099,8 @@
     },
     {
       "path": "scripts/capture-website-assets.mjs",
-      "sha256": "71c3edf7774edccf31cf51a9fe21662728843b635b1d4ce1a3425423a10a888b",
-      "size": 14024,
+      "sha256": "0469b52b995261a7d3f2d0941a76ffd7a80cf3afdc683e6ed77cd4c1dc99dfa2",
+      "size": 28376,
       "mode": "644"
     },
     {
@@ -5269,8 +5269,8 @@
     },
     {
       "path": "website/README.md",
-      "sha256": "37635563d2b7d24d3c6cd45ecf0f278733c6f12972508f134048cac86fc089eb",
-      "size": 1531,
+      "sha256": "d0483d23c6539e3bc4605136a51fcb18ec939cadef08b50ae4c19b39e3fd2093",
+      "size": 1649,
       "mode": "644"
     },
     {
@@ -5287,32 +5287,32 @@
     },
     {
       "path": "website/assets/studio-character.png",
-      "sha256": "0ba1eec78ae78afe128c09ccbbe7b771e7ed771a24bae8610b57b038418786e5",
-      "size": 24645,
+      "sha256": "5c0a4dc1f39a1bd58b2af3b4df1e2761273ba6239e56873f4f7be41cad06f14b",
+      "size": 72584,
       "mode": "644"
     },
     {
       "path": "website/assets/studio-extract.png",
-      "sha256": "44e8b3e5cd96a073b8b6b63b45aca9e2aaf558efd067b8ed1b28f0da1b1b8260",
-      "size": 29733,
+      "sha256": "f4cee3b9b256517bdedb812535aeb5be5080224ee33e696d150ebcb9d10f44a7",
+      "size": 76359,
       "mode": "644"
     },
     {
       "path": "website/assets/studio-map.png",
-      "sha256": "2795a464e60f831c6f18f2624b4a8658b8cd01da15defc18086177c6970aa9b2",
-      "size": 29262,
+      "sha256": "e27e1d20dfe4525353688def008abc8704f621ce36be635786fff90a0990c200",
+      "size": 77518,
       "mode": "644"
     },
     {
       "path": "website/assets/vnext-editor.png",
-      "sha256": "b1832010b413b547b02e8a75a6d94410bcbee29fa6551f60bdd15e05a7e2cfab",
-      "size": 41487,
+      "sha256": "0eb3105de9a06c85c144617acde10aab017a579bdb8b2db9aed40fa7261c0e68",
+      "size": 148130,
       "mode": "644"
     },
     {
       "path": "website/index.html",
-      "sha256": "dd5bcea05ded21fd6d767cda62a258b1d7e832c51e62f421accfce46eb2916af",
-      "size": 15847,
+      "sha256": "275f2ad3fd3dec3e6c7d66dc895119bd5de2a51684482cecbe1c8ebefa3cdd6f",
+      "size": 13531,
       "mode": "644"
     },
     {
@@ -5329,8 +5329,8 @@
     },
     {
       "path": "website/styles.css",
-      "sha256": "be604adcab4f5e7499bd81fbd95cea1881035d40f4a8bc584097a1c9ea01674c",
-      "size": 6975,
+      "sha256": "2b4818b4be6837cc21757e24587bff91d27526114b8cb8342d97647d5adb240d",
+      "size": 7073,
       "mode": "644"
     }
   ]

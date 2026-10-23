@@ -215,6 +215,13 @@ dd {
   margin-bottom: 0;
 }
 
+.note {
+  margin: 0.9rem 0 0;
+  max-width: 62ch;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;

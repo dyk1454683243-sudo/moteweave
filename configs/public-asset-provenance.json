@@ -54,7 +54,7 @@
       "kind": "website_screenshot",
       "source_rights": "repository_owned",
       "generator": "scripts/capture-website-assets.mjs",
-      "sha256": "0ba1eec78ae78afe128c09ccbbe7b771e7ed771a24bae8610b57b038418786e5",
+      "sha256": "5c0a4dc1f39a1bd58b2af3b4df1e2761273ba6239e56873f4f7be41cad06f14b",
       "release_status": "approved"
     },
     {
@@ -62,7 +62,7 @@
       "kind": "website_screenshot",
       "source_rights": "repository_owned",
       "generator": "scripts/capture-website-assets.mjs",
-      "sha256": "44e8b3e5cd96a073b8b6b63b45aca9e2aaf558efd067b8ed1b28f0da1b1b8260",
+      "sha256": "f4cee3b9b256517bdedb812535aeb5be5080224ee33e696d150ebcb9d10f44a7",
       "release_status": "approved"
     },
     {
@@ -70,7 +70,7 @@
       "kind": "website_screenshot",
       "source_rights": "repository_owned",
       "generator": "scripts/capture-website-assets.mjs",
-      "sha256": "2795a464e60f831c6f18f2624b4a8658b8cd01da15defc18086177c6970aa9b2",
+      "sha256": "e27e1d20dfe4525353688def008abc8704f621ce36be635786fff90a0990c200",
       "release_status": "approved"
     },
     {
@@ -78,7 +78,7 @@
       "kind": "website_screenshot",
       "source_rights": "repository_owned",
       "generator": "scripts/capture-website-assets.mjs",
-      "sha256": "b1832010b413b547b02e8a75a6d94410bcbee29fa6551f60bdd15e05a7e2cfab",
+      "sha256": "0eb3105de9a06c85c144617acde10aab017a579bdb8b2db9aed40fa7261c0e68",
       "release_status": "approved"
     },
     {
