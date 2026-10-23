@@ -209,6 +209,25 @@ export function deriveSequencePresentation(state = createInitialSequenceState())
   }
 }
 
+const SEQUENCE_BINDING_TITLE_KEYS = Object.freeze({
+  empty: 'sequence.binding.title.empty',
+  ready: 'sequence.binding.title.ready',
+  processing: 'sequence.binding.title.processing',
+  building: 'sequence.binding.title.building',
+  complete: 'sequence.binding.title.complete',
+  partial: 'sequence.binding.title.partial',
+  stale: 'sequence.binding.title.stale',
+  error: 'sequence.binding.title.error',
+  local_error: 'sequence.binding.title.local_error',
+})
+
+export function sequenceBindingTitleKey(phase, localFailureStage) {
+  if (phase === 'local_error' && localFailureStage === 'package_after_gif') {
+    return 'sequence.binding.title.packageError'
+  }
+  return SEQUENCE_BINDING_TITLE_KEYS[phase] ?? SEQUENCE_BINDING_TITLE_KEYS.empty
+}
+
 function currentBindingSnapshot(state) {
   return { sourceEpoch: state.sourceEpoch, optionsKey: state.optionsKey }
 }
@@ -613,6 +632,7 @@ function renderMetrics(state) {
     requests: state.gifRequestCount,
     step: processingStepLabel(state),
   }
+  setNodeText(byId('studio-sequence-binding-title'), studioT(sequenceBindingTitleKey(phase, state.localFailureStage)))
   setNodeText(bindingTitle, studioT(bindingValues[0], bindingParams))
   bindingLines.forEach((node, index) => setNodeText(node, studioT(bindingValues[index + 1], bindingParams)))
 

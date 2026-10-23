@@ -529,14 +529,36 @@ export function deriveActionBlockedRecovery(state, controls = {}) {
   return Object.freeze({ action, labelKey: ACTION_RECOVERY_LABEL_KEYS[action] })
 }
 
-function renderSourceMeta(state) {
-  const file = state.sourceFile
-  const descriptor = state.sourceDescriptor
-  setText('studio-action-source-name', file?.name ?? studioT('action.source.none'))
-  setText('studio-action-source-size', file ? studioT('action.source.bytes', { count: file.size }) : '—')
-  setText('studio-action-source-kind', descriptor?.media_kind ?? file?.type ?? '—')
-  setText('studio-action-source-identity', descriptor?.source_identity ?? '—')
-  setText('studio-action-upload-id', descriptor?.upload_id ?? '—')
+export function deriveActionAdvancedEntry(state) {
+  const open = state?.phase === 'advanced'
+  const sourceSetFlow = deriveActionFlow(state) === 'sourceSet'
+  return Object.freeze({
+    open,
+    hidden: sourceSetFlow,
+    disabled: sourceSetFlow || (!open && (
+      !state?.sourceFile ||
+      Boolean(state?.uiOperation) ||
+      ['paused', 'abandon', 'source_set'].includes(state?.phase)
+    )),
+    labelKey: open ? 'action.advancedClose' : 'action.advancedToggle',
+  })
+}
+
+export function shouldRetainActionModeError({ fromPhase, toPhase }) {
+  return (
+    (fromPhase === 'blocked' && toPhase === 'advanced') ||
+    (fromPhase === 'advanced' && toPhase === 'blocked')
+  )
+}
+
+function renderSelectedSource(state) {
+  const selected = byId('studio-action-selected-source')
+  if (!selected) return
+  const name = state.sourceFile?.name
+  selected.hidden = !name
+  selected.textContent = name
+    ? studioT('action.source.selected', { name })
+    : ''
 }
 
 function renderSelectedFiles(state) {
@@ -645,16 +667,6 @@ function renderOptions(state) {
     else if (field === 'keyColor') control.value = formatMotionKeyColor(value)
     else control.value = value == null ? '' : String(value)
   })
-  const actionSelect = byId('studio-action-option-action')
-  if (actionSelect && !actionSelect.options.length) {
-    for (const animation of TOPDOWN_RPG_V0.animations) {
-      const option = document.createElement('option')
-      option.value = animation.name
-      option.textContent = animation.name
-      actionSelect.append(option)
-    }
-    actionSelect.value = state.optionsModel.action
-  }
 }
 
 function renderFrameSelection(state, availability) {
@@ -850,9 +862,16 @@ function renderButtons(state, availability) {
     }
   }
   const modeSwitchLocked = Boolean(state.uiOperation) || state.phase === 'abandon'
-  for (const id of ['studio-action-advanced-toggle', 'studio-action-source-set-toggle']) {
-    const button = byId(id)
-    if (button) button.disabled = modeSwitchLocked
+  const sourceSetToggle = byId('studio-action-source-set-toggle')
+  if (sourceSetToggle) sourceSetToggle.disabled = modeSwitchLocked
+  const advancedToggle = byId('studio-action-advanced-toggle')
+  if (advancedToggle) {
+    const advancedEntry = deriveActionAdvancedEntry(state)
+    advancedToggle.hidden = advancedEntry.hidden
+    advancedToggle.disabled = advancedEntry.disabled
+    advancedToggle.setAttribute('aria-controls', 'studio-action-advanced-panel')
+    advancedToggle.setAttribute('aria-expanded', String(advancedEntry.open))
+    advancedToggle.textContent = studioT(advancedEntry.labelKey)
   }
   document.querySelectorAll('[data-action-return-guided]').forEach((button) => {
     button.disabled = modeSwitchLocked
@@ -922,7 +941,7 @@ export function renderStudioAction(state = actionState) {
   document.querySelectorAll('[data-action-source="guided"]').forEach((panel) => {
     panel.hidden = sourceSetFlow
   })
-  renderSourceMeta(state)
+  renderSelectedSource(state)
   renderSelectedFiles(state)
   const visibleFlow = sourceSetFlow ? 'sourceSet' : 'guided'
   renderJobMeta(state, visibleFlow)
@@ -1756,6 +1775,11 @@ function recoverBlockedOperation() {
 
 function parseOptionValue(field, control) {
   const kind = OPTION_FIELDS[field]
+  if (field === 'action') {
+    const value = String(control.value ?? '').trim()
+    if (!value) throw actionError('invalid_runtime_action', studioT('action.error.actionName'))
+    return value
+  }
   if (kind === 'boolean') return Boolean(control.checked)
   if (kind === 'number') return Number(control.value)
   if (kind === 'nullableNumber') return control.value === '' ? null : Number(control.value)
@@ -1869,20 +1893,29 @@ function updateFrameSelection(target) {
 function showActionMode(phase) {
   if (actionState.uiOperation) return
   if (!['advanced', 'source_set'].includes(phase)) return
-  if (!['advanced', 'source_set'].includes(actionState.phase)) {
+  if (
+    phase === 'advanced' &&
+    (!actionState.sourceFile || deriveActionFlow(actionState) === 'sourceSet')
+  ) return
+  const fromPhase = actionState.phase
+  if (!['advanced', 'source_set'].includes(fromPhase)) {
     actionState.priorPhase = actionState.phase
     actionState.priorFlow = actionState.currentFlow
   }
   if (phase === 'source_set') actionState.currentFlow = 'sourceSet'
   actionState.phase = phase
-  actionState.error = null
+  if (!shouldRetainActionModeError({ fromPhase, toPhase: phase })) actionState.error = null
   actionState.notice = null
   renderStudioAction(actionState)
-  byId('studio-action-phase-title')?.focus({ preventScroll: true })
+  const focusTarget = phase === 'advanced'
+    ? byId('studio-action-advanced-title')
+    : byId('studio-action-phase-title')
+  focusTarget?.focus({ preventScroll: true })
 }
 
-function returnToGuided() {
+function returnToGuided({ focusTargetId = null } = {}) {
   if (actionState.uiOperation) return
+  const fromPhase = actionState.phase
   const fallback = actionState.priorFlow === 'sourceSet'
     ? guidedFallbackPhase(actionState)
     : exactPhase(actionState.priorPhase)
@@ -1890,9 +1923,18 @@ function returnToGuided() {
   actionState.priorFlow = 'guided'
   actionState.phase = fallback
   if (['advanced', 'source_set'].includes(actionState.phase)) actionState.phase = 'empty'
-  actionState.error = null
+  if (!shouldRetainActionModeError({ fromPhase, toPhase: actionState.phase })) actionState.error = null
   actionState.notice = null
   renderStudioAction(actionState)
+  if (focusTargetId) byId(focusTargetId)?.focus({ preventScroll: true })
+}
+
+function toggleAdvancedMode() {
+  if (actionState.phase === 'advanced') {
+    returnToGuided({ focusTargetId: 'studio-action-advanced-toggle' })
+    return
+  }
+  showActionMode('advanced')
 }
 
 function hasUnappliedActionWork(state = actionState) {
@@ -2108,7 +2150,7 @@ function bindActionButtons() {
   bindActionControl('studio-action-source-set-analyze', () => void startSourceSetAnalysis())
   bindActionControl('studio-action-source-set-apply', () => void startSourceSetApply())
   bindActionControl('studio-action-restore-auto', restoreAutomaticSelection)
-  bindActionControl('studio-action-advanced-toggle', () => showActionMode('advanced'))
+  bindActionControl('studio-action-advanced-toggle', toggleAdvancedMode)
   bindActionControl('studio-action-source-set-toggle', () => showActionMode('source_set'))
   bindActionControl('studio-action-abandon-cancel', cancelAbandon)
   bindActionControl('studio-action-abandon-confirm', confirmAbandon)
@@ -2117,7 +2159,12 @@ function bindActionButtons() {
     requestAbandonToCharacter,
   )
   document.querySelectorAll('[data-action-return-guided]').forEach((button) => {
-    button.addEventListener('click', returnToGuided)
+    button.addEventListener('click', () => {
+      const focusTargetId = actionState.phase === 'advanced'
+        ? 'studio-action-advanced-toggle'
+        : 'studio-action-source-set-toggle'
+      returnToGuided({ focusTargetId })
+    })
   })
   document.querySelectorAll('[data-action-language]').forEach((button) => {
     button.addEventListener('click', () => {

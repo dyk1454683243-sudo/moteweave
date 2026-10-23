@@ -5,14 +5,65 @@ This file defines mandatory rules for AI agents and human contributors working i
 ## Read Order Before Any Task
 
 1. `AGENTS.md`
-2. `docs/guardrails/ui-implementation-guardrails.md`, REQUIRED before any task that touches `src/ui/` or `index.html`
-3. `docs/guardrails/editor-workspace-guardrails.md`, REQUIRED before any task that touches `src/editor-project/`, `src/ui/editor/`, `editor.html`, `src/editor-app.js`, `/api/editor/*`, or Editor Workspace protocols
-4. `docs/roadmap/technology-reference-roadmap.md`, only when proposing, prioritizing, or scheduling features inspired by external tools
-5. The relevant protocol or design document, when the task names one
-6. The implementation plan, when the task names one
-7. Only the existing files needed for the current task
+2. `docs/guardrails/ui-implementation-guardrails.md`, REQUIRED before any task that touches `src/ui/` or `index.html`. Also read `docs/guardrails/studio-topbar-convention.md` before any task that touches a Studio topbar, crumb, or header chrome.
+3. `docs/roadmap/studio-migration-status.md`, REQUIRED before any task that touches `src/ui/studio/`, Studio routes or redirects, Studio Figma Current/Archive material, or Studio product documentation
+4. `docs/guardrails/editor-workspace-guardrails.md`, REQUIRED before any task that touches `src/editor-project/`, `src/ui/editor/`, `editor.html`, `src/editor-app.js`, `/api/editor/*`, or Editor Workspace protocols
+5. `docs/roadmap/technology-reference-roadmap.md`, only when proposing, prioritizing, or scheduling features inspired by external tools
+6. The relevant protocol or design document, when the task names one
+7. The implementation plan, when the task names one
+8. Only the existing files needed for the current task
 
 Do not scan `output/`, `generated/`, or other artifact directories unless the task explicitly requires it.
+
+## Codex Reviewer And Pi Executor Workflow
+
+When the human user is working through the paired Codex + terminal Pi workflow,
+the roles are intentionally different:
+
+- **Codex is the independent reviewer.** Codex turns human feedback into explicit
+  acceptance criteria, checks the design and implementation lineage, audits the
+  real capability boundary, reviews path-limited diffs, and verifies current
+  Figma, browser, test, and Git evidence. Codex reports defects and sends focused
+  follow-up instructions to Pi. Codex does not implement the same change it is
+  assigned to review unless the human explicitly changes the role or requests a
+  narrowly scoped emergency repair.
+- **The single project Pi session is the executor.** Pi performs approved
+  research, design work, Figma synchronization, implementation, guarded tests,
+  and browser verification. It must finish with an evidence-backed handoff for
+  Codex review; it must not self-declare human acceptance.
+- **Use one persistent Pi session for this project.** Before starting Pi, check
+  for the existing Game tools Pi session and reuse it. Do not create a second
+  session, `/new`, fork, clone, branch, worktree, or parallel Pi executor for a
+  follow-up task. If the saved session is genuinely unavailable, create exactly
+  one named replacement, record its session ID, and use that ID thereafter.
+- **Every user-visible UI/design change synchronizes both truths.** The executor
+  must update the maintained implementation and the matching Figma Current
+  frames in the same coherent task. Preserve superseded designs in Archive /
+  Historical, keep prototype entry points on Current, and record Current node
+  IDs, Archive evidence, screenshots, and justified deviations. A runtime-only
+  or Figma-only change is incomplete unless the human explicitly limits scope.
+- **Review remains independent.** Pi supplies changed files, parameter/capability
+  mappings, guarded test results, browser evidence, Figma node IDs, provider or
+  external-call counts, and exact remaining dirty state. Codex rechecks that
+  evidence and either reports acceptance criteria as satisfied or sends one
+  consolidated repair prompt back to the same Pi session.
+- Commit, stage, push, destructive cleanup, new providers, real paid calls, and
+  protected contract changes still require the authority defined elsewhere in
+  this file. Role separation never expands scope or permissions.
+
+## Current-State Documentation
+
+- A current-state document is a required orientation snapshot, not an
+  implementation plan or a substitute for maintained code and protocols.
+- Keep one authoritative current-state document per product surface. Do not
+  create competing files that each claim to describe the current product.
+- When a change updates an accepted baseline, route, maintained capability,
+  design authority, state or release gate, approved retirement, or known active
+  gap, update the corresponding current-state document in the same coherent
+  change.
+- Historical plans and Archive design material remain evidence only. They must
+  not override the current-state document, maintained capability contracts, or
+  the exact Figma Current state selected for implementation.
 
 ## Repository-Native Workflow
 

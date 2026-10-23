@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process'
 import { once } from 'node:events'
 import http from 'node:http'
 import test from 'node:test'
+import { editorFetch as fetch } from '../helpers/editorFetch.js'
 import assert from 'node:assert/strict'
 import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import os from 'node:os'
@@ -24,7 +25,9 @@ import {
   createDefaultEditorProject,
   createEditorArtifactAccessRegistry,
   createLayerDocument,
+  encodeRgbaPng,
   handleEditorProjectApi,
+  sha256Bytes,
 } from '../../src/editor-project/index.js'
 
 const timestamp = '2026-06-22T00:00:00.000Z'
@@ -967,4 +970,102 @@ test('server delegates /api/editor namespace to editor API handler', async (t) =
   assert.match(editorResponse.text, /editor-export-project-pack/)
 
   await writeFile(path.join(root, 'generated', 'keep.txt'), 'source remains explicit')
+})
+
+test('from-job HTTP commits a process sheet and replays without rereading the job', async (t) => {
+  const root = await tempRoot()
+  const generatedDir = path.join(root, 'generated')
+  const jobId = 'job_http_from_job'
+  const png = encodeRgbaPng(4, 2, Buffer.from([
+    10, 20, 30, 0, 40, 50, 60, 128, 4, 5, 6, 0, 7, 8, 9, 255,
+    70, 80, 90, 255, 1, 2, 3, 0, 11, 12, 13, 128, 14, 15, 16, 0,
+  ]))
+  const digest = sha256Bytes(png)
+  await mkdir(path.join(generatedDir, jobId), { recursive: true })
+  await writeFile(path.join(generatedDir, jobId, 'normalized_sheet.png'), png)
+  await writeFile(path.join(generatedDir, jobId, 'animations.json'), `${JSON.stringify({
+    profile: 'topdown_rpg_v0',
+    frame_size: { w: 2, h: 2 },
+    animations: { idle: { frames: [0, 1], fps: 8, mode: 'loop' } },
+  })}\n`)
+  await writeFile(path.join(generatedDir, jobId, 'metadata.json'), '{"name":"Http From Job"}\n')
+  await writeFile(path.join(generatedDir, jobId, 'editor_metadata.json'), `${JSON.stringify({
+    frames: {
+      frame_1: { frame: { x: 0, y: 0, w: 2, h: 2 }, duration: 110 },
+      frame_2: { frame: { x: 2, y: 0, w: 2, h: 2 }, duration: 220 },
+    },
+  })}\n`)
+  await writeFile(path.join(generatedDir, jobId, 'debug_report.json'), '{"status":"pass"}\n')
+  const jobs = new Map([[jobId, {
+    id: jobId,
+    status: 'done',
+    normalized_sheet_url: `/generated/${jobId}/normalized_sheet.png`,
+    animations_url: `/generated/${jobId}/animations.json`,
+    metadata_url: `/generated/${jobId}/metadata.json`,
+    editor_metadata_url: `/generated/${jobId}/editor_metadata.json`,
+    debug_report_url: `/generated/${jobId}/debug_report.json`,
+  }]])
+  const { server, baseUrl } = await startEditorApiServer(root, {
+    generatedDir,
+    getGeneratedJob: (id) => jobs.get(id) ?? null,
+  })
+  t.after(() => server.close())
+  const created = await fetchJson(baseUrl, '/api/editor/projects/v1', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ operation_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' }),
+  })
+  assert.equal(created.status, 201)
+  const body = {
+    operation_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+    expected_revision: 1,
+    source: { job_id: jobId, artifact: 'sheet', expected_sha256: digest },
+    name: null,
+  }
+  const imported = await fetchJson(
+    baseUrl,
+    `/api/editor/projects/${created.json.project.id}/sprite-documents/from-job`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+  )
+  assert.equal(imported.status, 201)
+  assert.equal(imported.json.document.frames.frame_2.duration_ms, 220)
+  jobs.delete(jobId)
+  const replay = await fetchJson(
+    baseUrl,
+    `/api/editor/projects/${created.json.project.id}/sprite-documents/from-job`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    },
+  )
+  assert.equal(replay.status, 200)
+  assert.equal(replay.json.receipt.operation_id, body.operation_id)
+})
+
+test('legacy Accept keeps 32KiB request_too_large at HTTP 400', async () => {
+  const root = await tempRoot()
+  const { server, baseUrl } = await startEditorApiServer(root, {
+    getGeneratedJob: () => null,
+    updateGeneratedJob: () => null,
+  })
+  try {
+    const oversized = await fetchJson(
+      baseUrl,
+      '/api/editor/projects/project_demo/assets/asset_hero/action-repair/job_x/accept',
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: 'x'.repeat(32 * 1024 + 1),
+      },
+    )
+    assert.equal(oversized.status, 400)
+    assert.equal(oversized.json.error, 'request_too_large')
+  } finally {
+    server.close()
+  }
 })

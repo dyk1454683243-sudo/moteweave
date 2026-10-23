@@ -1,7 +1,5 @@
-import { execFile, spawn } from 'node:child_process'
-import { promisify } from 'node:util'
-
-const execFileAsync = promisify(execFile)
+import { spawn } from 'node:child_process'
+import { readProcessTree } from '../processTreeSnapshot.js'
 
 export const EXTERNAL_TOOL_FAILURE = Object.freeze({
   TIMEOUT: 'external_tool_timeout',
@@ -20,7 +18,7 @@ export const DEFAULT_GUARDED_TOOL_LIMITS = Object.freeze({
   maxOutputBytes: 16 * 1024,
 })
 
-const activeProcessGroups = new Set()
+const activeProcessGroups = new Map()
 let parentCleanupInstalled = false
 
 export class ExternalToolError extends Error {
@@ -136,46 +134,6 @@ class ByteTail {
   }
 }
 
-async function readProcessTree(rootPid) {
-  const { stdout } = await execFileAsync('ps', ['-axo', 'pid=,ppid=,rss='], {
-    maxBuffer: 4 * 1024 * 1024,
-    timeout: 1000,
-  })
-  const processes = stdout
-    .trim()
-    .split('\n')
-    .map((line) => line.trim().split(/\s+/).map(Number))
-    .filter(([pid, parentPid, rssKiB]) => (
-      Number.isSafeInteger(pid) &&
-      Number.isSafeInteger(parentPid) &&
-      Number.isFinite(rssKiB)
-    ))
-  const childrenByParent = new Map()
-  const rssByPid = new Map()
-  for (const [pid, parentPid, rssKiB] of processes) {
-    rssByPid.set(pid, rssKiB)
-    const children = childrenByParent.get(parentPid) ?? []
-    children.push(pid)
-    childrenByParent.set(parentPid, children)
-  }
-
-  const pids = []
-  const pending = [rootPid]
-  const visited = new Set()
-  while (pending.length) {
-    const pid = pending.shift()
-    if (visited.has(pid)) continue
-    visited.add(pid)
-    if (!rssByPid.has(pid)) continue
-    pids.push(pid)
-    pending.push(...(childrenByParent.get(pid) ?? []))
-  }
-  return {
-    pids,
-    rssKiB: pids.reduce((total, pid) => total + (rssByPid.get(pid) ?? 0), 0),
-  }
-}
-
 function signalProcessGroup(rootPid, signal) {
   try {
     process.kill(-rootPid, signal)
@@ -201,31 +159,54 @@ function wait(milliseconds) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds))
 }
 
-async function waitForProcessGroupExit(rootPid, timeoutMs) {
-  const deadline = Date.now() + Math.max(0, timeoutMs)
-  while (processGroupExists(rootPid) && Date.now() < deadline) {
-    await wait(Math.min(25, Math.max(1, deadline - Date.now())))
-  }
-  return !processGroupExists(rootPid)
+function knownProcessesExist(pids) {
+  return pids.some((pid) => {
+    try { process.kill(pid, 0); return true } catch (error) {
+      if (error?.code === 'ESRCH') return false
+      throw error
+    }
+  })
 }
 
-async function terminateProcessGroup(rootPid, graceMs) {
-  if (!signalProcessGroup(rootPid, 'SIGTERM')) return { termination_signal: null }
-  if (await waitForProcessGroupExit(rootPid, graceMs)) {
+function signalKnownProcesses(pids, signal) {
+  for (const pid of [...pids].reverse()) {
+    try { process.kill(pid, signal) } catch (error) {
+      if (error?.code !== 'ESRCH') throw error
+    }
+  }
+}
+
+async function waitForProcessGroupExit(rootPid, timeoutMs, pids = []) {
+  const deadline = Date.now() + Math.max(0, timeoutMs)
+  const treeExists = () => processGroupExists(rootPid) || knownProcessesExist(pids)
+  while (treeExists() && Date.now() < deadline) {
+    await wait(Math.min(25, Math.max(1, deadline - Date.now())))
+  }
+  return !treeExists()
+}
+
+async function terminateProcessGroup(rootPid, graceMs, pids = []) {
+  const groupExisted = signalProcessGroup(rootPid, 'SIGTERM')
+  const descendantsExisted = knownProcessesExist(pids)
+  signalKnownProcesses(pids, 'SIGTERM')
+  if (!groupExisted && !descendantsExisted) return { termination_signal: null }
+  if (await waitForProcessGroupExit(rootPid, graceMs, pids)) {
     return { termination_signal: 'SIGTERM' }
   }
   signalProcessGroup(rootPid, 'SIGKILL')
+  signalKnownProcesses(pids, 'SIGKILL')
   const killWaitMs = Math.max(250, Math.min(2000, graceMs * 4))
-  if (!await waitForProcessGroupExit(rootPid, killWaitMs)) {
+  if (!await waitForProcessGroupExit(rootPid, killWaitMs, pids)) {
     throw new Error(`external tool process group ${rootPid} survived SIGKILL`)
   }
   return { termination_signal: 'SIGKILL' }
 }
 
 function forceKillActiveGroups() {
-  for (const rootPid of activeProcessGroups) {
+  for (const [rootPid, tree] of activeProcessGroups) {
     try {
       signalProcessGroup(rootPid, 'SIGKILL')
+      signalKnownProcesses(tree.pids, 'SIGKILL')
     } catch {
       // Parent shutdown cleanup is best effort and must not mask the parent exit.
     }
@@ -366,13 +347,15 @@ async function runSpawnedTool(command, args, options) {
   return new Promise((resolve, reject) => {
     let settled = false
     let monitorTimer = null
+    let monitorAbort = null
     let timeoutTimer = null
     let termination = null
     let terminationCleanup = null
     let peakRssKiB = 0
     let peakProcessCount = 0
+    const knownTree = { pids: child.pid ? [child.pid] : [] }
 
-    if (child.pid) activeProcessGroups.add(child.pid)
+    if (child.pid) activeProcessGroups.set(child.pid, knownTree)
     child.stdout?.on('data', (chunk) => stdoutTail.append(chunk))
     child.stderr?.on('data', (chunk) => stderrTail.append(chunk))
 
@@ -390,6 +373,7 @@ async function runSpawnedTool(command, args, options) {
 
     const clearLifecycle = () => {
       if (monitorTimer) clearTimeout(monitorTimer)
+      monitorAbort?.abort()
       if (timeoutTimer) clearTimeout(timeoutTimer)
       if (limits.signal && abortHandler) limits.signal.removeEventListener('abort', abortHandler)
       if (child.pid) activeProcessGroups.delete(child.pid)
@@ -429,9 +413,9 @@ async function runSpawnedTool(command, args, options) {
       try {
         if (
           child.pid &&
-          processGroupExists(child.pid)
+          (processGroupExists(child.pid) || knownProcessesExist(knownTree.pids))
         ) {
-          await terminateProcessGroup(child.pid, limits.terminationGraceMs)
+          await terminateProcessGroup(child.pid, limits.terminationGraceMs, knownTree.pids)
         }
       } catch (error) {
         reject(createExternalToolError(
@@ -474,11 +458,13 @@ async function runSpawnedTool(command, args, options) {
       if (termination || settled) return
       termination = reason
       if (monitorTimer) clearTimeout(monitorTimer)
+      monitorAbort?.abort()
       if (timeoutTimer) clearTimeout(timeoutTimer)
       if (child.pid) {
         terminationCleanup = terminateProcessGroup(
           child.pid,
-          limits.terminationGraceMs
+          limits.terminationGraceMs,
+          knownTree.pids
         )
         void terminationCleanup.catch(failTerminationVerification)
       }
@@ -486,8 +472,14 @@ async function runSpawnedTool(command, args, options) {
 
     const monitor = async () => {
       if (termination || settled || child.exitCode !== null || child.signalCode !== null) return
+      const sampledAt = performance.now()
+      const currentAbort = new AbortController()
+      monitorAbort = currentAbort
       try {
-        const snapshot = await readProcessTree(child.pid)
+        const snapshot = await readProcessTree(child.pid, {
+          onDiscover: (pids) => { knownTree.pids = pids },
+          signal: currentAbort.signal,
+        })
         peakRssKiB = Math.max(peakRssKiB, snapshot.rssKiB)
         peakProcessCount = Math.max(peakProcessCount, snapshot.pids.length)
         if (snapshot.rssKiB > limits.maxRssKiB) {
@@ -495,13 +487,21 @@ async function runSpawnedTool(command, args, options) {
           return
         }
       } catch {
+        if (currentAbort.signal.aborted || settled || child.exitCode !== null || child.signalCode !== null) return
         requestTermination(EXTERNAL_TOOL_FAILURE.MONITOR_FAILED)
         return
+      } finally {
+        if (monitorAbort === currentAbort) monitorAbort = null
       }
-      monitorTimer = setTimeout(() => void monitor(), limits.pollIntervalMs)
+      if (termination || settled || child.exitCode !== null || child.signalCode !== null) return
+      monitorTimer = setTimeout(() => void monitor(), Math.max(0, limits.pollIntervalMs - (performance.now() - sampledAt)))
       monitorTimer.unref()
     }
 
+    child.once('exit', () => {
+      if (monitorTimer) clearTimeout(monitorTimer)
+      monitorAbort?.abort()
+    })
     child.once('error', (error) => {
       if (settled) return
       settled = true

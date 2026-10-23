@@ -8,6 +8,7 @@ import { Readable } from 'node:stream'
 import { fileURLToPath } from 'node:url'
 
 import { routeApi } from './src/server/routes/index.js'
+import { assertApiRequest, assertJsonRequest, readBoundedBody } from './src/server/localRequest.js'
 import { legacyStudioRedirectLocation } from './src/server/legacyStudioRedirect.js'
 import { acceptFullSheetGeneration } from './src/server/fullSheetGenerationAcceptance.js'
 import { buildCharacterPackArtifactManifest } from './src/character-pack/artifactManifest.js'
@@ -138,6 +139,7 @@ import {
 } from './src/editor-project/apiHandler.js'
 import { resolveManagedRevisionArtifactFile } from './src/editor-project/paths.js'
 import { loadEditorProject } from './src/editor-project/projectStore.js'
+import { createAssistantConversations } from './src/editor-project/assistantConversation.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -302,9 +304,8 @@ function uploadedImageFromBody(body, prefix, fallbackName) {
 }
 
 async function readBody(req) {
-  const chunks = []
-  for await (const chunk of req) chunks.push(chunk)
-  return Buffer.concat(chunks)
+  assertJsonRequest(req)
+  return readBoundedBody(req)
 }
 
 function boundedBodyError(code, message, httpStatus) {
@@ -1457,7 +1458,7 @@ async function handleProviderConfig(req, res) {
   try {
     body = JSON.parse((await readBody(req)).toString('utf8'))
   } catch (error) {
-    return sendJson(res, 400, { error: 'invalid_json', reason: String(error.message || error) })
+    return sendJson(res, error.http_status || 400, { error: error.code || 'invalid_json', reason: String(error.message || error) })
   }
 
   try {
@@ -3482,13 +3483,14 @@ async function handleAnalyzeMotionSourceSet(req, res) {
 }
 
 async function handleProcessSheet(req, res) {
-  const job = createJob({ status: JOB_STATUS.QUEUED })
+  const job = createJob({ status: JOB_STATUS.QUEUED, type: 'process_sheet' })
   try {
     const body = JSON.parse((await readBody(req)).toString('utf8'))
     const source = Buffer.from(body.source_base64, 'base64')
     const options = {
       ...(body.options ?? {}),
       blackSourceBuffer: body.source_black_base64 ? Buffer.from(body.source_black_base64, 'base64') : undefined,
+      backgroundMatteV2ArtifactUrlPrefix: `/generated/${job.id}`,
     }
     jobQueue.enqueue(
       async () => {
@@ -3783,6 +3785,9 @@ async function handleProjectPack(req, res) {
   } catch (error) {
     return sendJson(res, 400, { error: 'invalid_json', reason: String(error.message || error) })
   }
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return sendJson(res, 400, { error: 'invalid_json', reason: 'request body must be a JSON object' })
+  }
 
   const characterJobId = body.character_job_id ?? body.characterJobId
   const sceneJobId = body.scene_job_id ?? body.sceneJobId
@@ -3827,6 +3832,9 @@ async function handleBuildTwoPointFiveDTileset(req, res) {
     body = JSON.parse((await readBody(req)).toString('utf8'))
   } catch (error) {
     return sendJson(res, 400, { error: 'invalid_json', reason: String(error.message || error) })
+  }
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return sendJson(res, 400, { error: 'invalid_json', reason: 'request body must be a JSON object' })
   }
   const materialSourcePrompt = twoPointFiveDMaterialSourcePromptFromBody(body)
   if (materialSourcePrompt && !body.confirm_live_generation && !body.yes) {
@@ -3918,6 +3926,9 @@ async function handleTwoPointFiveDMaterialSourceBenchmark(req, res) {
     body = JSON.parse((await readBody(req)).toString('utf8'))
   } catch (error) {
     return sendJson(res, 400, { error: 'invalid_json', reason: String(error.message || error) })
+  }
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return sendJson(res, 400, { error: 'invalid_json', reason: 'request body must be a JSON object' })
   }
 
   const dryRunPlan = Boolean(body.dryRunPlan ?? body.dry_run_plan)
@@ -4061,9 +4072,14 @@ async function handleTwoPointFiveDMaterialSourceBenchmark(req, res) {
 async function handleBuildFrameGif(req, res) {
   try {
     const body = JSON.parse((await readBody(req)).toString('utf8'))
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return sendJson(res, 400, { error: 'gif_build_failed', reason: 'request body must be a JSON object' })
+    }
     const frames = Array.isArray(body.frames_base64) ? body.frames_base64 : []
     const buffers = frames.map((frame) => Buffer.from(frame, 'base64'))
-    const gif = await buildFrameGifFromImages(buffers, body.options ?? {})
+    const rawOptions = body.options && typeof body.options === 'object' && !Array.isArray(body.options) ? body.options : {}
+    const { maxUncompressedBytes: _ignoredBudget, onFrameDecode: _ignoredHook, ...safeOptions } = rawOptions
+    const gif = await buildFrameGifFromImages(buffers, safeOptions)
     res.writeHead(200, { 'content-type': 'image/gif' })
     res.end(gif)
   } catch (error) {
@@ -4141,6 +4157,8 @@ async function serveStatic(req, res) {
     .pipe(res)
 }
 
+const appAssistantConversations = createAssistantConversations({ readGenerationState: publicProviderState })
+
 const apiRouteHandlers = {
   editor: (req, res) => handleEditorProjectApi(req, res, {
     projectRoot: __dirname,
@@ -4148,6 +4166,7 @@ const apiRouteHandlers = {
     generatedDir: editorGeneratedDir,
     specializedGeneratedDir: generatedDir,
     artifactAccessRegistry: editorArtifactAccessRegistry,
+    assistantConversations: appAssistantConversations,
     getGeneratedJob: getJob,
     updateGeneratedJob: updateJob,
   }),
@@ -4191,9 +4210,20 @@ const apiRouteHandlers = {
 }
 
 const server = http.createServer(async (req, res) => {
-  const url = new URL(req.url, `http://localhost:${port}`)
-  if (await routeApi({ req, res, url, handlers: apiRouteHandlers })) return
-  return serveStatic(req, res)
+  try {
+    const url = new URL(req.url, `http://localhost:${port}`)
+    if (url.pathname.startsWith('/api/')) {
+      try { assertApiRequest(req, url.pathname) } catch (error) {
+        req.resume()
+        return sendJson(res, error.http_status || 403, { error: error.code || 'forbidden_origin' })
+      }
+    }
+    if (await routeApi({ req, res, url, handlers: apiRouteHandlers })) return
+    return await serveStatic(req, res)
+  } catch {
+    if (!res.headersSent) sendJson(res, 500, { error: 'internal_error', reason: 'Internal server error' })
+    else res.destroy()
+  }
 })
 
 server.listen(port, '127.0.0.1', () => {

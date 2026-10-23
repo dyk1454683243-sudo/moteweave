@@ -3,10 +3,11 @@ import { initStudioCharacter, renderStudioCharacterLanguage } from './characterV
 import { initStudioAction, renderStudioActionLanguage } from './actionView.js'
 import { initStudioSequence, renderStudioSequenceLanguage } from './sequenceView.js'
 import { initStudioTiles, renderStudioTilesLanguage } from './tilesView.js'
-import { initStudioScene, renderStudioSceneLanguage } from './sceneView.js'
+import { initStudioScene, refreshStudioSceneLiveReadiness, renderStudioSceneLanguage } from './sceneView.js'
 import { initStudioProject, renderStudioProjectLanguage } from './projectView.js'
 import { initStudioQa, renderStudioQaLanguage } from './qaView.js'
 import { initStudioPromptAssistants } from './promptAssistantView.js'
+import { setSharedCharacterResultRouteActive } from './characterResultView.js'
 import { getCurrentLanguage } from '../i18n.js'
 
 const STUDIO_ROUTES = Object.freeze(['character', 'action', 'sequence', 'tiles', 'scene', 'project', 'qa', 'settings'])
@@ -23,20 +24,20 @@ let qaInitializationPromise = null
 const STUDIO_TITLES = Object.freeze({
   zh: Object.freeze({
     character: 'MoteWeave · 角色工作室',
-    action: 'MoteWeave · 动作源',
+    action: 'MoteWeave · 动作取帧',
     sequence: 'MoteWeave · 序列工作室',
-    tiles: 'MoteWeave · 图块工作室',
-    scene: 'MoteWeave · 场景工坊',
+    tiles: 'MoteWeave · 地图工作室',
+    scene: 'MoteWeave · 地图工作室',
     project: 'MoteWeave · 项目包',
     qa: 'MoteWeave · 验收检查',
     settings: 'MoteWeave · 设置',
   }),
   en: Object.freeze({
     character: 'MoteWeave · Character Studio',
-    action: 'MoteWeave · Action Source',
+    action: 'MoteWeave · Frame Extraction',
     sequence: 'MoteWeave · Sequence Studio',
-    tiles: 'MoteWeave · Tiles Studio',
-    scene: 'MoteWeave · Scene Studio',
+    tiles: 'MoteWeave · Map Studio',
+    scene: 'MoteWeave · Map Studio',
     project: 'MoteWeave · Project Pack',
     qa: 'MoteWeave · QA Checklist',
     settings: 'MoteWeave · Settings',
@@ -64,6 +65,7 @@ export function renderStudioRuntimeAvailability(available = studioServiceAvailab
 
 export function resolveStudioRoute(hash = globalThis.location?.hash ?? '') {
   const route = String(hash).replace(/^#/, '')
+  if (route === 'scene') return 'tiles'
   return STUDIO_ROUTES.includes(route) ? route : 'character'
 }
 
@@ -74,6 +76,7 @@ export function renderStudioRoute(route = resolveStudioRoute(), { focus = false 
   document.querySelectorAll('[data-studio-view]').forEach((view) => {
     view.hidden = view.dataset.studioView !== activeRoute
   })
+  setSharedCharacterResultRouteActive(activeRoute === 'character')
   document.querySelectorAll('[data-studio-route]').forEach((link) => {
     const active = link.dataset.studioRoute === activeRoute
     link.classList.toggle('is-active', active)
@@ -84,7 +87,10 @@ export function renderStudioRoute(route = resolveStudioRoute(), { focus = false 
   else if (activeRoute === 'action') renderStudioActionLanguage()
   else if (activeRoute === 'sequence') renderStudioSequenceLanguage()
   else if (activeRoute === 'tiles') renderStudioTilesLanguage()
-  else if (activeRoute === 'scene') renderStudioSceneLanguage()
+  else if (activeRoute === 'scene') {
+    renderStudioSceneLanguage()
+    refreshStudioSceneLiveReadiness()
+  }
   else if (activeRoute === 'project') renderStudioProjectLanguage()
   else if (activeRoute === 'qa') renderStudioQaLanguage()
   else if (activeRoute === 'settings') refreshStudioSettingsLanguage()

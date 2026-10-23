@@ -12,6 +12,35 @@ See `package.json` and `package-lock.json` for the complete dependency tree.
 - `jszip` (`MIT`) for ZIP archive generation.
 - `gifenc` (`MIT`) for GIF preview encoding.
 
+## Bundled Fonts
+
+- Inter 4.1 (`SIL Open Font License 1.1`), Copyright (c) 2016 The Inter Project
+  Authors (https://github.com/rsms/inter). Only the unmodified web font files
+  `src/ui/vnext/assets/Inter-Regular.woff2` and
+  `src/ui/vnext/assets/Inter-Medium.woff2` from the official release
+  archive `Inter-4.1.zip` (https://github.com/rsms/inter/releases/tag/v4.1,
+  released 2024-11-16, archive SHA256
+  `9883fdd4a49d4fb66bd8177ba6625ef9a64aa45899767dde3d36aa425756b11e`) are
+  bundled at `src/ui/vnext/assets/`, together with the license text as
+  `src/ui/vnext/assets/Inter-LICENSE-OFL-1.1.txt`. They are served locally for
+  the VIS-01/VIS-02 visual preview only; no remote font host is contacted at runtime.
+  The Reserved Font Name "Inter" is used unchanged and the font is not sold or
+  redistributed on its own.
+
+## Bundled Icons
+
+- Lucide icons (`ISC`, with Feather-derived glyphs under `MIT`)
+  (https://github.com/lucide-icons/lucide). Selected 16px stroke glyphs
+  (image-plus, layout-grid, image, video, move, square-dashed, pencil, eraser,
+  paint-bucket, slash, square, type, puzzle, palette, brain, arrow-up, panel-left,
+  search, files, tv-minimal-play, chevron-down, and related workbench icons)
+  were exported from the Game-tool Figma file and
+  bundled at `src/ui/vnext/assets/icon-*.svg` for the isolated VNext preview.
+  Paths are used as exported; this is not a Lucide runtime dependency.
+  The upstream copyright and permission notices are included in
+  `src/ui/vnext/assets/Lucide-LICENSE.txt` (including the Feather notices),
+  from https://github.com/lucide-icons/lucide/blob/main/LICENSE.
+
 ## Repository-Owned Assets
 
 - `templates/motion_template_ocha_8x8.png` is an original deterministic
@@ -52,6 +81,18 @@ Where a format is learned from public documentation or observable files, the imp
 
 - Gemini image models may be accessed through OpenRouter-compatible APIs or the official Gemini API, depending on environment configuration.
 - AI generation is used to create source character sprite sheets. Provider terms of service apply to API use.
+- The optional Antigravity text connector independently implements the public
+  [CLI headless protocol](https://antigravity.google/docs/cli/headless/).
+  A [first-party issue tracker reproduction](https://github.com/google-antigravity/antigravity-cli/issues/1048)
+  identifies `system_message` events during resume; this is compatibility
+  evidence, not a guarantee for every CLI version. No vendor implementation,
+  binaries, credentials, or conversation records are bundled.
+- The native pixel-tool adapter independently implements the official
+  [Codex app-server protocol](https://learn.chatgpt.com/docs/app-server)
+  `dynamicTools` / `item/tool/call` flow, checked against the installed CLI
+  0.160.0 experimental schema. Drawing uses this project's own pixel kernel.
+  Generated vendor schema files are not bundled; tool-call counts are not a
+  guarantee of underlying model-request counts.
 
 ## Inspiration And Research
 
@@ -79,3 +120,8 @@ math is used; no external source code, dependency, asset, or model is copied or
 bundled.
 
 If an attribution is missing or inaccurate, update this file before release.
+
+- `src/ui/vnext/assets/skill-fixed-region-thumb-252.png` is a byte-identical UI
+  copy of the repository-owned `templates/motion_template_ocad_primary.png`,
+  covered by `scripts/verify-authoritative-generation-structure.mjs`. No new
+  image was generated for release packaging.

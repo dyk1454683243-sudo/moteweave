@@ -1,5 +1,21 @@
+import { EDITOR_PROJECT_VERSION } from './constants.js'
 import { getActiveAssetRevision, listAssetClipIds } from './assets.js'
 import { clonePlain } from './safety.js'
+
+function listIndexedSpriteDocumentIds(project) {
+  return Object.keys(project?.sprite_documents ?? {})
+}
+
+function rejectLegacyV1AssetWriter(project, assetId) {
+  const documentIds = listIndexedSpriteDocumentIds(project)
+  if (project?.version !== EDITOR_PROJECT_VERSION || documentIds.length) {
+    throw new EditorAssetLibraryError(
+      'unsupported_project_writer',
+      'legacy asset delete/unlink cannot write editor_project_v1 or document-referenced assets',
+      { project_id: project?.id ?? null, asset_id: assetId, document_ids: documentIds },
+    )
+  }
+}
 
 export class EditorAssetLibraryError extends Error {
   constructor(code, message, details = {}) {
@@ -98,6 +114,7 @@ export function buildAssetLibrary(project) {
 }
 
 export function removeAssetFromProject(project, assetId, { now = new Date() } = {}) {
+  rejectLegacyV1AssetWriter(project, assetId)
   const asset = project?.assets?.[assetId]
   if (!asset) throw assetMissing(assetId)
   const usage = summarizeAssetUsage(project, assetId)
@@ -116,6 +133,7 @@ export function removeAssetFromProject(project, assetId, { now = new Date() } = 
 }
 
 export function unlinkAssetFromScenes(project, assetId, { now = new Date() } = {}) {
+  rejectLegacyV1AssetWriter(project, assetId)
   const asset = project?.assets?.[assetId]
   if (!asset) throw assetMissing(assetId)
   const usage = summarizeAssetUsage(project, assetId)

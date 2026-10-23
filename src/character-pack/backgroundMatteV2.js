@@ -108,7 +108,10 @@ function rgbBytesToLinear(rgb) {
   return rgb.map(srgbChannelToLinearByte)
 }
 
-function rgbBytesToOklab(rgb) {
+function rgbBytesToOklab(rgb, options = {}) {
+  // Near black, a single 8-bit code value has a disproportionate Oklab distance.
+  // Opt-in classification only: source/foreground bytes are never quantized.
+  if (options.quantized_black_background === true && Math.max(...rgb) <= 1) return [0, 0, 0]
   const [r, g, b] = rgbBytesToLinear(rgb)
   const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b)
   const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b)
@@ -275,7 +278,7 @@ function sampledEdgePixels(image, options) {
     const offset = (y * image.width + x) * 4
     if (image.data[offset + 3] === 0) continue
     const rgb = [image.data[offset], image.data[offset + 1], image.data[offset + 2]]
-    samples.push({ x, y, rgb, lab: rgbBytesToOklab(rgb) })
+    samples.push({ x, y, rgb, lab: rgbBytesToOklab(rgb, options) })
   }
   return { edgeBand, sampleStride: stride, samples }
 }
@@ -323,7 +326,7 @@ function cornerAgreement(image, backgroundLab, edgeBand, options) {
         if (image.data[offset + 3] === 0) continue
         valid++
         const rgb = [image.data[offset], image.data[offset + 1], image.data[offset + 2]]
-        if (oklabDistance(rgbBytesToOklab(rgb), backgroundLab) <= options.oklab_p95_max_distance) matching++
+        if (oklabDistance(rgbBytesToOklab(rgb, options), backgroundLab) <= options.oklab_p95_max_distance) matching++
       }
     }
     const share = valid ? matching / valid : 0
@@ -360,6 +363,7 @@ export function analyzeFlatBackgroundV2(image, overrides = {}) {
     background_rgb: cluster?.rgb ?? null,
     background_linear_rgb: cluster?.linear_rgb.map((value) => round(value)) ?? null,
     background_oklab: cluster?.center.map((value) => round(value)) ?? null,
+    ...(options.quantized_black_background === true ? { quantized_black_background: true } : {}),
     oklab_p95_distance: cluster ? round(cluster.p95) : null,
     corner_block_size: corners.size,
     corner_agreement_count: corners.agreeing_count,
@@ -486,7 +490,7 @@ function classifyExteriorShoulderSingletons({
     if (!provisionalSureForeground[index] || image.data[index * 4 + 3] < hardAlphaByte) continue
     const offset = index * 4
     const rgb = [image.data[offset], image.data[offset + 1], image.data[offset + 2]]
-    const distance = oklabDistance(rgbBytesToOklab(rgb), backgroundLab)
+    const distance = oklabDistance(rgbBytesToOklab(rgb, analysis), backgroundLab)
     if (distance > weakBackgroundDistance && distance <= shoulderBackgroundDistance) {
       candidateMask[index] = 1
     }
@@ -532,7 +536,7 @@ function classifyExteriorFringeHardClear({
     if (!provisionalSureForeground[index] || image.data[index * 4 + 3] < hardAlphaByte) continue
     const offset = index * 4
     const rgb = [image.data[offset], image.data[offset + 1], image.data[offset + 2]]
-    const distance = oklabDistance(rgbBytesToOklab(rgb), backgroundLab)
+    const distance = oklabDistance(rgbBytesToOklab(rgb, analysis), backgroundLab)
     if (distance <= shoulderBackgroundDistance || distance > fringeBackgroundDistance) continue
     const touchesBaseExterior = neighboringIndexes8(index, image.width, image.height)
       .some((neighbor) => exteriorBackgroundCandidate[neighbor])
@@ -558,7 +562,7 @@ export function freezeBackgroundContractMasks(image, analysis, options = BACKGRO
     const offset = index * 4
     if (image.data[offset + 3] === 0) return true
     const rgb = [image.data[offset], image.data[offset + 1], image.data[offset + 2]]
-    return oklabDistance(rgbBytesToOklab(rgb), backgroundLab) <= sureDistance
+    return oklabDistance(rgbBytesToOklab(rgb, analysis), backgroundLab) <= sureDistance
   }
   const push = (index) => {
     if (visited[index]) return
@@ -594,7 +598,7 @@ export function freezeBackgroundContractMasks(image, analysis, options = BACKGRO
     visited[index] = 1
     const offset = index * 4
     const matchesWeakBackground = image.data[offset + 3] === 0 || oklabDistance(
-      rgbBytesToOklab([image.data[offset], image.data[offset + 1], image.data[offset + 2]]),
+      rgbBytesToOklab([image.data[offset], image.data[offset + 1], image.data[offset + 2]], analysis),
       backgroundLab,
     ) <= weakBackgroundDistance
     if (!matchesWeakBackground) return
@@ -694,7 +698,7 @@ export function freezeBackgroundContractMasks(image, analysis, options = BACKGRO
     const offset = index * 4
     if (image.data[offset + 3] === 0) continue
     const rgb = [image.data[offset], image.data[offset + 1], image.data[offset + 2]]
-    if (oklabDistance(rgbBytesToOklab(rgb), backgroundLab) <= weakBackgroundDistance) {
+    if (oklabDistance(rgbBytesToOklab(rgb, analysis), backgroundLab) <= weakBackgroundDistance) {
       protectedLightForeground[index] = 1
     }
   }
@@ -771,7 +775,7 @@ function assertExteriorShoulderSingletonContract(
     if (!provisionalSureForeground || source.data[index * 4 + 3] < hardAlphaByte) continue
     const offset = index * 4
     const rgb = [source.data[offset], source.data[offset + 1], source.data[offset + 2]]
-    const distance = oklabDistance(rgbBytesToOklab(rgb), analysis.background_oklab)
+    const distance = oklabDistance(rgbBytesToOklab(rgb, analysis), analysis.background_oklab)
     if (distance > weakBackgroundDistance && distance <= shoulderBackgroundDistance) {
       candidateMask[index] = 1
     }
@@ -843,7 +847,7 @@ function assertExteriorFringeHardClearContract(
     if (provisionalSureForeground && source.data[index * 4 + 3] >= hardAlphaByte) {
       const offset = index * 4
       const rgb = [source.data[offset], source.data[offset + 1], source.data[offset + 2]]
-      const distance = oklabDistance(rgbBytesToOklab(rgb), analysis.background_oklab)
+      const distance = oklabDistance(rgbBytesToOklab(rgb, analysis), analysis.background_oklab)
       if (distance > shoulderBackgroundDistance && distance <= fringeBackgroundDistance) {
         expected = neighboringIndexes8(index, source.width, source.height)
           .some((neighbor) => masks.exteriorBackgroundCandidate[neighbor]) ? 1 : 0
@@ -1305,7 +1309,7 @@ export function buildVisibleBackgroundResidueDiagnostics(
       if (touchesExteriorCandidate) {
         const offset = index * 4
         const sourceRgb = [source.data[offset], source.data[offset + 1], source.data[offset + 2]]
-        if (oklabDistance(rgbBytesToOklab(sourceRgb), backgroundLab) <= spillDistance) {
+        if (oklabDistance(rgbBytesToOklab(sourceRgb, analysis), backgroundLab) <= spillDistance) {
           isVisibleBackgroundLike = true
           adjacentSureForegroundPixels++
           if (masks.protectedLightForeground[index]) protectedLightOverlapPixels++
@@ -1393,7 +1397,7 @@ function buildBackgroundBoundaryDiagnostics(
     const rgb = [output.data[offset], output.data[offset + 1], output.data[offset + 2]]
     if (
       lowConfidenceMask[index] ||
-      (backgroundLab && oklabDistance(rgbBytesToOklab(rgb), backgroundLab) <= spillDistance)
+      (backgroundLab && oklabDistance(rgbBytesToOklab(rgb, analysis), backgroundLab) <= spillDistance)
     ) {
       spillMask[index] = 1
     }

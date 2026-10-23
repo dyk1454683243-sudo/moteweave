@@ -1,9 +1,7 @@
 #!/usr/bin/env node
 
-import { execFile, spawn } from 'node:child_process'
-import { promisify } from 'node:util'
-
-const execFileAsync = promisify(execFile)
+import { spawn } from 'node:child_process'
+import { readProcessTree } from '../src/processTreeSnapshot.js'
 
 const optionDefinitions = new Map([
   ['--max-old-space-mib', ['maxOldSpaceMiB', 1024]],
@@ -50,47 +48,6 @@ function parseArguments(argv) {
   }
 }
 
-async function readProcessTree(rootPid) {
-  const { stdout } = await execFileAsync('ps', ['-axo', 'pid=,ppid=,rss='], {
-    maxBuffer: 4 * 1024 * 1024,
-    timeout: 1000,
-  })
-  const processes = stdout
-    .trim()
-    .split('\n')
-    .map((line) => line.trim().split(/\s+/).map(Number))
-    .filter(([pid, parentPid, rssKiB]) => (
-      Number.isSafeInteger(pid)
-      && Number.isSafeInteger(parentPid)
-      && Number.isFinite(rssKiB)
-    ))
-  const childrenByParent = new Map()
-  const rssByPid = new Map()
-  for (const [pid, parentPid, rssKiB] of processes) {
-    rssByPid.set(pid, rssKiB)
-    const children = childrenByParent.get(parentPid) ?? []
-    children.push(pid)
-    childrenByParent.set(parentPid, children)
-  }
-
-  const pids = []
-  const pending = [rootPid]
-  const visited = new Set()
-  while (pending.length > 0) {
-    const pid = pending.shift()
-    if (visited.has(pid)) continue
-    visited.add(pid)
-    if (!rssByPid.has(pid)) continue
-    pids.push(pid)
-    pending.push(...(childrenByParent.get(pid) ?? []))
-  }
-
-  return {
-    pids,
-    rssKiB: pids.reduce((total, pid) => total + (rssByPid.get(pid) ?? 0), 0),
-  }
-}
-
 function signalProcesses(pids, signal) {
   for (const pid of [...pids].reverse()) {
     try {
@@ -98,6 +55,17 @@ function signalProcesses(pids, signal) {
     } catch (error) {
       if (error?.code !== 'ESRCH') throw error
     }
+  }
+}
+
+function signalProcessGroup(processGroupId, signal) {
+  if (!processGroupId) return false
+  try {
+    process.kill(-processGroupId, signal)
+    return true
+  } catch (error) {
+    if (error?.code !== 'ESRCH') throw error
+    return false
   }
 }
 
@@ -138,14 +106,18 @@ if (configuration) {
     `resource-guard: start command=${command} old-space=${maxOldSpaceMiB} MiB `
     + `RSS=${maxRssMiB} MiB timeout=${timeoutMs} ms poll=${pollMs} ms`,
   )
+  const isolatedProcessGroup = process.platform !== 'win32'
   const child = spawn(command, args, {
     env: buildChildEnvironment(maxOldSpaceMiB),
     stdio: 'inherit',
+    detached: isolatedProcessGroup,
   })
   let terminationReason = null
   let forceKillTimer = null
   let monitorTimer = null
+  const monitorAbort = new AbortController()
   let lastKnownPids = child.pid ? [child.pid] : []
+  const processGroupId = isolatedProcessGroup ? child.pid : null
   let peakRssKiB = 0
   let peakProcessCount = 0
   let requestedSignal = null
@@ -156,30 +128,76 @@ if (configuration) {
     ['SIGTERM', 143],
   ])
 
+  function signalGuardedTree(signal) {
+    if (isolatedProcessGroup) {
+      signalProcessGroup(processGroupId, signal)
+    }
+    signalProcesses(lastKnownPids, signal)
+  }
+
   async function terminate(reason) {
     if (terminationReason) return
     terminationReason = reason
-    let pids = lastKnownPids
-    try {
-      const snapshot = await readProcessTree(child.pid)
-      if (snapshot.pids.length > 0) pids = snapshot.pids
-    } catch {
-      // The last successful snapshot remains the safest bounded fallback.
-    }
-    signalProcesses(pids, 'SIGTERM')
+    monitorAbort.abort()
+    // Never delay termination behind the monitor that may itself have failed.
+    signalGuardedTree('SIGTERM')
     forceKillTimer = setTimeout(() => {
       try {
-        signalProcesses(pids, 'SIGKILL')
+        signalGuardedTree('SIGKILL')
       } catch (error) {
         console.error(`resource-guard: forced cleanup failed: ${error.message}`)
       }
     }, 100)
   }
 
-  async function monitor() {
-    if (terminationReason || child.exitCode !== null || child.signalCode !== null) return
+  function childAlreadyExited() {
+    return child.exitCode !== null || child.signalCode !== null
+  }
+
+  function waitForChildExitObservation() {
+    if (childAlreadyExited()) return Promise.resolve(true)
+    return new Promise((resolve) => {
+      let settled = false
+      let immediate = null
+      const finish = (exited) => {
+        if (settled) return
+        settled = true
+        if (immediate) clearImmediate(immediate)
+        child.removeListener('exit', onExit)
+        child.removeListener('close', onClose)
+        resolve(exited)
+      }
+      const onExit = () => finish(true)
+      const onClose = () => finish(true)
+      child.once('exit', onExit)
+      child.once('close', onClose)
+      immediate = setImmediate(() => finish(childAlreadyExited()))
+    })
+  }
+
+  function reapGuardedTree() {
+    if (spawnFailed) return
     try {
-      const snapshot = await readProcessTree(child.pid)
+      if (isolatedProcessGroup) signalProcessGroup(processGroupId, 'SIGKILL')
+      if (!childAlreadyExited()) {
+        signalGuardedTree('SIGKILL')
+        return
+      }
+      signalProcesses(lastKnownPids.filter((pid) => pid !== child.pid), 'SIGKILL')
+    } catch (error) {
+      console.error(`resource-guard: exit cleanup failed: ${error.message}`)
+    }
+  }
+
+  async function monitor() {
+    if (terminationReason || childAlreadyExited()) return
+    const sampledAt = performance.now()
+    try {
+      const snapshot = await readProcessTree(child.pid, {
+        onDiscover: (pids) => { lastKnownPids = pids },
+        signal: monitorAbort.signal,
+      })
+      if (terminationReason || childAlreadyExited()) return
       if (snapshot.pids.length > 0) lastKnownPids = snapshot.pids
       peakRssKiB = Math.max(peakRssKiB, snapshot.rssKiB)
       peakProcessCount = Math.max(peakProcessCount, snapshot.pids.length)
@@ -192,11 +210,19 @@ if (configuration) {
         return
       }
     } catch (error) {
-      console.error(`resource-guard: process monitoring failed: ${error.message}`)
+      // A failed ps can race with the child's exit/close events. Give that
+      // lifecycle transition one event-loop turn before fail-closed monitor
+      // termination; a still-live child remains a monitor failure.
+      if (terminationReason || await waitForChildExitObservation()) return
+      // Keep the failure attributable: a slow `ps` (timeout -> killed/SIGTERM) and a spawn failure
+      // (EAGAIN/ENOMEM) need different responses, and the message alone does not say which it was.
+      const detail = [`code=${error.code ?? ''}`, `signal=${error.signal ?? ''}`, `killed=${error.killed ?? ''}`,
+        `errno=${error.errno ?? ''}`, `stderr=${String(error.stderr ?? '').trim().slice(0, 200)}`].join(' ')
+      console.error(`resource-guard: process monitoring failed: ${error.message} (${detail})`)
       await terminate('monitor')
       return
     }
-    monitorTimer = setTimeout(monitor, pollMs)
+    monitorTimer = setTimeout(monitor, Math.max(0, pollMs - (performance.now() - sampledAt)))
     monitorTimer.unref()
   }
 
@@ -212,7 +238,7 @@ if (configuration) {
     const handler = () => {
       if (requestedSignal) {
         try {
-          signalProcesses(lastKnownPids, 'SIGKILL')
+          signalGuardedTree('SIGKILL')
         } catch (error) {
           console.error(`resource-guard: repeated-signal cleanup failed: ${error.message}`)
         }
@@ -232,6 +258,7 @@ if (configuration) {
 
   child.once('error', (error) => {
     spawnFailed = true
+    monitorAbort.abort()
     clearTimeout(timeout)
     if (monitorTimer) clearTimeout(monitorTimer)
     if (forceKillTimer) clearTimeout(forceKillTimer)
@@ -239,11 +266,17 @@ if (configuration) {
     console.error(`resource-guard: failed to start command: ${error.message}`)
     process.exitCode = 70
   })
+  child.once('exit', () => monitorAbort.abort())
   child.once('close', (code, signal) => {
+    monitorAbort.abort()
     clearTimeout(timeout)
     if (monitorTimer) clearTimeout(monitorTimer)
-    if (!terminationReason && forceKillTimer) clearTimeout(forceKillTimer)
+    if (forceKillTimer) {
+      clearTimeout(forceKillTimer)
+      forceKillTimer = null
+    }
     removeSignalHandlers()
+    reapGuardedTree()
     let exitCode
     if (spawnFailed) exitCode = 70
     else if (terminationReason === 'timeout') exitCode = 124

@@ -61,19 +61,30 @@ function makeMp4LikeBuffer() {
   ])
 }
 
+async function makeToolLauncher(binary, script, versionFlag, versionText) {
+  const quote = (value) => `'${value.replaceAll("'", "'\\''")}'`
+  // Version checks exercise the real guarded subprocess path without an
+  // unrelated Node cold start. Actual fixture work still runs in Node.
+  await writeFile(binary, `#!/bin/sh
+if [ "$1" = ${quote(versionFlag)} ]; then
+  printf '%s\\n' ${quote(versionText)}
+  exit 0
+fi
+exec ${quote(process.execPath)} ${quote(script)} "$@"
+`)
+  await chmod(binary, 0o755)
+}
+
 async function makeFakeFfmpeg() {
   const root = await mkdtemp(path.join(os.tmpdir(), 'motion-source-api-ffmpeg-'))
   const frameBuffers = await Promise.all(
     Array.from({ length: 6 }, (_, index) => encodeRgbaPng(makeMotionFrame(index, [90, 120, 190, 255])))
   )
   const binary = path.join(root, 'fake-ffmpeg.js')
-  await writeFile(binary, `#!/usr/bin/env node
+  const script = path.join(root, 'ffmpeg-fixture.cjs')
+  await writeFile(script, `
 const { mkdirSync, writeFileSync } = require('node:fs')
 const path = require('node:path')
-if (process.argv.includes('-version')) {
-  console.log('ffmpeg fake-test')
-  process.exit(0)
-}
 const outputPattern = process.argv[process.argv.length - 1]
 mkdirSync(path.dirname(outputPattern), { recursive: true })
 const frames = ${JSON.stringify(frameBuffers.map((buffer) => buffer.toString('base64')))}
@@ -81,7 +92,7 @@ for (let index = 0; index < frames.length; index += 1) {
   writeFileSync(outputPattern.replace('%05d', String(index + 1).padStart(5, '0')), Buffer.from(frames[index], 'base64'))
 }
 `)
-  await chmod(binary, 0o755)
+  await makeToolLauncher(binary, script, '-version', 'ffmpeg fake-test')
   return binary
 }
 
@@ -89,15 +100,12 @@ async function makeFakeRembg() {
   const root = await mkdtemp(path.join(os.tmpdir(), 'motion-source-api-rembg-'))
   const outputFrame = await encodeRgbaPng(makeMotionFrame(0, [130, 80, 170, 255]))
   const binary = path.join(root, 'fake-rembg.js')
+  const script = path.join(root, 'rembg-fixture.cjs')
   const marker = path.join(root, 'started.marker')
   const blockFile = path.join(root, 'block.marker')
-  await writeFile(binary, `#!/usr/bin/env node
+  await writeFile(script, `
 const { appendFileSync, existsSync, mkdirSync, writeFileSync } = require('node:fs')
 const path = require('node:path')
-if (process.argv.includes('--version')) {
-  console.log('rembg fake-test')
-  process.exit(0)
-}
 const outputPath = process.argv[process.argv.length - 1]
 mkdirSync(path.dirname(outputPath), { recursive: true })
 if (process.env.FAKE_REMBG_MARKER) appendFileSync(process.env.FAKE_REMBG_MARKER, outputPath + '\\n')
@@ -106,7 +114,7 @@ setTimeout(() => {
   writeFileSync(outputPath, Buffer.from('${outputFrame.toString('base64')}', 'base64'))
 }, delay)
 `)
-  await chmod(binary, 0o755)
+  await makeToolLauncher(binary, script, '--version', 'rembg fake-test')
   return { binary, marker, blockFile }
 }
 
@@ -311,8 +319,8 @@ test('motion source local API analyzes builds applies and gates source sets with
   const sourceZip = await makeMotionZip(6)
 
   const toolStatus = await fetchJson(baseUrl, '/api/motion-source-tool-status')
-  assert.equal(toolStatus.ffmpeg.available, true)
-  assert.equal(toolStatus.rembg.available, true)
+  assert.equal(toolStatus.ffmpeg.available, true, `${toolStatus.ffmpeg.path}: ${toolStatus.ffmpeg.reason || ''}`)
+  assert.equal(toolStatus.rembg.available, true, `${toolStatus.rembg.path}: ${toolStatus.rembg.reason || ''}`)
 
   const sourceUpload = await uploadMotionSource(
     baseUrl,

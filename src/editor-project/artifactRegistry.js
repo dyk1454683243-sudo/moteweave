@@ -111,6 +111,34 @@ const SCENE_ARTIFACT_FILES = Object.freeze({
   zip: 'scene_pack.zip',
 })
 
+export const CHARACTER_PACK_FROM_JOB_FILES = Object.freeze({
+  sheet: CHARACTER_ARTIFACT_FILES.sheet,
+  animations: CHARACTER_ARTIFACT_FILES.animations,
+  metadata: CHARACTER_ARTIFACT_FILES.metadata,
+  editor_metadata: CHARACTER_ARTIFACT_FILES.editor_metadata,
+  debug_report: CHARACTER_ARTIFACT_FILES.debug_report,
+})
+
+export function characterPackFromJobAllowedFiles() {
+  return new Set(Object.values(CHARACTER_PACK_FROM_JOB_FILES))
+}
+
+export function qualityStatusFromReport(value) {
+  return statusFromReport(value)
+}
+
+export function clipsFromCharacterAnimations(animationsJson) {
+  return deriveCharacterClips(animationsJson)
+}
+
+export function provenanceSourceTypeFromMetadata(metadata) {
+  return provenanceSourceType(metadata)
+}
+
+export async function assertGeneratedJobNotSpecialized({ jobId, generatedDir } = {}) {
+  await assertGeneralImportAllowed({ jobId, generatedDir })
+}
+
 const IMPORT_SPECS = Object.freeze({
   character_pack: Object.freeze({
     kind: 'character_pack',
@@ -192,7 +220,7 @@ function statusFromReport(value) {
 
 function provenanceSourceType(metadata = {}) {
   const raw = String(metadata.source?.type ?? '').trim()
-  if (['upload', 'provider', 'manual_import', 'local_procedural', 'derived_revision'].includes(raw)) return raw
+  if (['upload', 'provider', 'manual_import', 'local_procedural', 'derived_revision', 'subscription_sheet'].includes(raw)) return raw
   if (/repair|derived/i.test(raw)) return 'derived_revision'
   if (/provider|t2i|openrouter|gemini|generation/i.test(raw) || metadata.generation?.provider) return 'provider'
   return 'manual_import'

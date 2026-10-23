@@ -9,17 +9,22 @@ import {
 } from '../src/ui/motionSource/binding.js'
 import {
   createInitialActionState,
+  deriveActionAdvancedEntry,
   deriveActionAppliedDownloadUrl,
   deriveActionBlockedRecovery,
   deriveActionFlow,
+  shouldRetainActionModeError,
   deriveActionPresentation,
 } from '../src/ui/studio/actionView.js'
 import { STUDIO_TRANSLATIONS } from '../src/ui/studio/settingsView.js'
 
-const FIGMA_ACTION_NODE_IDS = Object.freeze([
+const FIGMA_ACTION_CURRENT_NODE_IDS = Object.freeze([
   '829:4494', '829:4862', '829:5230', '235:2223', '310:8798',
-  '829:5598', '830:4794', '829:5966', '829:6334', '830:5162',
-  '848:4571', '848:5036', '848:5501', '848:5966', '321:4871', '53:96',
+  '829:5598', '830:4794', '829:5966', '829:6334', '321:4871',
+])
+
+const FIGMA_ACTION_INVENTORY_NODE_IDS = Object.freeze([
+  '830:5162', '848:4571', '848:5036', '848:5501', '848:5966',
 ])
 
 const ACTION_PHASES = Object.freeze([
@@ -81,24 +86,133 @@ test('Studio Action is an internal Figma-backed route and preserves the existing
   assert.doesNotMatch(action, /href="\/legacy\?tab=motion-source"|action\.oldWorkspace|action-legacy-link/)
   assert.match(app, /import \{ initStudioAction, renderStudioActionLanguage \} from '\.\/actionView\.js'/)
   assert.match(app, /const STUDIO_ROUTES = Object\.freeze\(\['character', 'action', 'sequence', 'tiles', 'scene', 'project', 'qa', 'settings'\]\)/)
-  assert.match(app, /action: 'MoteWeave · 动作源'/)
+  assert.match(app, /action: 'MoteWeave · 动作取帧'/)
+  assert.match(app, /action: 'MoteWeave · Frame Extraction'/)
+  assert.match(html, /action: 'MoteWeave · 动作取帧（文件预览）'/)
   assert.match(app, /else if \(activeRoute === 'action'\) renderStudioActionLanguage\(\)/)
   assert.match(app, /actionInitializationPromise = Promise\.resolve\(initStudioAction\(\{ serviceAvailable \}\)\)/)
   assert.match(css, /\.action-workspace\s*\{/)
 
   const designSource = openingTagForId(html, 'studio-action-view')
-  for (const nodeId of FIGMA_ACTION_NODE_IDS) {
-    assert.match(designSource, new RegExp(nodeId.replace(':', '\\:')))
+  const currentSource = designSource.match(/data-design-source="([^"]+)"/)?.[1] ?? ''
+  const inventorySource = designSource.match(/data-design-inventory="([^"]+)"/)?.[1] ?? ''
+  const archiveSource = designSource.match(/data-design-archive-inventory="([^"]+)"/)?.[1] ?? ''
+  for (const nodeId of FIGMA_ACTION_CURRENT_NODE_IDS) {
+    assert.match(currentSource, new RegExp(nodeId.replace(':', '\\:')))
+    assert.doesNotMatch(inventorySource, new RegExp(nodeId.replace(':', '\\:')))
   }
+  for (const nodeId of FIGMA_ACTION_INVENTORY_NODE_IDS) {
+    assert.match(inventorySource, new RegExp(nodeId.replace(':', '\\:')))
+    assert.doesNotMatch(currentSource, new RegExp(nodeId.replace(':', '\\:')))
+  }
+  assert.match(archiveSource, /53\:96/)
+  assert.doesNotMatch(currentSource, /53\:96/)
   for (const phase of ACTION_PHASES) {
     assert.match(action, new RegExp(`data-action-panel="[^"]*\\b${phase}\\b`))
   }
 })
 
+test('Studio Action keeps the primary operation in a fixed footer and removes non-user empty-state detail', async () => {
+  const [html, css, view, api] = await Promise.all([
+    readFile('src/ui/studio/studio.html', 'utf8'),
+    readFile('src/ui/studio/studio.css', 'utf8'),
+    readFile('src/ui/studio/actionView.js', 'utf8'),
+    readFile('src/ui/motionSource/api.js', 'utf8'),
+  ])
+  const action = actionHtml(html)
+  const scrollStart = action.indexOf('class="action-control-scroll"')
+  const footerStart = action.indexOf('class="action-control-footer"')
+  const analyzeStart = action.indexOf('id="studio-action-analyze"')
+  const optionStart = action.indexOf('id="studio-action-option-target-frame-count"')
+  const advancedStart = action.indexOf('id="studio-action-advanced-toggle"')
+  const advancedPanelStart = action.indexOf('id="studio-action-advanced-panel"')
+
+  assert.ok(scrollStart >= 0 && footerStart > scrollStart, 'Action control scroll body must precede its footer')
+  assert.ok(optionStart > scrollStart && optionStart < footerStart, 'maintained options must remain in the scroll body')
+  assert.ok(advancedStart > optionStart && advancedStart < advancedPanelStart, 'Advanced must follow basic options in the left flow')
+  assert.ok(analyzeStart > footerStart, 'Analyze must remain in the independent footer')
+  assert.match(openingTagForId(action, 'studio-action-advanced-toggle'), /aria-controls="studio-action-advanced-panel"/)
+  assert.match(openingTagForId(action, 'studio-action-advanced-toggle'), /aria-expanded="false"/)
+  assert.match(openingTagForId(action, 'studio-action-advanced-title'), /tabindex="-1"/)
+  assert.match(openingTagForId(action, 'studio-action-selected-source'), /\bhidden\b/)
+  assert.match(openingTagForId(action, 'studio-action-selected-source'), /aria-live="polite"/)
+
+  for (const retired of [
+    'studio-action-source-meta', 'studio-action-source-name', 'studio-action-source-size',
+    'studio-action-source-kind', 'studio-action-source-identity', 'studio-action-upload-id',
+  ]) assert.equal(openingTagForId(action, retired), '', `retired source detail #${retired} must stay absent`)
+  assert.doesNotMatch(action, /action-empty-glyph/)
+  assert.doesNotMatch(css, /\.action-empty-glyph/)
+  assert.match(css, /\.action-control-scroll\s*\{[^}]*overflow:\s*auto/)
+  assert.match(css, /\.action-control-footer\s*\{/)
+  assert.match(css, /@media \(max-width:\s*860px\)[\s\S]*\.action-workspace\s*\{[^}]*display:\s*block[\s\S]*\.action-control-scroll\s*\{[^}]*overflow:\s*visible[\s\S]*\.action-control-footer\s*\{[^}]*position:\s*static/)
+  assert.doesNotMatch(view, /function renderSourceMeta\(/)
+  assert.match(view, /function renderSelectedSource\(state\)[\s\S]*state\.sourceFile\?\.name[\s\S]*selected\.textContent = name[\s\S]*action\.source\.selected/)
+  const selectedSourceRenderer = view.match(/function renderSelectedSource\(state\) \{[\s\S]*?\n\}/)?.[0] ?? ''
+  assert.doesNotMatch(selectedSourceRenderer, /sourceDescriptor|source_identity|upload_id|operation_id|\.size|\.type|innerHTML/)
+  assert.match(view, /aria-expanded/)
+  assert.match(view, /studio-action-advanced-title[\s\S]*focus/)
+  assert.match(view, /studio-action-advanced-toggle[\s\S]*focus/)
+
+  assert.match(api, /function sourceOperationBody\(source, operationId, options\)[\s\S]*source_upload_id:\s*source\.upload_id[\s\S]*source_identity:\s*source\.source_identity[\s\S]*operation_id:\s*operationId/)
+  assert.match(api, /\.\.\.\(options \? \{ options \} : \{\}\)/)
+  assert.match(view, /function serializedOptions\(state = actionState\)[\s\S]*serializeMotionOptions\(state\.optionsModel/)
+  assert.match(view, /function invalidateOptionDependentState\(field\)/)
+  assert.match(view, /function resetForSourceFile\(file\)[\s\S]*observationController\?\.abort\(\)[\s\S]*renderToken \+= 1[\s\S]*sourceEpoch \+= 1[\s\S]*clearDerivedState\(state, \{ keepSource: false \}\)[\s\S]*releasePriorUpload\(priorDescriptor, priorOperationId\)/)
+})
+
+test('Studio Action Advanced entry follows source, operation, and flow truth', () => {
+  const initial = createInitialActionState()
+  assert.deepEqual(deriveActionAdvancedEntry(initial), {
+    open: false, hidden: false, disabled: true, labelKey: 'action.advancedToggle',
+  })
+  assert.equal(deriveActionAdvancedEntry({ ...initial, sourceFile: { name: 'walk.gif' } }).disabled, false)
+  assert.equal(deriveActionAdvancedEntry({
+    ...initial,
+    sourceFile: { name: 'walk.gif' },
+    uiOperation: { storeKey: 'analysis' },
+    phase: 'running',
+  }).disabled, true)
+  assert.equal(deriveActionAdvancedEntry({
+    ...initial,
+    sourceFile: { name: 'walk.gif' },
+    phase: 'abandon',
+  }).disabled, true)
+  assert.equal(deriveActionAdvancedEntry({
+    ...initial,
+    sourceFile: { name: 'walk.gif' },
+    phase: 'paused',
+  }).disabled, true)
+  assert.deepEqual(deriveActionAdvancedEntry({
+    ...initial,
+    sourceFile: { name: 'walk.gif' },
+    phase: 'advanced',
+  }), {
+    open: true, hidden: false, disabled: false, labelKey: 'action.advancedClose',
+  })
+  assert.equal(deriveActionAdvancedEntry({
+    ...initial,
+    sourceFile: { name: 'walk.gif' },
+    currentFlow: 'sourceSet',
+    phase: 'source_set',
+  }).hidden, true)
+  for (const phase of ['review', 'blocked', 'applied']) {
+    assert.equal(deriveActionAdvancedEntry({
+      ...initial,
+      sourceFile: { name: 'walk.gif' },
+      phase,
+    }).disabled, false, `${phase} should permit a new Advanced configuration view`)
+  }
+  assert.equal(shouldRetainActionModeError({ fromPhase: 'blocked', toPhase: 'advanced' }), true)
+  assert.equal(shouldRetainActionModeError({ fromPhase: 'advanced', toPhase: 'blocked' }), true)
+  assert.equal(shouldRetainActionModeError({ fromPhase: 'review', toPhase: 'advanced' }), false)
+})
+
 test('Studio Action renders only Figma states and all 18 maintained Motion options', async () => {
-  const [html, view] = await Promise.all([
+  const [html, view, css] = await Promise.all([
     readFile('src/ui/studio/studio.html', 'utf8'),
     readFile('src/ui/studio/actionView.js', 'utf8'),
+    readFile('src/ui/studio/studio.css', 'utf8'),
   ])
   const action = actionHtml(html)
   const fields = [...action.matchAll(/data-action-option="([^"]+)"/g)].map((match) => match[1])
@@ -110,11 +224,20 @@ test('Studio Action renders only Figma states and all 18 maintained Motion optio
     assert.notEqual(tag, '', `missing Motion option ${field}`)
     assert.match(tag, /data-studio-server-required/)
   }
-  assert.match(openingTagForId(action, 'studio-action-option-target-frame-count'), /value="4"/)
+  assert.match(openingTagForId(action, 'studio-action-option-action'), /type="text"[^>]*value="walk_down"/)
+  assert.match(openingTagForId(action, 'studio-action-option-action'), /data-action-option="action"/)
+  assert.match(openingTagForId(html, 'studio-action-option-target-frame-count'), /value="4"/)
+  assert.match(html, /class="action-context-toolbar" hidden/)
+  assert.match(css, /\.action-context-toolbar \{[^}]*display: none !important/)
+  assert.match(css, /\.action-workspace \{[^}]*grid-template-rows: minmax\(0, 1fr\)/)
+  assert.match(view, /field === 'action'/)
+  assert.match(view, /action\.error\.actionName/)
   assert.deepEqual(
     quotedValues(action.match(/<select id="studio-action-option-selection-recipe"[\s\S]*?<\/select>/)?.[0] ?? ''),
     ['motion_selection_recipe_v2', 'motion_selection_v1_compat'],
   )
+  assert.match(action, /class="action-field action-operator-field" hidden[\s\S]*id="studio-action-option-selection-recipe"/)
+  assert.match(css, /\.action-operator-field \{[^}]*display: none !important/)
   assert.deepEqual(
     quotedValues(action.match(/<select id="studio-action-option-loop-expectation"[\s\S]*?<\/select>/)?.[0] ?? ''),
     ['auto', 'loop', 'once'],
@@ -350,9 +473,10 @@ test('Studio Action exposes the main Applied download only from current done non
 })
 
 test('Studio Action supports Source Set and Abandon without pretending to apply output', async () => {
-  const [html, view] = await Promise.all([
+  const [html, view, css] = await Promise.all([
     readFile('src/ui/studio/studio.html', 'utf8'),
     readFile('src/ui/studio/actionView.js', 'utf8'),
+    readFile('src/ui/studio/studio.css', 'utf8'),
   ])
   const action = actionHtml(html)
   for (const id of [
@@ -361,6 +485,9 @@ test('Studio Action supports Source Set and Abandon without pretending to apply 
     'studio-action-source-set-apply', 'studio-action-abandon-cancel',
     'studio-action-abandon-confirm',
   ]) assert.notEqual(openingTagForId(action, id), '', `missing Action control #${id}`)
+  assert.match(openingTagForId(action, 'studio-action-source-set-toggle'), /\bhidden\b/)
+  assert.match(action, /id="studio-action-source-set-panel"/)
+  assert.match(css, /#studio-action-source-set-toggle,\s*#studio-action-source-set-panel,\s*\.action-source-set-stage \{[^}]*display: none !important/)
   assert.match(view, /analyzeMotionSourceSet\(payload, \{ signal \}\)/)
   assert.match(view, /applyMotionSourceSet\(payload, \{ signal \}\)/)
   assert.match(view, /reports\.set\?\.can_apply_multi_strip === true/)
@@ -434,6 +561,27 @@ test('Studio Action has complete bilingual markers and an explicit default prese
       assert.ok(Object.hasOwn(STUDIO_TRANSLATIONS[language], key), `missing ${language} Action recovery translation ${key}`)
     }
   }
+  assert.deepEqual({
+    header: STUDIO_TRANSLATIONS.zh['action.headerTitle'],
+    source: STUDIO_TRANSLATIONS.zh['action.sourceTitle'],
+    analyze: STUDIO_TRANSLATIONS.zh['action.analyze'],
+  }, {
+    header: '动作取帧',
+    source: '动作素材',
+    analyze: '分析素材',
+  })
+  assert.deepEqual({
+    header: STUDIO_TRANSLATIONS.en['action.headerTitle'],
+    source: STUDIO_TRANSLATIONS.en['action.sourceTitle'],
+    analyze: STUDIO_TRANSLATIONS.en['action.analyze'],
+  }, {
+    header: 'Frame Extraction',
+    source: 'Source media',
+    analyze: 'Analyze source media',
+  })
+  assert.match(action, /data-studio-i18n="action\.headerTitle">动作取帧</)
+  assert.match(action, /data-studio-i18n="action\.sourceTitle">动作素材</)
+  assert.match(action, /data-studio-i18n="action\.analyze">分析素材</)
   const initial = createInitialActionState()
   assert.equal(initial.phase, 'empty')
   assert.equal(initial.serviceAvailable, true)
@@ -467,4 +615,17 @@ test('Studio Action has complete bilingual markers and an explicit default prese
   }
   const view = await readFile('src/ui/studio/actionView.js', 'utf8')
   assert.match(view, /'studio-action-status',[\s\S]*translatedActionStatus\(presentation\.status\)/)
+})
+
+test('Action Current clips the left flow explainer and keeps phase copy inventory', async () => {
+  const [html, css] = await Promise.all([
+    readFile('src/ui/studio/studio.html', 'utf8'),
+    readFile('src/ui/studio/studio.css', 'utf8'),
+  ])
+  const action = actionHtml(html)
+  assert.match(action, /class="action-flow-header"/)
+  assert.match(action, /id="studio-action-phase-title"/)
+  assert.match(action, /id="studio-action-phase-summary"/)
+  assert.match(action, /aria-labelledby="studio-action-phase-title"/)
+  assert.match(css, /\.action-flow-header \{[^}]*clip:\s*rect\(0,\s*0,\s*0,\s*0\)/)
 })

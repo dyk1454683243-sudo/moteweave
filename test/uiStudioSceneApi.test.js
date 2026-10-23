@@ -13,7 +13,10 @@ import {
   postSceneImport,
   releaseSceneArtifacts,
   sceneSubmissionIsDefiniteRejection,
+  selectEligibleSceneGeminiPreset,
 } from '../src/ui/studio/sceneApi.js'
+import { selectStrictGeminiPreset } from '../src/ui/studio/characterApi.js'
+import { selectEligibleTilesGeminiPreset } from '../src/ui/studio/tilesApi.js'
 
 function jsonResponse(body, { status = 200 } = {}) {
   return new Response(JSON.stringify(body), {
@@ -40,6 +43,39 @@ function doneArtifacts(id = 'job_scene_1') {
     tileset_url: `/generated/${id}/tileset.png`,
     scene_pack_zip_url: `/generated/${id}/scene_pack.zip`,
     zip_url: `/generated/${id}/scene_pack.zip`,
+  }
+}
+
+function nativeGeminiState(id = 'gemini_native_1') {
+  return {
+    status: 'ready',
+    available: true,
+    active_preset_id: id,
+    presets: [{
+      id,
+      available: true,
+      provider: 'gemini',
+      route_kind: 'google_native',
+      model: 'gemini-3.1-flash-image-preview',
+      supports_image_size: true,
+      image_config: { image_size: '2K', aspect_ratio: '1:1' },
+    }],
+  }
+}
+
+function sceneGenerationFetch({ state = nativeGeminiState(), onGenerate } = {}) {
+  const calls = []
+  return {
+    calls,
+    fetchImpl: async (url, options) => {
+      calls.push({ url, method: options?.method, body: options?.body })
+      if (url === '/api/gemini-state') return jsonResponse(state)
+      if (url === '/api/generate-scene-tiles') {
+        onGenerate?.(JSON.parse(options.body))
+        return jsonResponse(sceneJob({ type: 'scene_tile_generation' }))
+      }
+      throw new Error(`unexpected ${url}`)
+    },
   }
 }
 
@@ -126,32 +162,83 @@ test('local Scene import sends only the source and normalized existing options',
   )
 })
 
-test('live Scene generation requires fresh confirmation and binds one call per candidate', async () => {
+test('live Scene generation requires native Gemini, fresh confirmation, and the exact preset id', async () => {
   let body
   await assert.rejects(
     postSceneGeneration({ description: 'mossy path', candidateCount: 2, confirmed: false }),
     (error) => error instanceof StudioSceneApiError && error.code === 'live_confirmation_required',
   )
+  const native = sceneGenerationFetch({
+    onGenerate(payload) { body = payload },
+  })
   const job = await postSceneGeneration({
     description: 'mossy path',
     candidateCount: 2,
     confirmed: true,
     options: { width: 6, height: 4 },
-    fetchImpl: async (url, options) => {
-      assert.equal(url, '/api/generate-scene-tiles')
-      body = JSON.parse(options.body)
-      return jsonResponse(sceneJob({ type: 'scene_tile_generation' }))
-    },
+    fetchImpl: native.fetchImpl,
   })
   assert.equal(job.type, 'scene_tile_generation')
+  assert.deepEqual(native.calls.map((call) => call.url), ['/api/gemini-state', '/api/generate-scene-tiles'])
   assert.equal(body.confirm_live_generation, true)
   assert.equal(body.description, 'mossy path')
   assert.equal(body.options.candidateCount, 2)
-  assert.equal(body.providerPresetId, undefined)
+  assert.equal(body.providerPresetId, 'gemini_native_1')
   assert.equal(body.imageConfig, undefined)
   await assert.rejects(
     postSceneGeneration({ description: 'mossy path', candidateCount: SCENE_MAX_CANDIDATES + 1, confirmed: true }),
     (error) => error instanceof StudioSceneApiError && error.code === 'invalid_scene_options',
+  )
+})
+
+test('live Scene generation fails closed with zero POSTs when native Gemini is unavailable', async () => {
+  const blocked = sceneGenerationFetch({
+    state: {
+      status: 'ready',
+      presets: [{
+        id: 'openrouter_1',
+        available: true,
+        provider: 'openrouter',
+        route_kind: 'openrouter',
+        model: 'example/model',
+      }],
+    },
+  })
+  await assert.rejects(
+    postSceneGeneration({ description: 'mossy path', confirmed: true, fetchImpl: blocked.fetchImpl }),
+    (error) => error instanceof StudioSceneApiError && error.code === 'gemini_not_ready',
+  )
+  assert.deepEqual(blocked.calls.map((call) => call.url), ['/api/gemini-state'])
+  const failedCalls = []
+  await assert.rejects(
+    postSceneGeneration({
+      description: 'mossy path',
+      confirmed: true,
+      fetchImpl: async (url, options) => {
+        failedCalls.push(url)
+        throw new Error('network down')
+      },
+    }),
+    (error) => error instanceof StudioSceneApiError && error.code === 'gemini_not_ready',
+  )
+  assert.deepEqual(failedCalls, ['/api/gemini-state'])
+  assert.equal(selectEligibleSceneGeminiPreset(nativeGeminiState()).id, 'gemini_native_1')
+  assert.throws(
+    () => selectEligibleSceneGeminiPreset({ presets: [{ available: true, provider: 'openrouter', route_kind: 'openrouter', id: 'or1' }] }),
+    (error) => error instanceof StudioSceneApiError && error.code === 'gemini_not_ready',
+  )
+  assert.throws(
+    () => selectStrictGeminiPreset({
+      status: 'ready',
+      presets: [{ available: true, provider: 'openrouter', route_kind: 'openrouter', id: 'or1' }],
+    }),
+    (error) => error?.code === 'gemini_not_ready',
+  )
+  assert.throws(
+    () => selectEligibleTilesGeminiPreset({
+      presets: [{ available: true, provider: 'openrouter', route_kind: 'openrouter', id: 'or1' }],
+    }),
+    (error) => error?.code === 'gemini_not_ready',
   )
 })
 
@@ -247,4 +334,7 @@ test('only definite client rejection proves that a live submission consumed no c
   assert.equal(sceneSubmissionIsDefiniteRejection({ status: 429 }), true)
   assert.equal(sceneSubmissionIsDefiniteRejection({ status: 500 }), false)
   assert.equal(sceneSubmissionIsDefiniteRejection(new Error('network')), false)
+  assert.equal(sceneSubmissionIsDefiniteRejection({ code: 'gemini_not_ready' }), true)
+  assert.equal(sceneSubmissionIsDefiniteRejection({ code: 'gemini_preset_mismatch' }), true)
+  assert.equal(sceneSubmissionIsDefiniteRejection({ code: 'request_failed' }), false)
 })

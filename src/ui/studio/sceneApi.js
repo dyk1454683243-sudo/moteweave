@@ -282,7 +282,13 @@ function candidateCount(value) {
   return integerOption(value ?? 1, 'candidateCount', 1, SCENE_MAX_CANDIDATES)
 }
 
+const SCENE_PRECHECK_REJECTION_CODES = new Set([
+  'gemini_not_ready',
+  'gemini_preset_mismatch',
+])
+
 export function sceneSubmissionIsDefiniteRejection(error) {
+  if (SCENE_PRECHECK_REJECTION_CODES.has(error?.code)) return true
   const status = Number(error?.status)
   return Number.isInteger(status) && status >= 400 && status < 500
 }
@@ -307,10 +313,46 @@ export async function postSceneImport({
   return assertSceneJob(job)
 }
 
+export function selectEligibleSceneGeminiPreset(providerState = {}) {
+  const presets = Array.isArray(providerState.presets) ? providerState.presets : []
+  const eligible = presets.filter((preset) => (
+    preset?.available === true &&
+    preset.provider === 'gemini' &&
+    preset.route_kind === 'google_native' &&
+    SAFE_ID_PATTERN.test(String(preset.id ?? '')) &&
+    !String(preset.id).includes('..')
+  ))
+  const selected = eligible.find((preset) => preset.id === providerState.active_preset_id) ?? eligible[0]
+  if (!selected) {
+    throw sceneError('gemini_not_ready', 'No eligible native Gemini image preset is configured')
+  }
+  return Object.freeze({
+    id: selected.id,
+    model: selected.model,
+    routeKind: selected.route_kind,
+    label: selected.label ?? selected.id,
+  })
+}
+
+export async function fetchSceneGeminiPreset({
+  fetchImpl = globalThis.fetch,
+  signal,
+} = {}) {
+  try {
+    const state = await requestJson('/api/gemini-state', { method: 'GET', signal }, fetchImpl)
+    return selectEligibleSceneGeminiPreset(state)
+  } catch (error) {
+    if (error?.name === 'AbortError') throw error
+    if (error instanceof StudioSceneApiError && error.code === 'gemini_not_ready') throw error
+    throw sceneError('gemini_not_ready', 'Native Gemini readiness could not be confirmed', { cause: error })
+  }
+}
+
 export async function postSceneGeneration({
   description,
   candidateCount: requestedCandidates = 1,
   confirmed = false,
+  providerPresetId = null,
   options = {},
   fetchImpl = globalThis.fetch,
   signal,
@@ -319,9 +361,14 @@ export async function postSceneGeneration({
   if (!cleanDescription) throw sceneError('description_required', 'A scene tile description is required')
   if (!confirmed) throw sceneError('live_confirmation_required', 'Live Scene generation requires explicit confirmation')
   const count = candidateCount(requestedCandidates)
+  const preset = await fetchSceneGeminiPreset({ fetchImpl, signal })
+  if (providerPresetId != null && String(providerPresetId) !== preset.id) {
+    throw sceneError('gemini_preset_mismatch', 'providerPresetId must match the active native Gemini preset')
+  }
   const body = {
     confirm_live_generation: true,
     description: cleanDescription,
+    providerPresetId: preset.id,
     options: {
       ...normalizeSceneOptions(options),
       candidateCount: count,

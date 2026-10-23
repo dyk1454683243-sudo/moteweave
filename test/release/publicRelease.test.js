@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import {
   access,
   mkdir,
@@ -154,6 +154,39 @@ test('public release checker passes an approved source-only fixture', async () =
   })
   assert.equal(report.status, 'pass', JSON.stringify(report.issues))
   assert.deepEqual(report.issues, [])
+})
+
+test('licensed fonts require included, hash-matched license evidence and attribution', async () => {
+  const fixture = await releaseFixture()
+  const digest = value => createHash('sha256').update(value).digest('hex')
+  const fontPath = 'src/ui/assets/sample.woff2'
+  const licensePath = 'src/ui/assets/sample-license.txt'
+  const sourceUrl = 'https://example.com/font-release'
+  fixture.files.push(await writeFixtureFile(fixture.root, fontPath, 'fixture-font'))
+  fixture.files.push(await writeFixtureFile(fixture.root, licensePath, 'fixture-license'))
+  const asset = {
+    path: fontPath, kind: 'font', source_rights: 'licensed_third_party',
+    license: 'OFL-1.1', license_path: licensePath, license_sha256: digest('fixture-license'),
+    source_url: sourceUrl, source_archive_sha256: digest('fixture-archive'),
+    sha256: digest('fixture-font'), release_status: 'approved',
+  }
+  await writeFixtureFile(fixture.root, 'ATTRIBUTIONS.md', `${fontPath}\n${licensePath}\n${sourceUrl}\n`)
+  await writeFixtureFile(fixture.root, 'configs/public-asset-provenance.json', JSON.stringify({ schema_version: 1, assets: [asset] }))
+  const check = () => checkPublicRelease({ rootDir: fixture.root, trackedFiles: fixture.files })
+  assert.equal((await check()).status, 'pass')
+  const nonFontPath = 'src/ui/assets/not-a-font.png'
+  fixture.files.push(await writeFixtureFile(fixture.root, nonFontPath, 'fixture-font'))
+  await writeFixtureFile(fixture.root, 'configs/public-asset-provenance.json', JSON.stringify({ schema_version: 1, assets: [asset, { ...asset, path: nonFontPath }] }))
+  assert.ok((await check()).issues.some(i => i.code === 'asset.not_release_approved' && i.file === nonFontPath))
+  fixture.files = fixture.files.filter(p => p !== nonFontPath)
+  await writeFixtureFile(fixture.root, 'configs/public-asset-provenance.json', JSON.stringify({ schema_version: 1, assets: [asset] }))
+  await writeFixtureFile(fixture.root, licensePath, 'changed-license')
+  assert.ok((await check()).issues.some(i => i.code === 'asset.not_release_approved'))
+  await writeFixtureFile(fixture.root, licensePath, 'fixture-license')
+  await writeFixtureFile(fixture.root, 'ATTRIBUTIONS.md', `${fontPath}\n`)
+  assert.ok((await check()).issues.some(i => i.code === 'asset.attribution_missing'))
+  fixture.files = fixture.files.filter(p => p !== licensePath)
+  assert.ok((await check()).issues.some(i => i.code === 'asset.not_release_approved'))
 })
 
 test('public snapshot export copies only included regular files and writes a ledger', async () => {

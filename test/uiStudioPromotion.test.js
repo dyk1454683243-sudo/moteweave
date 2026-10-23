@@ -29,7 +29,7 @@ test('Studio promotion permanently redirects every legacy shell entry through fi
   }
   assert.match(smoke, /legacyFallbackCases/)
   assert.match(smoke, /'character-pack', '\/src\/ui\/studio\/studio\.html#character'/)
-  assert.match(smoke, /studio\.html\?open=scene-prompt#scene/)
+  assert.match(smoke, /studio\.html#tiles/)
   assert.match(smoke, /\?tab=qa&tab=motion-source/)
   assert.match(smoke, /\?tab=__proto__/)
   await assert.rejects(access('index.html'), { code: 'ENOENT' })
@@ -66,23 +66,55 @@ test('Studio local Character closes advanced configuration before running and re
 })
 
 test('Studio local Character UI binds real reports, previews, and individual engine packages without fake capability', async () => {
-  const [html, css, view, api] = await Promise.all([
+  const [html, css, view, api, resultView] = await Promise.all([
     readFile('src/ui/studio/studio.html', 'utf8'),
     readFile('src/ui/studio/studio.css', 'utf8'),
     readFile('src/ui/studio/characterLocalView.js', 'utf8'),
     readFile('src/ui/studio/characterLocalApi.js', 'utf8'),
+    readFile('src/ui/studio/characterResultView.js', 'utf8'),
   ])
 
+  assert.match(css, /\.crumb \{ display: none !important;/)
+  assert.doesNotMatch(css, /\.(?:project|qa|scene)-topbar > strong \{[^}]*flex-basis:\s*auto/)
+  assert.match(html, /id="character-header-crumb" class="crumb"/)
+  assert.match(css, /--topbar-title-slot:\s*92px/)
+  assert.match(css, /--topbar-title-gap:\s*24px/)
+  assert.match(css, /--topbar-control-gap:\s*8px/)
+  assert.match(css, /\.topbar > strong \{[^}]*flex:\s*0 0 var\(--topbar-title-slot\)/)
+  assert.match(css, /\.topbar > strong \{[^}]*font-size:\s*14px/)
+  assert.match(css, /\.topbar > strong \{[^}]*margin-inline-end:\s*calc\(var\(--topbar-title-gap\) - var\(--topbar-control-gap\)\)/)
   assert.match(css, /\.character-local-workspace \{[^}]*grid-template-columns: 300px minmax\(0, 1fr\)/)
-  assert.match(css, /\.character-local-stage \{[^}]*grid-template-rows: 36px minmax\(0, 1fr\) 104px/)
+  assert.doesNotMatch(css, /\.character-local-workspace \{[^}]*grid-template-columns: 280px minmax\(0, 1fr\)/)
+  assert.doesNotMatch(css, /\.character-advanced-overlay \{[^}]*left: 280px/)
+  assert.match(css, /\.character-local-stage \{[^}]*grid-template-rows: 36px minmax\(0, 1fr\) auto/)
+  assert.match(css, /\.character-local-clip-thumb \{[^}]*overflow: hidden/)
+  assert.match(css, /\.character-local-clip strong \{[^}]*flex: 0 0 12px[^}]*line-height: 12px/)
   assert.match(css, /@media \(max-width: 860px\)[\s\S]*\.character-local-workspace \{[^}]*grid-template-columns: 1fr; grid-template-rows: auto auto/)
   assert.match(css, /\.character-local-file:focus-visible \+ \.character-local-drop,[\s\S]*\.character-local-file:focus-visible ~ \.character-local-source-card/)
   assert.match(html, /id="character-local-canvas"[^>]*width="960"[^>]*height="500"[^>]*aria-describedby="character-local-stage-help character-local-preview-state"[^>]*data-character-local-aria="previewAria"/)
+  assert.match(css, /\.character-local-preview canvas \{[^}]*object-fit: contain/)
+  assert.match(resultView, /function syncLocalPreviewCanvas\(/)
+  assert.match(resultView, /host.clientWidth/)
+  assert.match(resultView, /if \(syncLocalPreviewCanvas\(canvas\)\) centerPreviewActor\(canvas\)/)
   assert.match(html, /data-character-local-aria="sourceActionsAria"/)
   assert.match(html, /data-character-local-aria="defaultsAria"/)
+  assert.doesNotMatch(html, /class="(?:[^"]*\s)?character-local-advanced(?:\s[^"]*)?"/)
+  assert.doesNotMatch(html, /data-character-local-copy="advanced(?:Help|Cleanup|Anchor|Motion|Export)?"/)
+  assert.doesNotMatch(html, /id="character-advanced-entry"/)
+  assert.match(html, /class="character-local-panel"[\s\S]*id="character-advanced-config"[\s\S]*id="character-local-primary"/)
   assert.doesNotMatch(html, /data-character-local-copy="profileId"/)
   assert.doesNotMatch(html, /id="character-local-empty-stage"/)
   assert.match(html, /id="character-local-quality-link"[^>]*target="_blank"/)
+  assert.match(html, /id="character-local-progress-bar"[^>]*max="100"[^>]*aria-labelledby="character-local-progress-label"/)
+  assert.doesNotMatch(html, /id="character-local-progress-bar"[^>]*\bvalue=/)
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.character-local-progress-ring \{ animation: none; \}/)
+  for (const id of ['character-export-link', 'studio-scene-export', 'studio-project-export']) {
+    const tag = html.match(new RegExp(`<[^>]+id="${id}"[^>]*>`))?.[0] ?? ''
+    assert.match(tag, /class="[^"]*button secondary/)
+    assert.doesNotMatch(tag, /class="[^"]*button primary/)
+  }
+  assert.match(css, /\.project-topbar \{ height: 56px; padding-inline: var\(--topbar-pad-x\); \}/)
+  assert.match(css, /\.qa-topbar \{ height: 56px; padding-inline: var\(--topbar-pad-x\); \}/)
   for (const id of [
     'character-local-export-pack',
     'character-local-export-godot',
@@ -91,15 +123,29 @@ test('Studio local Character UI binds real reports, previews, and individual eng
   ]) assert.match(html, new RegExp(`id="${id}"`))
   assert.doesNotMatch(html, /id="character-local-export-(?:unity|tres)"/)
   assert.doesNotMatch(html, /id="character-local-(?:cancel|simulate)/)
-  assert.match(view, /getMovementIntent\(preview\.keys, preview\.direction\)/)
-  assert.match(view, /movePreviewActor\(preview\.position, intent/)
+  const previewSrc = `${view}\n${resultView}`
+  assert.match(previewSrc, /getMovementIntent\(preview\.keys, preview\.direction\)/)
+  assert.match(previewSrc, /movePreviewActor\(preview\.position, intent/)
+  assert.match(previewSrc, /function sheetFrameSource\(/)
+  assert.match(previewSrc, /function drawClipThumbnail\(/)
+  assert.match(previewSrc, /const CLIP_THUMB_FILL = 0.8/)
+  assert.match(previewSrc, /function opaqueClipBounds\(/)
+  assert.match(previewSrc, /thumb.className = 'character-local-clip-thumb'/)
+  assert.match(
+    previewSrc,
+    /drawClipThumbnail\(thumb, preview\.image, presentation\.animations, animation\)/,
+  )
+  assert.match(previewSrc, /opaqueClipBounds\(image, source\) \?\? source/)
+  assert.doesNotMatch(previewSrc, /character-local-clip-thumb[\s\S]{0,80}placeholder|fake clip|sample clip/i)
+  assert.match(css, /\.character-local-clip-thumb \{[^}]*width: 48px[^}]*height: 48px[^}]*image-rendering: pixelated/)
   assert.match(view, /sourceActionsAria: 'Source file actions'/)
   assert.match(view, /defaultsAria: 'Locked processing defaults'/)
   assert.match(view, /previewAria: 'Playable verified character preview\./)
   assert.match(view, /gridLocked: '8 × 8 · locked processing layout'/)
   assert.match(view, /defaultFps: 'FPS · defined per animation'/)
   assert.doesNotMatch(view, /profileId:|currentBinding:|setHidden\('character-local-empty-stage'/)
-  assert.doesNotMatch(css, /\.character-local-profile code|\.character-local-empty-stage/)
+  assert.doesNotMatch(view, /advanced: 'Advanced defaults'|advanced: '高级默认值'|advancedHelp:|advancedCleanup:|advancedAnchor:|advancedMotion:|advancedExport:/)
+  assert.doesNotMatch(css, /\.character-local-profile code|\.character-local-empty-stage|\.character-local-advanced/)
   assert.doesNotMatch(`${html}\n${view}`, /FPS · 10|由锁定布局识别|detected from locked layout|网格识别使用/)
   assert.match(view, /primary\.disabled = [^\n]+!currentInputValid[^\n]+\['blocked', 'running'\]\.includes\(presentation\.action\)/)
   assert.match(api, /requestStudioCharacterJson\('\/api\/process-sheet'/)
@@ -108,7 +154,7 @@ test('Studio local Character UI binds real reports, previews, and individual eng
 
 test('Studio local Character invalidates release before decode and discards out-of-order selections', async () => {
   const view = await readFile('src/ui/studio/characterLocalView.js', 'utf8')
-  const start = view.indexOf('async function selectSource(file)')
+  const start = view.indexOf('async function selectSource(file,')
   const end = view.indexOf('\nfunction clearSource(', start)
   assert.notEqual(start, -1)
   assert.notEqual(end, -1)
@@ -119,6 +165,6 @@ test('Studio local Character invalidates release before decode and discards out-
   assert.ok(invalidateIndex >= 0 && invalidateIndex < decodeIndex)
   assert.ok(resetIndex >= 0 && resetIndex < decodeIndex)
   assert.match(selection, /const selectionEpoch = \+\+sourceSelectionEpoch/)
-  assert.match(selection, /if \(selectionEpoch !== sourceSelectionEpoch\) \{[\s\S]*revokeObjectURL/)
+  assert.match(selection, /if \(selectionEpoch !== sourceSelectionEpoch \|\| signal\?\.aborted\) \{[\s\S]*revokeObjectURL/)
   assert.match(view, /function clearSource\([^)]*\) \{[\s\S]*sourceSelectionEpoch \+= 1/)
 })

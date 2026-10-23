@@ -8,6 +8,14 @@ not part of this gate. Keep the process-sheet fixture available for older
 tests, and keep the knight JPEG as a private-only historical sample. Do not
 use either as a baseline for new local-image quality work.
 
+The two exact accepted-C regressions in `test/character-pack/pixelGridSampling.test.js`
+use `GAMETOOL_PRIVATE_KNIGHT_FIXTURE=/absolute/path/to/private-original.jpg`.
+Without that setting they explicitly report skipped historical-input coverage;
+the public synthetic regressions still run. With it set, a missing file or a SHA256
+other than `262d86c2cda1a5a0c45e873e8487d163dd2ef8615c1c52493290a7eabd0eb3fe`
+fails the check. Do not substitute the repository-owned sample or redistribute
+the private original. Run it through the normal resource-guarded test entry.
+
 ## Purpose
 
 - Run provider-free image quality checks when live image APIs are unavailable.
@@ -119,3 +127,11 @@ values are `original`, `test_generated`, `generated_by_ai_from_template`, `cc0`,
 `public_domain`, `user_provided_for_repository_test_use`, and
 `user_provided_with_repository_test_rights`. Keep local-only or named-IP samples
 outside tracked manifests.
+
+The separate historical four-frame fire integration test uses the private trial
+folder supplied through `GAMETOOL_PRIVATE_FIRE_FIXTURE_DIR` (absolute path). It
+requires the original `generation.json` SHA256
+`7cd3511c0f18db63b8ac4ce65cfe8567c56f7d88f50ac2c8f8596e4a3d6974ff`
+and verifies every original image hash.
+Without that input the historical check is explicitly skipped; a supplied but
+missing or invalid fixture fails. The private trial is not distributed.

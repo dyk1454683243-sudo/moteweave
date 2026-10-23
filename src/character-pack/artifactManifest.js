@@ -134,6 +134,7 @@ export function buildCharacterPackArtifactManifest(jobId, result) {
     ...(backgroundRemovedProviderOutput ? [backgroundRemovedProviderOutput] : []),
     ...backgroundMatteV2Files,
     { name: 'source.png', content: result.files.sourcePng },
+    ...optionalFile('source_pixel_recovery.png', result.files.sourcePixelRecoveryPng),
     ...optionalFile('source_layout_overlay.png', result.files.sourceLayoutOverlayPng),
     ...optionalFile('source_quality_report.json', result.files.sourceQualityReportJson),
     ...optionalFile('source_subject_count_report.json', result.files.sourceSubjectCountReportJson),
@@ -192,6 +193,7 @@ export function buildCharacterPackArtifactManifest(jobId, result) {
           }
         : {}),
       source_url: generatedUrl(jobId, 'source.png'),
+      ...(result.files.sourcePixelRecoveryPng ? { source_pixel_recovery_url: generatedUrl(jobId, 'source_pixel_recovery.png') } : {}),
       ...(result.files.sourceLayoutOverlayPng ? { source_layout_overlay_url: generatedUrl(jobId, 'source_layout_overlay.png') } : {}),
       ...(result.files.sourceQualityReportJson ? { source_quality_report_url: generatedUrl(jobId, 'source_quality_report.json') } : {}),
       ...(result.files.sourceSubjectCountReportJson ? { source_subject_count_report_url: generatedUrl(jobId, 'source_subject_count_report.json') } : {}),

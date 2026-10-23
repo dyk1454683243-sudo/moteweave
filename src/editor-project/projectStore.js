@@ -1,10 +1,16 @@
 import { constants as fsConstants, existsSync } from 'node:fs'
-import { copyFile, lstat, mkdir, open, readFile, realpath, rename, stat, writeFile } from 'node:fs/promises'
+import { copyFile, lstat, mkdir, open, opendir, readFile, realpath, rename, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
+import {
+  EDITOR_PROJECT_LIST_LIMITS,
+  EDITOR_PROJECT_V1_VERSION,
+  EDITOR_PROJECT_V2_VERSION,
+  EDITOR_PROJECT_VERSION,
+} from './constants.js'
 import { createDefaultEditorProject } from './defaults.js'
 import { resolveEditorProjectPaths } from './paths.js'
-import { clonePlain } from './safety.js'
+import { clonePlain, isIsoTimestamp, isPlainObject, isPositiveInteger, isValidId } from './safety.js'
 import { parseEditorProjectJson, serializeEditorProject } from './serializer.js'
 
 const projectMutationTails = new Map()
@@ -78,6 +84,16 @@ function storageBoundaryFailure(code, projectId) {
       : 'editor project directory identity changed before publication',
     projectId,
   )
+}
+
+function rejectLegacyV1Write(project, current = null) {
+  if ((current && current.version !== EDITOR_PROJECT_VERSION) || (project && project.version !== EDITOR_PROJECT_VERSION)) {
+    throw new EditorProjectStoreError(
+      'unsupported_project_writer',
+      'legacy editor project writers only support editor_project_v0',
+      { project_id: current?.id ?? project?.id ?? null },
+    )
+  }
 }
 
 function sameFilesystemIdentity(left, right) {
@@ -379,6 +395,401 @@ export async function loadEditorProject({
   return { project, paths }
 }
 
+function listStoreError(code, message) {
+  return new EditorProjectStoreError(code, message)
+}
+
+function listResourceLimit() {
+  return listStoreError('resource_limit', 'editor project list exceeds its resource limit')
+}
+
+function listRootUnsafe() {
+  return listStoreError('artifact_integrity_failed', 'editor project list root is unsafe')
+}
+
+function listRootUnreadable() {
+  return listStoreError('storage_commit_failed', 'editor project list root could not be read')
+}
+
+function configuredListWorkspaceRoot({ projectRoot = process.cwd(), workspaceRoot } = {}) {
+  return path.resolve(workspaceRoot ?? path.join(projectRoot, 'workspace'))
+}
+
+async function emitListReadEvent(listener, event) {
+  if (typeof listener !== 'function') return event
+  await listener(event)
+  return event
+}
+
+async function captureListDirectoryIdentity(directoryPath) {
+  let lexicalStat
+  try {
+    lexicalStat = await lstat(directoryPath)
+  } catch (error) {
+    if (error?.code === 'ENOENT') return { kind: 'missing' }
+    return { kind: 'unreadable' }
+  }
+  if (lexicalStat.isSymbolicLink()) return { kind: 'unsafe' }
+  if (!lexicalStat.isDirectory()) return { kind: 'not-directory' }
+  let resolvedPath
+  let resolvedStat
+  try {
+    resolvedPath = await realpath(directoryPath)
+    resolvedStat = await stat(resolvedPath)
+  } catch {
+    return { kind: 'unreadable' }
+  }
+  if (!resolvedStat.isDirectory() || !sameFilesystemIdentity(lexicalStat, resolvedStat)) {
+    return { kind: 'unsafe' }
+  }
+  return {
+    kind: 'ok',
+    identity: Object.freeze({
+      path: path.resolve(directoryPath),
+      realPath: resolvedPath,
+      dev: resolvedStat.dev,
+      ino: resolvedStat.ino,
+    }),
+  }
+}
+
+async function assertListRootIdentity(workspace, projectsDir, workspaceIdentity, projectsIdentity) {
+  const workspaceNow = await captureListDirectoryIdentity(workspace)
+  if (workspaceNow.kind === 'unreadable') throw listRootUnreadable()
+  if (
+    workspaceNow.kind !== 'ok'
+    || workspaceNow.identity.realPath !== workspaceIdentity.realPath
+    || !sameFilesystemIdentity(workspaceNow.identity, workspaceIdentity)
+  ) {
+    throw listRootUnsafe()
+  }
+  const projectsNow = await captureListDirectoryIdentity(projectsDir)
+  if (projectsNow.kind === 'unreadable') throw listRootUnreadable()
+  if (
+    projectsNow.kind !== 'ok'
+    || projectsNow.identity.realPath !== projectsIdentity.realPath
+    || !sameFilesystemIdentity(projectsNow.identity, projectsIdentity)
+    || path.join(workspaceNow.identity.realPath, 'projects') !== projectsNow.identity.realPath
+  ) {
+    throw listRootUnsafe()
+  }
+}
+
+function projectDirectoryStillTrusted(current, expected, projectsIdentity, projectId, paths) {
+  return current?.kind === 'ok'
+    && current.identity.realPath === expected.realPath
+    && sameFilesystemIdentity(current.identity, expected)
+    && path.join(projectsIdentity.realPath, projectId) === current.identity.realPath
+    && path.join(paths.projectDir, 'project.json') === paths.projectJson
+}
+
+function projectListSummary(value, expectedId) {
+  if (!isPlainObject(value)) return null
+  const { id, name, version, revision, updated_at } = value
+  if (id !== expectedId || !isValidId(id)) return null
+  if (![EDITOR_PROJECT_VERSION, EDITOR_PROJECT_V1_VERSION, EDITOR_PROJECT_V2_VERSION].includes(version)) return null
+  if (typeof name !== 'string') return null
+  if (!isPositiveInteger(revision)) return null
+  if (!isIsoTimestamp(updated_at)) return null
+  return { id, name, version, revision, updated_at }
+}
+
+async function classifyListedProjectEntry(paths) {
+  const directory = await captureListDirectoryIdentity(paths.projectDir)
+  if (directory.kind === 'missing' || directory.kind === 'not-directory') return { kind: 'ignore' }
+  if (directory.kind !== 'ok') return { kind: 'omit' }
+
+  let fileStat
+  try {
+    fileStat = await lstat(paths.projectJson)
+  } catch (error) {
+    if (error?.code === 'ENOENT') return { kind: 'ignore' }
+    return { kind: 'omit' }
+  }
+  if (fileStat.isSymbolicLink() || !fileStat.isFile()) return { kind: 'omit' }
+  if (fileStat.size > EDITOR_PROJECT_LIST_LIMITS.maxIndexBytes) return { kind: 'omit' }
+  return {
+    kind: 'index',
+    size: fileStat.size,
+    identity: { dev: fileStat.dev, ino: fileStat.ino },
+    directoryIdentity: directory.identity,
+  }
+}
+
+async function readListedFileHandleBytes(fileHandle, size) {
+  const bytes = Buffer.alloc(size)
+  let offset = 0
+  while (offset < size) {
+    const { bytesRead } = await fileHandle.read(bytes, offset, size - offset, offset)
+    if (!bytesRead) throw new Error('listed project read ended early')
+    offset += bytesRead
+  }
+  return bytes
+}
+
+async function readListedProjectIndex(filePath, expected, onListReadEvent) {
+  if (!Number.isInteger(fsConstants.O_NOFOLLOW)) return { kind: 'omit', consumed: 0 }
+  const flags = fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW
+  let fileHandle
+  try {
+    fileHandle = await open(filePath, flags)
+  } catch (error) {
+    if (error?.code === 'ENOENT') return { kind: 'ignore', consumed: 0 }
+    return { kind: 'omit', consumed: 0 }
+  }
+  let billedSize = 0
+  try {
+    const openedStat = await fileHandle.stat()
+    if (
+      !openedStat.isFile()
+      || openedStat.size !== expected.size
+      || openedStat.size > EDITOR_PROJECT_LIST_LIMITS.maxIndexBytes
+      || !sameFilesystemIdentity(openedStat, expected.identity)
+    ) {
+      return { kind: 'omit', consumed: 0 }
+    }
+    billedSize = openedStat.size
+    await emitListReadEvent(onListReadEvent, {
+      stage: 'before-index-read',
+      filePath,
+      size: openedStat.size,
+    })
+    const bytes = await readListedFileHandleBytes(fileHandle, openedStat.size)
+    const afterStat = await fileHandle.stat()
+    if (
+      !afterStat.isFile()
+      || afterStat.size !== openedStat.size
+      || !sameFilesystemIdentity(afterStat, expected.identity)
+    ) {
+      return { kind: 'omit', consumed: billedSize }
+    }
+    return { kind: 'bytes', bytes, consumed: billedSize }
+  } catch (error) {
+    if (error instanceof EditorProjectStoreError) throw error
+    return { kind: 'omit', consumed: billedSize }
+  } finally {
+    try {
+      await fileHandle.close()
+    } catch {
+      // List reads must always release the handle.
+    }
+  }
+}
+
+function compareProjectListSummaries(left, right) {
+  if (left.updated_at !== right.updated_at) {
+    return left.updated_at < right.updated_at ? 1 : -1
+  }
+  if (left.id === right.id) return 0
+  return left.id < right.id ? -1 : 1
+}
+
+export async function listEditorProjects({
+  projectRoot = process.cwd(),
+  workspaceRoot,
+  cursor = null,
+  paginate = false,
+  onListReadEvent,
+} = {}) {
+  if (cursor != null && (typeof cursor !== 'string' || !isValidId(cursor))) {
+    throw listStoreError('invalid_request', 'editor project list cursor is invalid')
+  }
+  const paged = Boolean(paginate || cursor != null)
+  const workspace = configuredListWorkspaceRoot({ projectRoot, workspaceRoot })
+  const projectsDir = path.join(workspace, 'projects')
+
+  const workspaceCaptured = await captureListDirectoryIdentity(workspace)
+  if (workspaceCaptured.kind === 'missing') {
+    return { projects: [], omitted_count: 0, ...(cursor != null ? { has_more: false, next_cursor: null } : {}) }
+  }
+  if (workspaceCaptured.kind === 'unreadable') throw listRootUnreadable()
+  if (workspaceCaptured.kind !== 'ok') throw listRootUnsafe()
+
+  const projectsCaptured = await captureListDirectoryIdentity(projectsDir)
+  if (projectsCaptured.kind === 'missing') {
+    return { projects: [], omitted_count: 0, ...(cursor != null ? { has_more: false, next_cursor: null } : {}) }
+  }
+  if (projectsCaptured.kind === 'unreadable') throw listRootUnreadable()
+  if (projectsCaptured.kind !== 'ok') throw listRootUnsafe()
+  if (path.join(workspaceCaptured.identity.realPath, 'projects') !== projectsCaptured.identity.realPath) {
+    throw listRootUnsafe()
+  }
+
+  await emitListReadEvent(onListReadEvent, {
+    stage: 'after-root-identity',
+    workspace,
+    projectsDir,
+  })
+  await assertListRootIdentity(
+    workspace,
+    projectsDir,
+    workspaceCaptured.identity,
+    projectsCaptured.identity,
+  )
+
+  let directory
+  try {
+    directory = await opendir(projectsDir)
+  } catch {
+    throw listRootUnreadable()
+  }
+
+  const entryNames = []
+  try {
+    while (true) {
+      const dirent = await directory.read()
+      if (!dirent) break
+      entryNames.push(dirent.name)
+      if (entryNames.length > EDITOR_PROJECT_LIST_LIMITS.maxFirstLevelEntries) {
+        throw listResourceLimit()
+      }
+    }
+  } catch (error) {
+    if (error instanceof EditorProjectStoreError) throw error
+    throw listRootUnreadable()
+  } finally {
+    try {
+      await directory.close()
+    } catch {
+      // Directory iteration may already have closed the handle.
+    }
+  }
+  entryNames.sort()
+
+  await assertListRootIdentity(
+    workspace,
+    projectsDir,
+    workspaceCaptured.identity,
+    projectsCaptured.identity,
+  )
+
+  const summaries = []
+  let omittedCount = 0
+  let candidateCount = 0
+  let cumulativeReadBytes = 0
+  let lastCompletedEntryName = null
+  let hasMore = false
+  let nextCursor = null
+
+  for (const entryName of entryNames) {
+    if (!isValidId(entryName)) continue
+    if (cursor != null && entryName <= cursor) continue
+
+    await assertListRootIdentity(
+      workspace,
+      projectsDir,
+      workspaceCaptured.identity,
+      projectsCaptured.identity,
+    )
+
+    let paths
+    try {
+      paths = resolveEditorProjectPaths({
+        projectId: entryName,
+        projectRoot,
+        workspaceRoot: workspace,
+      })
+    } catch {
+      continue
+    }
+
+    const classified = await classifyListedProjectEntry(paths)
+    if (classified.kind === 'ignore') continue
+
+    if (paged && candidateCount >= EDITOR_PROJECT_LIST_LIMITS.maxCandidates && lastCompletedEntryName != null) {
+      hasMore = true
+      nextCursor = lastCompletedEntryName
+      break
+    }
+    candidateCount += 1
+    if (candidateCount > EDITOR_PROJECT_LIST_LIMITS.maxCandidates) throw listResourceLimit()
+    if (classified.kind === 'omit') {
+      omittedCount += 1
+      lastCompletedEntryName = entryName
+      continue
+    }
+
+    if (cumulativeReadBytes + classified.size > EDITOR_PROJECT_LIST_LIMITS.maxCumulativeReadBytes) {
+      if (paged && lastCompletedEntryName != null) {
+        candidateCount -= 1
+        hasMore = true
+        nextCursor = lastCompletedEntryName
+        break
+      }
+      throw listResourceLimit()
+    }
+
+    await emitListReadEvent(onListReadEvent, {
+      stage: 'after-project-identity',
+      projectId: entryName,
+      projectDir: paths.projectDir,
+    })
+    const directoryNow = await captureListDirectoryIdentity(paths.projectDir)
+    if (!projectDirectoryStillTrusted(
+      directoryNow,
+      classified.directoryIdentity,
+      projectsCaptured.identity,
+      entryName,
+      paths,
+    )) {
+      omittedCount += 1
+      lastCompletedEntryName = entryName
+      continue
+    }
+
+    cumulativeReadBytes += classified.size
+
+    const read = await readListedProjectIndex(paths.projectJson, classified, onListReadEvent)
+    if (read.consumed > classified.size) {
+      const extra = read.consumed - classified.size
+      if (cumulativeReadBytes + extra > EDITOR_PROJECT_LIST_LIMITS.maxCumulativeReadBytes) {
+        throw listResourceLimit()
+      }
+      cumulativeReadBytes += extra
+    }
+    if (read.kind === 'ignore') {
+      candidateCount -= 1
+      lastCompletedEntryName = entryName
+      continue
+    }
+    if (read.kind !== 'bytes') {
+      omittedCount += 1
+      lastCompletedEntryName = entryName
+      continue
+    }
+
+    let parsed
+    try {
+      parsed = JSON.parse(read.bytes.toString('utf8'))
+    } catch {
+      omittedCount += 1
+      lastCompletedEntryName = entryName
+      continue
+    }
+    const summary = projectListSummary(parsed, entryName)
+    if (!summary) {
+      omittedCount += 1
+      lastCompletedEntryName = entryName
+      continue
+    }
+    summaries.push(summary)
+    lastCompletedEntryName = entryName
+  }
+
+  summaries.sort(compareProjectListSummaries)
+  const result = {
+    projects: summaries,
+    omitted_count: omittedCount,
+    ...(hasMore
+      ? { has_more: true, next_cursor: nextCursor }
+      : (cursor != null ? { has_more: false, next_cursor: null } : {})),
+  }
+  if (Buffer.byteLength(JSON.stringify(result), 'utf8') > EDITOR_PROJECT_LIST_LIMITS.maxResponseBytes) {
+    throw listResourceLimit()
+  }
+  return result
+}
+
 async function saveEditorProjectUnlocked({
   project,
   projectRoot = process.cwd(),
@@ -391,6 +802,7 @@ async function saveEditorProjectUnlocked({
   await mkdir(paths.projectDir, { recursive: true })
 
   const current = await readProjectFile(paths.projectJson)
+  rejectLegacyV1Write(project, current)
   if (!autosave && current && expectedRevision !== current.revision) {
     throw new EditorProjectStoreError('revision_conflict', 'editor project revision conflict', {
       expected_revision: expectedRevision,
@@ -445,6 +857,7 @@ export async function createPreparedEditorProject({
   now = new Date(),
 } = {}) {
   const projectId = project?.id
+  rejectLegacyV1Write(project)
   const paths = resolveEditorProjectPaths({ projectId, projectRoot, workspaceRoot })
   return withEditorProjectMutationLock({ projectId, workspaceRoot: paths.workspaceRoot }, async () => {
     const workspaceIdentity = await captureWorkspaceIdentity(
@@ -553,6 +966,7 @@ export async function mutateEditorProject({
 } = {}) {
   return withEditorProjectMutationLock({ projectId, workspaceRoot }, async () => {
     const loaded = await loadEditorProject({ projectId, projectRoot, workspaceRoot })
+    rejectLegacyV1Write(loaded.project)
     if (loaded.project.revision !== expectedRevision) {
       throw new EditorProjectStoreError('revision_conflict', 'editor project revision conflict', {
         expected_revision: expectedRevision,

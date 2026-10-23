@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs'
 import path from 'node:path'
 
 import { getActiveAssetRevision } from './assets.js'
-import { EDITOR_PROJECT_VERSION } from './constants.js'
+import { EDITOR_PROJECT_V1_VERSION, EDITOR_PROJECT_VERSION } from './constants.js'
 import {
   buildEngineConsumerValidation,
   buildEngineExportReviewStatus,
@@ -325,6 +325,11 @@ export function buildEditorProjectPack(project, {
   workspaceRoot = null,
   createdAt = new Date(),
 } = {}) {
+  if (project?.version !== EDITOR_PROJECT_VERSION) {
+    const error = new Error('editor_project_v1 export-pack is unsupported')
+    error.code = 'unsupported_input'
+    throw error
+  }
   const created = timestamp(createdAt)
   const projectValidation = validateEditorProject(project)
   const assetReferences = buildAssetReferences(project, { projectRoot, workspaceRoot })

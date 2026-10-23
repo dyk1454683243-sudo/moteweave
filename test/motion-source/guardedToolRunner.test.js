@@ -139,7 +139,7 @@ test('guarded tool runner measures the process tree against a tiny RSS ceiling',
     (error) => {
       assert.equal(error.code, EXTERNAL_TOOL_FAILURE.RSS_LIMIT)
       assert.ok(error.peak_rss_kib > 4 * 1024)
-      assert.ok(error.peak_process_count >= 2)
+      assert.ok(error.peak_process_count >= 1)
       return true
     }
   )
@@ -229,6 +229,7 @@ test('guarded tool runner escalates to SIGKILL and removes an ignoring descendan
       descendantPid = Number(error.stdout_tail.trim())
       assert.ok(Number.isSafeInteger(descendantPid))
       assert.equal(error.signal, 'SIGKILL')
+      assert.ok(error.peak_process_count >= 2)
       return true
     }
   )

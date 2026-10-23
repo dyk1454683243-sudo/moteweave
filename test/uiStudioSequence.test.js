@@ -6,6 +6,7 @@ import {
   applySequenceFrameEdit,
   createInitialSequenceState,
   deriveSequencePresentation,
+  sequenceBindingTitleKey,
   sequenceOutputsAreCurrent,
 } from '../src/ui/studio/sequenceView.js'
 import {
@@ -109,55 +110,55 @@ const PRESENTATION_CONTRACT = Object.freeze({
 const FIGMA_PHASE_COPY = Object.freeze({
   empty: {
     crumb: '· 本地打包 · 等待导入',
-    status: '等待帧',
+    status: '等待添加帧',
     label: '导入',
     primary: '选择帧文件',
   },
   ready: {
     crumb: '· 本地打包 · 帧已就绪',
-    status: 'ready · 0 请求',
+    status: '帧已就绪 · 0 次请求',
     label: '就绪',
     primary: '生成序列资源',
   },
   processing: {
     crumb: '· 本地打包 · 本地处理中',
-    status: 'local_processing · 0 请求',
+    status: '正在本地处理 · 0 次请求',
     label: '处理中',
     primary: '本地处理中…',
   },
   building: {
     crumb: '· 本地打包 · GIF 生成中',
-    status: 'building · 1 请求',
+    status: '正在生成预览 · 1 次请求',
     label: '生成',
     primary: '正在生成 GIF…',
   },
   complete: {
     crumb: '· 本地打包 · 全部完成',
-    status: 'complete',
+    status: '已完成',
     label: '完成',
     primary: '重新生成',
   },
   partial: {
     crumb: '· 本地打包 · GIF 失败 · 部分完成',
-    status: 'partial · GIF failed',
+    status: '部分完成 · GIF 不可用',
     label: '部分',
     primary: '重新生成 GIF',
   },
   stale: {
     crumb: '· 本地打包 · 输入或参数已变更',
-    status: 'stale · locked',
+    status: '输入已变更 · 需要重新生成',
     label: '失效',
     primary: '按当前参数重新生成',
   },
   error: {
     crumb: '· 本地打包 · 输入解码失败',
-    status: 'input_error · 0 请求',
+    status: '输入需要处理 · 0 次请求',
     label: '错误',
     primary: '重新选择帧文件',
   },
   local_error: {
     crumb: '· 本地打包 · 本地步骤失败',
-    status: 'local_error · 0 请求',
+    status: '本地输出需要处理 · 0 次请求',
     label: '错误',
     primary: '重试本地合成',
   },
@@ -305,9 +306,15 @@ test('Studio Sequence HTML carries the exact nine phase copies, Binding summary,
   assert.match(sequence, /<header id="studio-sequence-result-heading" class="sequence-result-heading sequence-phase-copy">/)
   assert.doesNotMatch(sequence, /id="studio-sequence-result-title"/)
   assert.match(sequence, /id="studio-sequence-binding-summary"[^>]*aria-labelledby="studio-sequence-binding-title"/)
-  assert.match(sequence, /id="studio-sequence-binding-title"[^>]*>Binding Summary<\/h2>/)
-  assert.match(sequence, /class="sequence-pixel-person"[^>]*aria-hidden="true"><i><\/i><b><\/b><span><\/span>/)
+  assert.match(sequence, /id="studio-sequence-binding-title"[^>]*data-studio-i18n="sequence\.binding\.title\.empty"[^>]*>尚未建立生成绑定<\/h2>/)
+  assert.doesNotMatch(sequence, /sequence-pixel-person|Binding Summary/)
+  assert.match(sequence, /data-sequence-panel="empty"[^>]*aria-labelledby="studio-sequence-empty-title"/)
+  assert.match(sequence, /id="studio-sequence-empty-title"[^>]*>等待导入序列帧<\/h2>/)
   assert.match(sequence, /class="sequence-truth-pill"[^>]*>无 AI · 无任务队列 · 不保存到项目<\/small>/)
+  assert.match(css, /\.sequence-empty-copy\s*\{[^}]*left:\s*40px;[^}]*width:\s*524px;/s)
+  assert.match(css, /\.sequence-empty-copy p\s*\{[^}]*width:\s*524px;/s)
+  assert.match(css, /\.sequence-empty-copy small\s*\{[^}]*left:\s*112px;/s)
+  assert.doesNotMatch(css, /sequence-pixel-person/)
   assert.match(css, /\.sequence-main \.sequence-phase-copy \[data-sequence-copy-phase\][^{]*\{\s*display:\s*none !important;/s)
   for (const phase of SEQUENCE_PHASES) {
     assert.match(css, new RegExp(`data-sequence-phase="${phase}"[^}]+data-sequence-copy-phase~="${phase}"`))
@@ -895,10 +902,96 @@ test('Sequence has the 1771, 1083, and 860 responsive contracts required by the 
   assert.match(mobile, /\.sequence-stage\s*\{[^}]*min-height:\s*1036px;[^}]*grid-template-rows:\s*36px minmax\(896px, auto\) 104px;/s)
   assert.match(mobile, /\.sequence-stage-toolbar\s*\{\s*overflow:\s*hidden;\s*\}/)
   assert.match(mobile, /\.sequence-stage-phase\s*\{\s*display:\s*none;\s*\}/)
+  assert.match(mobile, /data-sequence-phase="empty"[^}]*\.sequence-empty-panel\s*\{[^}]*left:\s*20px;[^}]*width:\s*calc\(100% - 40px\);[^}]*transform:\s*none;/s)
+  assert.match(mobile, /data-sequence-phase="empty"[^}]*\.sequence-empty-copy\s*\{[^}]*left:\s*40px;[^}]*width:\s*calc\(100% - 80px\);/s)
+  assert.doesNotMatch(mobile, /data-sequence-phase="empty"[^}]*\.sequence-empty-copy\s*\{[^}]*left:\s*92px;[^}]*width:\s*calc\(100% - 108px\);/s)
+  assert.doesNotMatch(mobile, /sequence-pixel-person/)
+  assert.match(mobile, /data-sequence-phase="empty"[^}]*\.sequence-empty-copy p\s*\{[^}]*width:\s*auto;[^}]*height:\s*auto;/s)
   assert.match(mobile, /#studio-sequence-live-status\s*\{[^}]*left:\s*122px;[^}]*right:\s*8px;[^}]*width:\s*auto;/s)
   assert.match(mobile, /data-sequence-phase="processing"[^}]*sequence-processing-panel[\s\S]*data-sequence-phase="local_error"[^}]*sequence-local-error-panel[^}]*\{[^}]*left:\s*20px;[^}]*width:\s*calc\(100% - 40px\);[^}]*transform:\s*none;/)
   assert.match(mobile, /\.sequence-processing-panel h2,[\s\S]*\.sequence-processing-recovery\s*\{\s*width:\s*100%;\s*\}/)
   assert.match(mobile, /\.sequence-error-panel h2,[\s\S]*\.sequence-error-recovery\s*\{\s*width:\s*100%;\s*\}/)
+})
+
+test('Sequence Current clips the left flow explainer and keeps phase copy inventory', async () => {
+  const [html, css] = await Promise.all([
+    readFile('src/ui/studio/studio.html', 'utf8'),
+    readFile('src/ui/studio/studio.css', 'utf8'),
+  ])
+  const sequence = sequenceHtml(html)
+  assert.match(sequence, /class="sequence-flow-header"/)
+  assert.match(sequence, /id="studio-sequence-phase-title"/)
+  assert.match(sequence, /id="studio-sequence-phase-label"/)
+  assert.match(sequence, /id="studio-sequence-phase-summary"/)
+  assert.match(sequence, /aria-labelledby="studio-sequence-phase-title"/)
+  assert.match(css, /\.sequence-flow-header \{[^}]*clip:\s*rect\(0,\s*0,\s*0,\s*0\)/)
+  assert.match(css, /\.sequence-source-card \{ top: 16px;/)
+  assert.match(css, /\.sequence-parameter-card \{ top: 134px;/)
+  assert.match(css, /\.sequence-binding-summary \{[^}]*top:\s*344px;/)
+})
+
+test('Sequence empty state drops the decorative person and Binding titles follow Current phases', async () => {
+  const [html, css, view] = await Promise.all([
+    readFile('src/ui/studio/studio.html', 'utf8'),
+    readFile('src/ui/studio/studio.css', 'utf8'),
+    readFile('src/ui/studio/sequenceView.js', 'utf8'),
+  ])
+  const sequence = sequenceHtml(html)
+  const renderMetrics = namedFunctionSource(view, 'renderMetrics')
+  const renderLanguage = namedFunctionSource(view, 'renderStudioSequenceLanguage')
+  const bindingTitles = Object.freeze({
+    empty: { zh: '尚未建立生成绑定', en: 'No generation binding yet' },
+    ready: { zh: '当前生成绑定', en: 'Current generation binding' },
+    processing: { zh: '本地处理进行中', en: 'Local processing in progress' },
+    building: { zh: '本地产物已封存', en: 'Local outputs recorded' },
+    complete: { zh: '生成绑定一致', en: 'Generation binding matches' },
+    partial: { zh: '部分成功', en: 'Partially complete' },
+    stale: { zh: '旧输出已失效', en: 'Previous outputs are stale' },
+    error: { zh: '生成未开始', en: 'Generation not started' },
+    local_error: { zh: '失败时点 · GIF 请求前', en: 'Failed before GIF request' },
+  })
+
+  assert.doesNotMatch(html, /sequence-pixel-person/)
+  assert.doesNotMatch(css, /sequence-pixel-person/)
+  assert.doesNotMatch(view, /sequence-pixel-person/)
+  assert.match(sequence, /data-sequence-panel="empty"[^>]*aria-labelledby="studio-sequence-empty-title"/)
+  assert.match(sequence, /id="studio-sequence-empty-title"[^>]*data-studio-i18n="sequence\.emptyTitle"/)
+  assert.match(sequence, /data-studio-i18n="sequence\.emptyHelp"/)
+  assert.match(sequence, /class="sequence-truth-pill"[^>]*data-studio-i18n="sequence\.emptyTruth"/)
+  assert.match(css, /\.sequence-empty-copy\s*\{[^}]*left:\s*40px;[^}]*top:\s*36px;[^}]*width:\s*524px;/s)
+
+  for (const phase of SEQUENCE_PHASES) {
+    const key = sequenceBindingTitleKey(phase)
+    assert.equal(key, `sequence.binding.title.${phase}`)
+    assert.equal(STUDIO_TRANSLATIONS.zh[key], bindingTitles[phase].zh)
+    assert.equal(STUDIO_TRANSLATIONS.en[key], bindingTitles[phase].en)
+    assert.notEqual(STUDIO_TRANSLATIONS.zh[key], phase)
+    assert.notEqual(STUDIO_TRANSLATIONS.en[key], phase)
+    assert.notEqual(STUDIO_TRANSLATIONS.zh[key], STUDIO_TRANSLATIONS.en[key])
+  }
+  assert.equal(
+    sequenceBindingTitleKey('local_error', 'package_after_gif'),
+    'sequence.binding.title.packageError',
+  )
+  assert.equal(sequenceBindingTitleKey('not-a-phase'), 'sequence.binding.title.empty')
+  assert.doesNotMatch(JSON.stringify(STUDIO_TRANSLATIONS), /Binding Summary/)
+
+  assert.match(
+    renderMetrics,
+    /setNodeText\(byId\('studio-sequence-binding-title'\), studioT\(sequenceBindingTitleKey\(phase, state\.localFailureStage\)\)\)/,
+  )
+  assert.match(renderLanguage, /translateStudioDocument\(root, getCurrentLanguage\(\)\)/)
+  assert.match(renderLanguage, /if \(sequenceState\) renderStudioSequence\(sequenceState\)/)
+  assert.doesNotMatch(renderLanguage, /phase\s*=/)
+  assert.equal(deriveSequencePresentation(createInitialSequenceState()).phase, 'empty')
+  assert.equal(
+    sequenceBindingTitleKey(deriveSequencePresentation({
+      ...createInitialSequenceState(),
+      phase: 'ready',
+      frames: [{}],
+    }).phase),
+    'sequence.binding.title.ready',
+  )
 })
 
 test('every visible or dynamic Sequence translation key exists in English and Chinese', async () => {

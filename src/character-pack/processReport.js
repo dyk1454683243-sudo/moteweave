@@ -4,7 +4,7 @@ import { buildCharacterQualityClosure } from './qualityClosureGate.js'
 import { canonicalSourceLayoutId, isFixedRegionMotionLayoutId } from './sourceLayouts.js'
 import { validateNormalizedFrames } from './validator.js'
 
-export function buildValidationStage({ frames, profile, sourceRegionEdgePressure, sourceQualityReport, backgroundWarnings = [] } = {}) {
+export function buildValidationStage({ frames, profile, sourceRegionEdgePressure, sourceQualityReport, backgroundWarnings = [], backgroundQuality = null } = {}) {
   const rawValidation = validateNormalizedFrames(frames, profile)
   const runtimeEdgeRisk =
     rawValidation.warnings.includes('edge_pressure_high') ||
@@ -14,6 +14,7 @@ export function buildValidationStage({ frames, profile, sourceRegionEdgePressure
   const sourceQualityWarnings = sourceQualityReport?.warnings ?? []
   const sourceQualityBlockingErrors = sourceQualityReport?.blocking_errors ?? []
   const combinedBlockingErrors = [...sourceQualityBlockingErrors, ...rawValidation.blocking_errors]
+  if (backgroundQuality && backgroundQuality.status !== 'pass') combinedBlockingErrors.push(`background_v2_${backgroundQuality.status ?? 'unverified'}`)
   const combinedWarnings = [...sourceQualityWarnings, ...rawValidation.warnings, ...sourceLayoutWarnings, ...backgroundWarnings]
   const status = combinedBlockingErrors.length ? 'fail' : rawValidation.status === 'pass' && combinedWarnings.length ? 'warning' : rawValidation.status
   const validation = {
@@ -23,6 +24,7 @@ export function buildValidationStage({ frames, profile, sourceRegionEdgePressure
     warnings: combinedWarnings,
     metrics: {
       ...rawValidation.metrics,
+      ...(backgroundQuality ? { background_quality: backgroundQuality } : {}),
       ...(sourceRegionEdgePressure ? { source_region_edge_pressure: sourceRegionEdgePressure } : {}),
       ...(sourceQualityReport ? { source_quality: sourceQualityReport.summary } : {}),
     },

@@ -175,12 +175,13 @@ try {
     'id="studio-character-view"',
     'id="character-local-workspace"',
     'id="character-ai-workspace"',
-    'id="character-compat-workspace"',
     'id="character-local-entry"',
     'id="character-ai-entry"',
-    'id="character-compat-entry"',
     'href="#project"',
   ]) assertCondition(studioHtml.includes(expected), `Studio is missing ${expected}`)
+  for (const retired of ['id="character-compat-workspace"', 'id="character-compat-entry"']) {
+    assertCondition(!studioHtml.includes(retired), `Studio still contains retired ${retired}`)
+  }
 
   const legacyRedirectCases = [
     ['/legacy', 'motion-source', '/src/ui/studio/studio.html#action', '&next=https%3A%2F%2Fexample.test'],
@@ -189,7 +190,7 @@ try {
     ['/legacy.html', 'project-pack', '/src/ui/studio/studio.html#project', ''],
     ['/legacy/', 'qa', '/src/ui/studio/studio.html#qa', '&open=ignored'],
     ['/legacy.html', 'character-pack', '/src/ui/studio/studio.html#character', '&next=%2Flegacy'],
-    ['/legacy', 'prompts', '/src/ui/studio/studio.html?open=scene-prompt#scene', '&open=ignored&next=https%3A%2F%2Fexample.test'],
+    ['/legacy', 'prompts', '/src/ui/studio/studio.html#tiles', '&open=ignored&next=https%3A%2F%2Fexample.test'],
   ]
   for (const [legacyPath, tab, expectedLocation, extraSearch] of legacyRedirectCases) {
     const response = await fetch(

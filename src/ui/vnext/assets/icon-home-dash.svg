@@ -1,0 +1,9 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Group 1">
+<path id="Subtract" d="M16 12H4V0H16V12ZM5 1V11H15V1H5Z" fill="#282828"/>
+<path id="Rectangle 1" d="M0 3L4 0V12L0 15V3Z" fill="#282828"/>
+<path id="Rectangle 1_2" d="M16 13L11.5 16L0.5 16L4.5 13L16 13Z" fill="#282828"/>
+<rect id="Rectangle 2" x="9" y="4" width="1" height="3" fill="#282828"/>
+<rect id="Rectangle 2_2" x="12" y="4" width="1" height="3" fill="#282828"/>
+</g>
+</svg>
