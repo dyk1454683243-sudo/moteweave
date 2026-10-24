@@ -31,8 +31,8 @@
     },
     {
       "path": ".github/ISSUE_TEMPLATE/config.yml",
-      "sha256": "e5b5ca69de9db35ee6d4b580be9dd7bd90e7266f485003c1df0ce544a9440077",
-      "size": 372,
+      "sha256": "133f95269d85ab41a333c1c95d362c1fc2cafbc3fd5bfa4963abfbcd8c247b71",
+      "size": 350,
       "mode": "644"
     },
     {
@@ -67,20 +67,20 @@
     },
     {
       "path": "ATTRIBUTIONS.md",
-      "sha256": "ff4005030bafb33e25eabbf4b9116ca3c0f77a579d1579464eac56a885c43fa5",
-      "size": 7468,
+      "sha256": "893d1d994184373d56f315c3cc2c4ced28d7c043d81cd2b5562edf68aec327e4",
+      "size": 8355,
       "mode": "644"
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "08ca1d6f6c7d29deaf46da07a68b4b23b63c86fe55aa008b342e6fe7d4351d1d",
-      "size": 13960,
+      "sha256": "4b07c15c9d2165de99d4f7390ea9469b951a65d8aa208b51c8754701df50fc98",
+      "size": 14184,
       "mode": "644"
     },
     {
       "path": "CONTRIBUTING.md",
-      "sha256": "52b27173908eeb15f780d3fa1be1070c40d8cb87ae66f10bb4d29af8eed17ff9",
-      "size": 1412,
+      "sha256": "50fd444fab00befe005a495c985590dc445ceb8aa384cc80ecec66c4af01f7ba",
+      "size": 1524,
       "mode": "644"
     },
     {
@@ -91,14 +91,20 @@
     },
     {
       "path": "README.md",
-      "sha256": "218bd643477a198eb29f2ae0b1ea6a24e8b08a052447cec8750a06604f871152",
-      "size": 12717,
+      "sha256": "491bd2b8c6b68b67c4e8ecb9b4ac317b8e031ee5eb456a88e33e28730d3591ce",
+      "size": 12689,
       "mode": "644"
     },
     {
       "path": "configs/public-asset-provenance.json",
-      "sha256": "6befe4e987105e309babe32ddb15876a70f0de8e3868a8c137e930c3f2e8764f",
-      "size": 3344,
+      "sha256": "62cd47f51c66acf1e322a7383974336bc90a3708b689bebb1452d6772879d015",
+      "size": 5637,
+      "mode": "644"
+    },
+    {
+      "path": "configs/public-overlay.json",
+      "sha256": "e02d92655821e66cfb80ead7c6d4d39d61d40961fd5ed665598d0b371eccdce8",
+      "size": 2521,
       "mode": "644"
     },
     {
@@ -630,6 +636,12 @@
       "mode": "644"
     },
     {
+      "path": "docs/releases/public-overlay.md",
+      "sha256": "03de8e2448ef41c12cea8cfbd54882be11eac508de9f793511e3bac60c9b5f89",
+      "size": 2841,
+      "mode": "644"
+    },
+    {
       "path": "docs/releases/public-v0.5.0-snapshot.md",
       "sha256": "07a902da1a923f2d69a2da652305ad6dacefd72d395343ba42597096d043a5b2",
       "size": 2133,
@@ -1086,6 +1098,12 @@
       "mode": "644"
     },
     {
+      "path": "scripts/capture-website-assets.mjs",
+      "sha256": "24f4377dcf06fbc91f1277fe2686bd0dcb3718a2d806401af18c1c0d1cc8302d",
+      "size": 28593,
+      "mode": "644"
+    },
+    {
       "path": "scripts/character-pack-cli.mjs",
       "sha256": "5656752c2f1439f1d80967868e93dc2b5ed23e402536e2b1c001afb5ad08a24a",
       "size": 173075,
@@ -1137,6 +1155,12 @@
       "path": "scripts/create-website-og.mjs",
       "sha256": "a0985bcfe8437341226328cc4287f5b8a8ad021312db04d88524d031f194dbfe",
       "size": 12426,
+      "mode": "644"
+    },
+    {
+      "path": "scripts/create-website-sample-art.mjs",
+      "sha256": "e38efef028e7c34f0770d23f834365eb1ecb621de8ccaaf5571ccb1c8560962e",
+      "size": 20422,
       "mode": "644"
     },
     {
@@ -5239,8 +5263,8 @@
     },
     {
       "path": "test/website/publicSite.test.js",
-      "sha256": "21e439cdcd6deb8c4650ef41b532e3834a6e1ff322ab79c8b32a26162b691b0e",
-      "size": 4853,
+      "sha256": "0e836189543c413b5fe951cfd003c0aa6652de49d1f79b188bee10fcd7d03e28",
+      "size": 5840,
       "mode": "644"
     },
     {
@@ -5251,8 +5275,8 @@
     },
     {
       "path": "website/README.md",
-      "sha256": "8db1749958b40f97940514831cbcb52a1a3dbac98add41ff10413b8238a00da0",
-      "size": 1214,
+      "sha256": "a270513ff60e86a760e1f14bb24901332f18ac4a0fffdbb937584b190949fd45",
+      "size": 1665,
       "mode": "644"
     },
     {
@@ -5262,9 +5286,51 @@
       "mode": "644"
     },
     {
+      "path": "website/assets/hero-walk.png",
+      "sha256": "e62988845d9f1c805f2333f28268af714963fbee01ad4a69402ac4dd43c75411",
+      "size": 1792,
+      "mode": "644"
+    },
+    {
+      "path": "website/assets/sample-character.png",
+      "sha256": "8bbea6ca8bc0d7ab6357becd19926e101df804712df15503d194bbdf75c21636",
+      "size": 14753,
+      "mode": "644"
+    },
+    {
+      "path": "website/assets/sample-tiles.png",
+      "sha256": "fa0bcb30d4a0cbec7cc47caa29533c62c8572b9250a169e5ac3bf0fe5554e03c",
+      "size": 749,
+      "mode": "644"
+    },
+    {
+      "path": "website/assets/studio-character.png",
+      "sha256": "d93aafe69eba8ab1faa0e77dde484e14861ee1fad3d08f4fe0300ea71ddcc53b",
+      "size": 73359,
+      "mode": "644"
+    },
+    {
+      "path": "website/assets/studio-extract.png",
+      "sha256": "e88c7c923850e5816972368f837184e169adea36d76baa688621ee63ec1eefba",
+      "size": 76637,
+      "mode": "644"
+    },
+    {
+      "path": "website/assets/studio-map.png",
+      "sha256": "e287caf95f91e391413c10e8b7f107b9f7ce04b3132b1769a43951978571425e",
+      "size": 78622,
+      "mode": "644"
+    },
+    {
+      "path": "website/assets/vnext-editor.png",
+      "sha256": "92d7dec8e61b3374c7f2aa019d3ba9df45aaf70584d283586cd7110542616bac",
+      "size": 151451,
+      "mode": "644"
+    },
+    {
       "path": "website/index.html",
-      "sha256": "d9823e407e7194cfe47af571006d7cc83f258d1bfa594606a7a1240af365582b",
-      "size": 23680,
+      "sha256": "ab3bfe4807d5830e70fdc6efc4b3c65fbec30b2ca573bc1f131813e75ebc6503",
+      "size": 13121,
       "mode": "644"
     },
     {
@@ -5275,14 +5341,14 @@
     },
     {
       "path": "website/site.js",
-      "sha256": "62deb7bd0a96fc4cbf1d6460503c9fe18f7b0208d63f18aa6339a5f595166154",
-      "size": 18115,
+      "sha256": "3e2a757f3da688091815fcb46ae34e0c95ff1c3cc888c0059091757dd8bd536e",
+      "size": 1708,
       "mode": "644"
     },
     {
       "path": "website/styles.css",
-      "sha256": "546f34411963690b6342f66a743dba8a75e0bf34fb248bfe061a86bb427328b9",
-      "size": 33850,
+      "sha256": "a6740837047faac9fc21762c0ce7848738710b19f5dbffb0fd26d017b618b9a8",
+      "size": 14756,
       "mode": "644"
     }
   ]

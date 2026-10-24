@@ -27,10 +27,30 @@ test('public site keeps a standalone static asset boundary', async () => {
   assert.match(html, /src="\.\/site\.js"/)
   assert.match(html, /content="https:\/\/moteweave\.pages\.dev\/og\.png"/)
   assert.doesNotMatch(html, /\bsrc=["']https?:\/\//i)
+  assert.doesNotMatch(html, /<style\b/i)
+  assert.doesNotMatch(html, /\sstyle=/i)
+  assert.doesNotMatch(html, /\son[a-z]+=/i)
+  const allowedHttpsHrefs = [
+    'https://github.com/dyk1454683243-sudo/moteweave',
+    'https://github.com/dyk1454683243-sudo/moteweave/blob/main/CONTRIBUTING.md',
+    'https://github.com/dyk1454683243-sudo/moteweave/blob/main/LICENSE',
+    'https://github.com/dyk1454683243-sudo/moteweave/issues/13',
+    'https://github.com/dyk1454683243-sudo/moteweave/issues/9',
+    'https://github.com/dyk1454683243-sudo/moteweave/releases/tag/v0.6.0',
+    'https://moteweave.pages.dev/',
+  ]
   assert.deepEqual(
-    [...html.matchAll(/\bhref=["'](https?:\/\/[^"']+)/gi)].map((match) => match[1]),
-    ['https://moteweave.pages.dev/'],
+    [...new Set([...html.matchAll(/\bhref=["'](https?:\/\/[^"']+)/gi)].map((match) => match[1]))].sort(),
+    allowedHttpsHrefs,
   )
+  const images = [...html.matchAll(/<img\b[^>]*>/gi)].map((match) => match[0])
+  assert.ok(images.length >= 5)
+  for (const tag of images) {
+    assert.match(tag, /\balt="[^"]+"/)
+    assert.match(tag, /\bwidth="\d+"/)
+    assert.match(tag, /\bheight="\d+"/)
+    assert.match(tag, /\bsrc="\.\/assets\/[^"]+\.png"/)
+  }
 })
 
 test('public site does not expose hosted product capabilities', async () => {
@@ -46,10 +66,11 @@ test('public site does not expose hosted product capabilities', async () => {
     script,
     /\b(?:fetch|XMLHttpRequest|WebSocket|EventSource|sendBeacon)\b/,
   )
-  assert.match(combined, /不接收文件/)
-  assert.match(combined, /不调用模型/)
-  assert.match(combined, /网页未提供/)
-  assert.match(combined, /用户文件上传与云端处理/)
+  assert.match(combined, /does not accept files/)
+  assert.match(combined, /does not call models/)
+  assert.match(combined, /The website does not provide/)
+  assert.match(combined, /user file upload/)
+  assert.match(combined, /cloud processing/)
 })
 
 test('public copy avoids restricted branding and unsupported release claims', async () => {
@@ -121,14 +142,14 @@ test('public page includes baseline accessibility and capability truth', async (
   const h1Count = (html.match(/<h1\b/g) ?? []).length
 
   assert.equal(h1Count, 1)
-  assert.match(html, /<html lang="zh-CN">/)
+  assert.match(html, /<html lang="en">/)
   assert.match(html, /name="viewport"/)
   assert.match(html, /<main id="main-content">/)
   assert.match(html, /class="skip-link"/)
   assert.match(html, /aria-live="polite"/)
   assert.match(css, /prefers-reduced-motion/)
-  assert.match(html, /完整 WFC/)
-  assert.match(html, /AI 生成只是可选路径/)
+  assert.match(html, /Full WFC/)
+  assert.match(html, /AI generation is an optional path/)
 })
 
 test('site script parses and security headers block network and form actions', async () => {

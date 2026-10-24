@@ -42,6 +42,65 @@
       "release_status": "approved"
     },
     {
+      "path": "website/assets/sample-character.png",
+      "kind": "website_sprite",
+      "source_rights": "repository_owned",
+      "generator": "scripts/create-website-sample-art.mjs",
+      "license": "MIT",
+      "sha256": "8bbea6ca8bc0d7ab6357becd19926e101df804712df15503d194bbdf75c21636",
+      "release_status": "approved"
+    },
+    {
+      "path": "website/assets/hero-walk.png",
+      "kind": "website_sprite",
+      "source_rights": "repository_owned",
+      "generator": "scripts/create-website-sample-art.mjs",
+      "license": "MIT",
+      "sha256": "e62988845d9f1c805f2333f28268af714963fbee01ad4a69402ac4dd43c75411",
+      "release_status": "approved"
+    },
+    {
+      "path": "website/assets/sample-tiles.png",
+      "kind": "website_sprite",
+      "source_rights": "repository_owned",
+      "generator": "scripts/create-website-sample-art.mjs",
+      "license": "MIT",
+      "sha256": "fa0bcb30d4a0cbec7cc47caa29533c62c8572b9250a169e5ac3bf0fe5554e03c",
+      "release_status": "approved"
+    },
+    {
+      "path": "website/assets/studio-character.png",
+      "kind": "website_screenshot",
+      "source_rights": "repository_owned",
+      "generator": "scripts/capture-website-assets.mjs",
+      "sha256": "d93aafe69eba8ab1faa0e77dde484e14861ee1fad3d08f4fe0300ea71ddcc53b",
+      "release_status": "approved"
+    },
+    {
+      "path": "website/assets/studio-extract.png",
+      "kind": "website_screenshot",
+      "source_rights": "repository_owned",
+      "generator": "scripts/capture-website-assets.mjs",
+      "sha256": "e88c7c923850e5816972368f837184e169adea36d76baa688621ee63ec1eefba",
+      "release_status": "approved"
+    },
+    {
+      "path": "website/assets/studio-map.png",
+      "kind": "website_screenshot",
+      "source_rights": "repository_owned",
+      "generator": "scripts/capture-website-assets.mjs",
+      "sha256": "e287caf95f91e391413c10e8b7f107b9f7ce04b3132b1769a43951978571425e",
+      "release_status": "approved"
+    },
+    {
+      "path": "website/assets/vnext-editor.png",
+      "kind": "website_screenshot",
+      "source_rights": "repository_owned",
+      "generator": "scripts/capture-website-assets.mjs",
+      "sha256": "92d7dec8e61b3374c7f2aa019d3ba9df45aaf70584d283586cd7110542616bac",
+      "release_status": "approved"
+    },
+    {
       "path": "src/ui/vnext/assets/Inter-Regular.woff2",
       "kind": "font",
       "source_rights": "licensed_third_party",

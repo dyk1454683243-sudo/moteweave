@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "purpose": "MoteWeave-only paths to restore after a Game-tool release:export overwrites this tree. The private export does not read this file. See docs/releases/public-overlay.md.",
+  "overlays": [
+    {
+      "path": "CONTRIBUTING.md",
+      "reason": "Public contributor guide. It is not part of the private export."
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/",
+      "reason": "Public GitHub issue forms and the contact link to the static site."
+    },
+    {
+      "path": ".github/workflows/public-release.yml",
+      "reason": "Public release workflow. It runs release:check, the release unit test, and site:check on Node.js 22 and 24."
+    },
+    {
+      "path": "README.md",
+      "reason": "Public contributor introduction and Quick Start (npm ci, Node.js 22 or 24) on top of the exported README."
+    },
+    {
+      "path": "CHANGELOG.md",
+      "reason": "Unreleased note for the public contributor surface. Re-apply that note if an export adds newer release headings."
+    },
+    {
+      "path": "configs/public-snapshot-manifest.json",
+      "reason": "include_paths lists CONTRIBUTING.md so the public snapshot classifies it."
+    },
+    {
+      "path": "configs/public-overlay.json",
+      "reason": "This registry."
+    },
+    {
+      "path": "configs/public-asset-provenance.json",
+      "reason": "Provenance entries for website/assets screenshots and the original site pixel art. Merge those entries if an export adds other assets."
+    },
+    {
+      "path": "ATTRIBUTIONS.md",
+      "reason": "Names the public-site images and their generators. Merge those paragraphs if an export changes other attribution text."
+    },
+    {
+      "path": "docs/releases/public-overlay.md",
+      "reason": "Sync procedure for restoring this overlay after release:export."
+    },
+    {
+      "path": "scripts/capture-website-assets.mjs",
+      "reason": "Headless Chrome capture of the local Studio and VNext screens used by the public site."
+    },
+    {
+      "path": "scripts/create-website-sample-art.mjs",
+      "reason": "Deterministic original pixel art for the public site: character sheet, walk preview, and tile set."
+    },
+    {
+      "path": "test/website/publicSite.test.js",
+      "reason": "Public-site safety checks: no external script or image hosts, npm ci commands, and accessibility basics."
+    },
+    {
+      "path": "website/",
+      "reason": "Entire static public site: HTML, CSS, script, security headers, README, social image, and assets."
+    }
+  ]
+}
