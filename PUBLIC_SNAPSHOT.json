@@ -103,8 +103,8 @@
     },
     {
       "path": "configs/public-overlay.json",
-      "sha256": "e02d92655821e66cfb80ead7c6d4d39d61d40961fd5ed665598d0b371eccdce8",
-      "size": 2521,
+      "sha256": "0785e546c352b121d7d392201626533e905b05574193d9538d5671bc20ea0906",
+      "size": 2757,
       "mode": "644"
     },
     {
@@ -480,6 +480,12 @@
       "mode": "644"
     },
     {
+      "path": "docs/protocols/godot-spriteframes-tres-v0.md",
+      "sha256": "983f2d952ecde8e10df5cb6071554fac88f5ebba3a47e2ff8e234c000ef91b3a",
+      "size": 10085,
+      "mode": "644"
+    },
+    {
       "path": "docs/protocols/ldtk-project-export.md",
       "sha256": "76038e41c37d771efee99f7fa09aa2e2236e48bfe484bd7f6a5ceb9e0106ac3a",
       "size": 3242,
@@ -637,8 +643,8 @@
     },
     {
       "path": "docs/releases/public-overlay.md",
-      "sha256": "03de8e2448ef41c12cea8cfbd54882be11eac508de9f793511e3bac60c9b5f89",
-      "size": 2841,
+      "sha256": "d9a16331a889cd12a17461b9025dfe2d36df5e8e9e7b74eb6952003359b80f4b",
+      "size": 2886,
       "mode": "644"
     },
     {
