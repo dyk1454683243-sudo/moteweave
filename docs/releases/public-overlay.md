@@ -18,7 +18,7 @@ then already contains them, and this restore step is a no-op.
 
 ```bash
 git fetch origin
-git checkout origin/main -- CONTRIBUTING.md .github/ISSUE_TEMPLATE .github/workflows/public-release.yml README.md CHANGELOG.md configs/public-snapshot-manifest.json configs/public-overlay.json configs/public-asset-provenance.json ATTRIBUTIONS.md docs/releases/public-overlay.md scripts/capture-website-assets.mjs scripts/create-website-sample-art.mjs test/website/publicSite.test.js website
+git checkout origin/main -- CONTRIBUTING.md .github/ISSUE_TEMPLATE .github/workflows/public-release.yml README.md CHANGELOG.md configs/public-snapshot-manifest.json configs/public-overlay.json configs/public-asset-provenance.json ATTRIBUTIONS.md docs/releases/public-overlay.md docs/protocols/godot-spriteframes-tres-v0.md scripts/capture-website-assets.mjs scripts/create-website-sample-art.mjs test/website/publicSite.test.js website
 ```
 
 4. Bump the published version the same way the export already does

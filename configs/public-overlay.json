@@ -43,6 +43,10 @@
       "reason": "Sync procedure for restoring this overlay after release:export."
     },
     {
+      "path": "docs/protocols/godot-spriteframes-tres-v0.md",
+      "reason": "Public spec for an optional Godot SpriteFrames .tres exporter. The exporter is not implemented. The private export does not contain this note."
+    },
+    {
       "path": "scripts/capture-website-assets.mjs",
       "reason": "Headless Chrome capture of the local Studio and VNext screens used by the public site."
     },
