@@ -103,8 +103,8 @@
     },
     {
       "path": "configs/public-overlay.json",
-      "sha256": "0785e546c352b121d7d392201626533e905b05574193d9538d5671bc20ea0906",
-      "size": 2757,
+      "sha256": "00fd6677a730c6ec9e3906e612e0abd0dce4bc1216ae895e9c9ddda91a41a782",
+      "size": 3507,
       "mode": "644"
     },
     {
@@ -481,8 +481,8 @@
     },
     {
       "path": "docs/protocols/godot-spriteframes-tres-v0.md",
-      "sha256": "983f2d952ecde8e10df5cb6071554fac88f5ebba3a47e2ff8e234c000ef91b3a",
-      "size": 10085,
+      "sha256": "838bd4b37fc832cf9a3873381c36178fe9caac32a1d3c76e739115bec1fdb829",
+      "size": 11283,
       "mode": "644"
     },
     {
@@ -643,8 +643,8 @@
     },
     {
       "path": "docs/releases/public-overlay.md",
-      "sha256": "d9a16331a889cd12a17461b9025dfe2d36df5e8e9e7b74eb6952003359b80f4b",
-      "size": 2886,
+      "sha256": "146615cd31be77ef7437a54263006bcb9f53c1e2430de00acac8a7ccc56c41c8",
+      "size": 3065,
       "mode": "644"
     },
     {
@@ -1443,6 +1443,12 @@
       "path": "src/character-pack/exporters/godotNpcExport.js",
       "sha256": "cfc365e6bcaeb5927aefb568533a014e44105911d8c557d8175904e5e2cdc5e0",
       "size": 4101,
+      "mode": "644"
+    },
+    {
+      "path": "src/character-pack/exporters/godotSpriteFramesExport.js",
+      "sha256": "48b33275a6b075593ba31c68b15822262afc638f0efae0a81e1d78efd60aa58c",
+      "size": 6083,
       "mode": "644"
     },
     {
@@ -3822,6 +3828,12 @@
       "mode": "644"
     },
     {
+      "path": "test/character-pack/godotSpriteFramesExport.test.js",
+      "sha256": "ec35a78286d939dc541eb78d359ed1d60201d2ae22b46f27bc6379d2c9c0cf26",
+      "size": 9165,
+      "mode": "644"
+    },
+    {
       "path": "test/character-pack/gridAdjustment.test.js",
       "sha256": "4c0afd9f407a128ddadf58758068ef38dc40b79e2d890aee77867c3f431b3daa",
       "size": 906,
@@ -4449,6 +4461,12 @@
       "path": "test/editor-project/workspaceInspectionFeedback.test.js",
       "sha256": "96cff0bf0a858cf03b8ccc6e8d6259c9ef26c0ae44930f19a9ac0d7ec4bac724",
       "size": 30988,
+      "mode": "644"
+    },
+    {
+      "path": "test/fixtures/character-pack/godot-spriteframes-v0/topdown_rpg_v0.tres",
+      "sha256": "6a2ea4153684355c5474b4a67b94fd578ca141306f09b1c8b1fc7e48652f6399",
+      "size": 13048,
       "mode": "644"
     },
     {

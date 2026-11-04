@@ -1,12 +1,16 @@
 # Optional Godot SpriteFrames .tres export
 
-**Status:** Proposed. Not implemented.
-**Date:** 2026-10-28
+**Status:** Serializer and files-map exporter. Not published.
+**Date:** 2026-11-04
 **Issue:** [#13](https://github.com/dyk1454683243-sudo/moteweave/issues/13)
 
-No exporter, golden fixture, download, or `.tres` artifact exists. `README.md`
-and the public site still list Godot `.tres` export as not implemented. This
-note does not change that.
+`buildGodotSpriteFramesTres` and `buildGodotSpriteFramesExport` in
+`src/character-pack/exporters/godotSpriteFramesExport.js` write the `.tres`
+text and the two-file map below. Nothing calls them from
+`buildEngineExportArtifacts`. No job writes `godot_spriteframes_pack.zip`,
+and `character_pack.zip` does not gain these paths. `godot_npc_pack.zip` is
+unchanged. `README.md` and the public site still list Godot `.tres` export
+as not implemented.
 
 ## Decision
 
@@ -155,26 +159,27 @@ the `frame_size` / `sheet_size` in that file.
 
 ## Pack layout
 
-Same layering as `rpgmaker_v0` and `ocad_v0`: a module under
-`src/character-pack/exporters/`, invoked from `buildEngineExportArtifacts`
-in `src/character-pack/processArtifacts.js`, zipped with
-`buildCharacterPackZip`, and published only when
+Same layering as `rpgmaker_v0` and `ocad_v0` once it is wired in: a module
+under `src/character-pack/exporters/`, invoked from
+`buildEngineExportArtifacts` in `src/character-pack/processArtifacts.js`,
+zipped with `buildCharacterPackZip`, and published only when
 `artifactManifest.js` publishes release artifacts. Diagnostic jobs that
 withhold `godot_npc_pack.zip`, `rpgmaker_pack.zip`, and `ocad_pack.zip`
-withhold this zip too.
+withhold this zip too. That call is not in place yet. The module can be
+imported on its own.
 
-Proposed module and profile id:
+Module and profile id:
 
 ```text
 src/character-pack/exporters/godotSpriteFramesExport.js
 godot_spriteframes_v0
 ```
 
-Proposed entry point: `buildGodotSpriteFramesExport`. It returns a `files`
-map, as the other exporters do. `metadata.id` is required, as it is for
-`buildGodotNpcJson`.
+`buildGodotSpriteFramesExport` returns a `files` map, as the other
+exporters do. `metadata.id` is required, as it is for `buildGodotNpcJson`.
+The function is synchronous. It does not resample the sheet.
 
-Proposed artifact:
+The pack to publish later:
 
 ```text
 godot_spriteframes_pack.zip
@@ -182,10 +187,11 @@ godot_spriteframes_pack.zip
   moteweave/spriteframes/<metadata.id>/normalized_sheet.png
 ```
 
-The same two paths are copied into `character_pack.zip`. They do not sit
-under `AI资源库/一图全动作/<metadata.id>/`, which remains the NPC plugin
-folder. The filename `godot_spriteframes.tres` is the name already reserved
-in `docs/protocols/godot-npc-json.md`.
+When that zip is published, the same two paths are also copied into
+`character_pack.zip`. They do not sit under
+`AI资源库/一图全动作/<metadata.id>/`, which remains the NPC plugin folder.
+The filename `godot_spriteframes.tres` is the name already reserved in
+`docs/protocols/godot-npc-json.md`. Neither copy is written today.
 
 Unzip at the Godot project root, then assign the `.tres` to an
 `AnimatedSprite2D` `sprite_frames` property. The texture path inside the
@@ -236,19 +242,26 @@ animations = [{
 }]
 ```
 
-That sketch is not a byte contract. The golden fixture will pin the writer's
-exact text. A later Godot re-save is evidence that the file loads. Godot
-rewrites ids and uids, so the fixture does not have to match a re-saved file
-byte for byte.
+That sketch is the shape. The writer pins the bytes in
+`test/fixtures/character-pack/godot-spriteframes-v0/topdown_rpg_v0.tres`
+for pack id `npc_20260524_010203_green_priestess` and the current
+`topdown_rpg_v0` `animations.json`. The header adds
+`load_steps` (1 + one ext resource + one atlas sub-resource per distinct
+frame index) and omits `uid`. Each frame dictionary is on its own lines,
+matching Godot 4 text that still stores `"loop"` and `"speed"`. Whole
+numbers are spelled `10.0`. Other finite speeds use six decimal places
+with trailing zeros removed. A later Godot re-save is still the evidence
+that the file loads. Godot rewrites ids and uids, so the fixture does not
+have to match a re-saved file byte for byte.
 
 ## Open questions
 
-1. **Serialized loop field.** Godot 4.7's `SpriteFrames` API has
-   `loop_mode` (`LOOP_NONE`, `LOOP_LINEAR`, `LOOP_PINGPONG`) and deprecates
-   the boolean `loop`. Older Godot 4 text files still store `"loop": true`
-   and `"speed"`. This repo has not saved a `.tres` from a pinned editor, so
-   the exact keys, `load_steps`, `uid` lines, and numeric spelling stay
-   unset until the golden fixture.
+1. **Serialized loop field.** The writer stores the boolean `"loop"` and
+   `"speed"`, with `load_steps` and no `uid` lines. Godot 4.7's
+   `SpriteFrames` API also has `loop_mode` (`LOOP_NONE`, `LOOP_LINEAR`,
+   `LOOP_PINGPONG`) and deprecates the boolean `loop`. This repo has not
+   saved a `.tres` from a pinned editor, so whether 4.7 loads this file or
+   wants `loop_mode` stays open.
 2. **Ping-pong.** `animations.json` reserves `mode: "pingpong"`. Godot 4.7
    can represent it as `LOOP_PINGPONG`. This exporter rejects it until the
    fixture shows the field the pinned editor writes.
@@ -265,10 +278,13 @@ byte for byte.
 
 ## Next step
 
-Implement the exporter and a golden fixture. The fixture should cover the
-`walk_down` and `attack_right` regions and speeds above, a `mode` / `loop`
-mismatch, `flip_h: true`, and `pingpong`. It should also show that
-`godot_npc_pack.zip` still contains only the three NPC paths.
+Wire `buildGodotSpriteFramesExport` into `buildEngineExportArtifacts`, zip
+it as `godot_spriteframes_pack.zip`, and copy the same two paths into
+`character_pack.zip`. Withhold that zip on the same diagnostic jobs that
+withhold the other compatibility packs. The wiring lives in private-synced
+modules (`processArtifacts.js`, `processSheet.js`, `artifactManifest.js`).
+It should land in the private tree, or as an explicit overlay merge, so a
+later `release:export` does not drop it or freeze those modules.
 
-`README.md` and the website mention `.tres` export only after that evidence
-exists.
+`README.md` and the website mention `.tres` export only after a published
+pack exists and tests prove it.

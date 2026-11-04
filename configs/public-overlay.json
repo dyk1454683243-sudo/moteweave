@@ -44,7 +44,19 @@
     },
     {
       "path": "docs/protocols/godot-spriteframes-tres-v0.md",
-      "reason": "Public spec for an optional Godot SpriteFrames .tres exporter. The exporter is not implemented. The private export does not contain this note."
+      "reason": "Public spec for an optional Godot SpriteFrames .tres exporter. The serializer and golden fixture exist; the pack is not published. The private export does not contain this note."
+    },
+    {
+      "path": "src/character-pack/exporters/godotSpriteFramesExport.js",
+      "reason": "Public Godot SpriteFrames .tres serializer and files-map exporter. It is not wired into the private job pipeline. The private export does not contain this module."
+    },
+    {
+      "path": "test/character-pack/godotSpriteFramesExport.test.js",
+      "reason": "Tests for the public SpriteFrames serializer, the golden fixture, and the unchanged Godot NPC pack paths."
+    },
+    {
+      "path": "test/fixtures/character-pack/godot-spriteframes-v0/topdown_rpg_v0.tres",
+      "reason": "Golden SpriteFrames text for the current topdown_rpg_v0 animations.json. The private export does not contain this fixture."
     },
     {
       "path": "scripts/capture-website-assets.mjs",
